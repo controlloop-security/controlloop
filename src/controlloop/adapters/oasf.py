@@ -19,7 +19,6 @@ verified version is added to the registry.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from controlloop.acbom import (
     Confidence,
@@ -33,7 +32,6 @@ from controlloop.acbom.completeness import incomplete_diagnostic
 from controlloop.acbom.identity import NodeIdentityMaterial, SemanticIdentity, node_id
 from controlloop.adapters.framework import DetectionResult, DiscoveryResult, ScanContext
 from controlloop.bounded_recursion import bounded_recursion
-from controlloop.repository import walk_repository
 
 _NAME = "oasf"
 
@@ -49,15 +47,15 @@ _NAMESPACE = "oasf.record"
 
 def _claimed_paths(context: ScanContext) -> tuple[str, ...]:
     found = set()
-    for item in walk_repository(context.root):
-        if isinstance(item, Path) and item.suffix.lower() == ".json":
+    for file in context.repository_files():
+        if file.path.suffix.lower() == ".json":
             try:
                 with bounded_recursion(margin=500):
-                    document = json.loads(item.read_text(encoding="utf-8"))
+                    document = json.loads(file.path.read_text(encoding="utf-8"))
             except (OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError):
                 continue
             if isinstance(document, dict) and _VERSION_FIELD in document:
-                found.add(item.relative_to(context.root.path).as_posix())
+                found.add(file.relative)
     return tuple(sorted(found))
 
 

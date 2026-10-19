@@ -44,7 +44,6 @@ from controlloop.adapters.claude_code import (
 )
 from controlloop.adapters.framework import DetectionResult, DiscoveryResult, ScanContext
 from controlloop.bounded_recursion import bounded_recursion
-from controlloop.repository import walk_repository
 
 DOCUMENTATION_SNAPSHOT = "2026-10-17"
 
@@ -71,11 +70,7 @@ CURSOR_EGRESS_SCALE = (
 
 
 def _paths(context: ScanContext) -> list[str]:
-    return sorted(
-        item.relative_to(context.root.path).as_posix()
-        for item in walk_repository(context.root)
-        if isinstance(item, Path)
-    )
+    return sorted(file.relative for file in context.repository_files())
 
 
 def _load_toml(path: Path) -> dict[str, Any]:

@@ -196,9 +196,14 @@ def build_acbom_document(
     files = [entry for entry in walked if isinstance(entry, Path)]
     walk_diagnostics = tuple(entry for entry in walked if isinstance(entry, Diagnostic))
 
-    discovery = run_adapters(
-        [adapter_cls() for adapter_cls in ALL_ADAPTERS], ScanContext(root=root)
+    # Adapters see a default-bounds walk (they always have), so this
+    # walk is handed to them only when it is one; otherwise the context
+    # walks once more with default bounds.
+    default_bounds = bounds is None or bounds == TraversalBounds()
+    context = ScanContext(
+        root=root, walked_files=tuple(files) if default_bounds else None
     )
+    discovery = run_adapters([adapter_cls() for adapter_cls in ALL_ADAPTERS], context)
     secret_scan_diagnostics = _run_secret_scan(root, files)
     nodes, annotation_diagnostics = _annotate_from_manifest(root, discovery.nodes)
 

@@ -53,7 +53,6 @@ from controlloop.acbom.identity import NodeIdentityMaterial, SemanticIdentity, n
 from controlloop.adapters import agent_authority as aa
 from controlloop.adapters.framework import DetectionResult, DiscoveryResult, ScanContext
 from controlloop.bounded_recursion import bounded_recursion
-from controlloop.repository import walk_repository
 
 _NAME = "mcp"
 _SUPPORTED_VERSIONS: tuple[str, ...] = ("2025-06-18",)
@@ -146,11 +145,9 @@ def _location_for(relative: str) -> _Location | None:
 
 def _claimed_paths(context: ScanContext) -> tuple[str, ...]:
     found = set()
-    for item in walk_repository(context.root):
-        if isinstance(item, Path):
-            relative = item.relative_to(context.root.path).as_posix()
-            if _location_for(relative) is not None:
-                found.add(relative)
+    for file in context.repository_files():
+        if _location_for(file.relative) is not None:
+            found.add(file.relative)
     return tuple(sorted(found))
 
 

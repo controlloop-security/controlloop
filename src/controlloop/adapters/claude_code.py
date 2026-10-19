@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 from controlloop.acbom import (
@@ -42,7 +41,6 @@ from controlloop.acbom import (
 from controlloop.adapters import agent_authority as aa
 from controlloop.adapters.framework import DetectionResult, DiscoveryResult, ScanContext
 from controlloop.adapters.mcp import discover_mcp_config
-from controlloop.repository import walk_repository
 
 _NAME = "claude-code"
 HOST = "claude-code"
@@ -212,11 +210,10 @@ _MCP_POLICY_NAMESPACE = "claude-code.mcp-server-policy"
 
 def _claimed_paths(context: ScanContext) -> tuple[str, ...]:
     found: set[str] = set()
-    for item in walk_repository(context.root):
-        if isinstance(item, Path):
-            relative = item.relative_to(context.root.path).as_posix()
-            if relative in _SETTINGS_PATHS or relative == _PROJECT_MCP_CONFIG:
-                found.add(relative)
+    for file in context.repository_files():
+        relative = file.relative
+        if relative in _SETTINGS_PATHS or relative == _PROJECT_MCP_CONFIG:
+            found.add(relative)
     return tuple(sorted(found))
 
 

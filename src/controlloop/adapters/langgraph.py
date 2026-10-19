@@ -74,7 +74,6 @@ from controlloop.adapters.framework_versions import (
     require_supported,
 )
 from controlloop.bounded_recursion import bounded_recursion
-from controlloop.repository import walk_repository
 
 _NAME = "langgraph"
 _NAMESPACE = "langgraph.graph"
@@ -125,9 +124,9 @@ def _unresolved(evidence: tuple[Evidence, ...], reason: str) -> Diagnostic:
 
 def _config_paths(context: ScanContext) -> tuple[str, ...]:
     found = set()
-    for item in walk_repository(context.root):
-        if isinstance(item, Path) and item.name == _CONFIG_FILENAME:
-            found.add(item.relative_to(context.root.path).as_posix())
+    for file in context.repository_files():
+        if file.path.name == _CONFIG_FILENAME:
+            found.add(file.relative)
     return tuple(sorted(found))
 
 

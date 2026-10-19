@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
 from typing import Any
 
 from controlloop.acbom import (
@@ -55,7 +54,7 @@ from controlloop.acbom.identity import (
 )
 from controlloop.adapters.framework import DetectionResult, DiscoveryResult, ScanContext
 from controlloop.bounded_recursion import bounded_recursion
-from controlloop.repository import ContainmentError, assert_within_root, walk_repository
+from controlloop.repository import ContainmentError, assert_within_root
 
 _NAME = "a2a"
 _SUPPORTED_VERSIONS: tuple[str, ...] = ("0.1", "0.2", "0.3")
@@ -71,11 +70,9 @@ _REMOTE_TARGET_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
 
 def _claimed_paths(context: ScanContext) -> tuple[str, ...]:
     found = set()
-    for item in walk_repository(context.root):
-        if isinstance(item, Path):
-            relative = item.relative_to(context.root.path).as_posix()
-            if relative in _CARD_PATHS:
-                found.add(relative)
+    for file in context.repository_files():
+        if file.relative in _CARD_PATHS:
+            found.add(file.relative)
     return tuple(sorted(found))
 
 

@@ -40,7 +40,6 @@ from controlloop.acbom.identity import (
 )
 from controlloop.adapters.framework import DetectionResult, DiscoveryResult, ScanContext
 from controlloop.bounded_recursion import bounded_recursion
-from controlloop.repository import walk_repository
 
 _NAME = "openapi"
 _SUPPORTED_VERSIONS: tuple[str, ...] = ("3.0", "3.1")
@@ -58,11 +57,11 @@ def _load(absolute: Path) -> object:
 
 def _candidate_paths(context: ScanContext) -> tuple[str, ...]:
     found = set()
-    for item in walk_repository(context.root):
-        if isinstance(item, Path) and item.suffix.lower() in _CANDIDATE_SUFFIXES:
-            relative = item.relative_to(context.root.path).as_posix()
+    for file in context.repository_files():
+        if file.path.suffix.lower() in _CANDIDATE_SUFFIXES:
+            relative = file.relative
             try:
-                document = _load(item)
+                document = _load(file.path)
             except (OSError, UnicodeDecodeError, yaml.YAMLError, RecursionError):
                 continue
             if isinstance(document, dict) and (

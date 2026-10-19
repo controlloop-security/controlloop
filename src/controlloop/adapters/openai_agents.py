@@ -73,7 +73,6 @@ from controlloop.adapters.framework_versions import (
     require_supported,
 )
 from controlloop.bounded_recursion import bounded_recursion
-from controlloop.repository import walk_repository
 
 _NAME = "openai-agents"
 _NAMESPACE = "openai-agents.module"
@@ -175,10 +174,10 @@ def _candidate_modules(context: ScanContext) -> tuple[str, ...]:
     """
 
     found: set[str] = set()
-    for item in walk_repository(context.root):
-        if not isinstance(item, Path) or item.suffix != ".py":
+    for file in context.repository_files():
+        if file.path.suffix != ".py":
             continue
-        raw = _looks_like_a_candidate(item)
+        raw = _looks_like_a_candidate(file.path)
         if raw is None:
             continue
         try:
@@ -191,7 +190,7 @@ def _candidate_modules(context: ScanContext) -> tuple[str, ...]:
         except (SyntaxError, ValueError, RecursionError):
             continue
         if _imports_the_sdk(tree):
-            found.add(item.relative_to(context.root.path).as_posix())
+            found.add(file.relative)
     return tuple(sorted(found))
 
 

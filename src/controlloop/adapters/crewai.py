@@ -37,7 +37,6 @@ number, never the source text, never the display name.
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 from typing import Any
 
 import yaml
@@ -72,7 +71,6 @@ from controlloop.adapters.framework_versions import (
     require_supported,
 )
 from controlloop.bounded_recursion import bounded_recursion
-from controlloop.repository import walk_repository
 
 _NAME = "crewai"
 _NAMESPACE = "crewai.agent"
@@ -130,15 +128,13 @@ def _relative_paths(context: ScanContext) -> tuple[tuple[str, ...], tuple[str, .
 
     configs: set[str] = set()
     crews: set[str] = set()
-    for item in walk_repository(context.root):
-        if not isinstance(item, Path):
-            continue
-        relative = item.relative_to(context.root.path).as_posix()
+    for file in context.repository_files():
+        relative = file.relative
         if relative in _AGENTS_CONFIG_PATHS or relative.endswith(
             tuple(f"/{name}" for name in _AGENTS_CONFIG_PATHS)
         ):
             configs.add(relative)
-        elif item.name == _CREW_BASENAME:
+        elif file.path.name == _CREW_BASENAME:
             crews.add(relative)
     return tuple(sorted(configs)), tuple(sorted(crews))
 
