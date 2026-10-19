@@ -6,14 +6,12 @@ without asking. A pull request that replaces `Bash(npm test)` with
 command. This rule reports an added rule that is a wildcard or covers a
 baseline rule it does not equal, and a rule changed to cover its old
 pattern. A narrowed rule, a removed rule, a new `deny` or `ask`, and an
-identical rule moved between files are silent. Severities are decisions
-D3 and D4 (#434): widening `high`; on a first scan, wildcard rules
-`low`. The owner amended D3 on 2026-10-17 after the E18.10 benign corpus
-(#444): a rule for a read-only tool (`Read`, `Grep`, `Glob`, and the
-Gemini CLI equivalents) is `medium`, since it cannot run, change, or send
-anything. A shell rule stays `high` however narrow its prefix looks:
-`Bash(npm run:*)` runs any script in a file the same pull request can
-edit.
+identical rule moved between files are silent. Widening is `high`; on
+a first scan, wildcard rules are `low`. A rule for a read-only tool
+(`Read`, `Grep`, `Glob`, and the Gemini CLI equivalents) is `medium`,
+since it cannot run, change, or send anything. A shell rule stays
+`high` however narrow its prefix looks: `Bash(npm run:*)` runs any
+script in a file the same pull request can edit.
 """
 
 from __future__ import annotations
@@ -28,7 +26,7 @@ _RULE_VERSION = "1.0.0"
 #: Rules held directly by these are standing pre-approvals. Grants a
 #: skill or subagent makes itself are `policy.component-self-grant`'s.
 _HOLDERS = frozenset({"host", "workflow-runtime"})
-#: Tools that only read the workspace (decision D3 as amended, #444).
+#: Tools that only read the workspace.
 READ_ONLY_TOOLS = frozenset(
     {
         "Read",
