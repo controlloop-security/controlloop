@@ -1,15 +1,15 @@
 [build-system]
-requires = ["hatchling>=1.28,<2"]
+requires = ["hatchling>=1.28,<2", "hatch-fancy-pypi-readme>=25.1,<26"]
 build-backend = "hatchling.build"
 
 [project]
 name = "controlloop"
 version = "0.1.0"
 description = "Local-first security scanner and deterministic CI gate for AI agents"
-readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.12,<3.13"
+dynamic = ["readme"]
 dependencies = [
     "pathspec>=1.1.1,<2",
     "pydantic>=2.12,<3",
@@ -37,12 +37,35 @@ release = [
 
 [tool.hatch.build.targets.sdist]
 include = [
+    "/README.md",
     "/src",
     "/tests",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/controlloop"]
+
+# The PyPI project page shows README.md, but pypi.org cannot resolve its
+# repository-relative links and images. These substitutions rewrite them to
+# absolute GitHub URLs in the package metadata only; README.md itself is
+# unchanged. Images first, so the link pattern sees them already absolute.
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '!\[([^\]]*)\]\((?!https?://)([^)#]+)\)'
+replacement = '![\1](https://raw.githubusercontent.com/controlloop-security/controlloop/main/\2)'
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '\]\((?!https?://|#|mailto:)([^)]+)\)'
+replacement = '](https://github.com/controlloop-security/controlloop/blob/main/\1)'
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '\]\(#([^)]+)\)'
+replacement = '](https://github.com/controlloop-security/controlloop#\1)'
 
 [tool.mypy]
 python_version = "3.12"
