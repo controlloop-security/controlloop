@@ -86,17 +86,46 @@ publishing a release is always a deliberate, human act.
    `schemas.controlloop.ai` resolve -- GitHub Pages must still be enabled
    for this repository, and DNS must still be pointed at it, separately,
    once, by the maintainers.
+9. **Publish to PyPI** -- only after stage 7 has created the GitHub
+   Release, uploads the same wheel and sdist (not the release manifest) to
+   the [`controlloop`](https://pypi.org/project/controlloop/) project with
+   `pypa/gh-action-pypi-publish`. It uses PyPI trusted publishing: PyPI
+   accepts a short-lived OIDC token GitHub issues to this run, so no PyPI
+   API token is stored in the repository or its secrets. The action also
+   uploads PEP 740 attestations, which PyPI shows on each file. It runs
+   last because PyPI never accepts the same version twice: an upload
+   cannot be replaced, only yanked. The job runs in the `pypi`
+   environment.
+
+## Setting up PyPI publishing
+
+Done once, by a maintainer who owns the `controlloop` project on PyPI:
+
+1. On PyPI, open the project's **Manage → Publishing** page and add a
+   GitHub trusted publisher: owner `controlloop-security`, repository
+   `controlloop`, workflow `release.yml`, environment `pypi`. All four
+   must match exactly, or the upload is refused.
+2. In this repository's **Settings → Environments**, create an
+   environment named `pypi`. To hold every upload until a maintainer
+   approves it, add required reviewers there. To stop uploads from
+   anything but a release tag, add a deployment tag rule for `v*.*.*`.
+3. Release by pushing a `vX.Y.Z` tag whose version matches
+   `pyproject.toml` and has a `CHANGELOG.md` section. `0.1.0` was
+   uploaded by hand when the name was reserved, so the first release from
+   this pipeline must be a later version.
+
+If the `publish-pypi` job fails after the GitHub Release is created, fix
+the cause and re-run only that job; nothing earlier needs to run again.
 
 ## What this pipeline does not do
 
-- **No PyPI, GHCR, or Homebrew publication.** Each is separate, later
-  work, and each uses the same name, `controlloop`, across PyPI, the
-  Homebrew tap, and the container namespace. The Homebrew tap repository
-  now exists (`controlloop-security/homebrew-controlloop`, reserved,
-  no formula yet), but the PyPI project name has not been registered and
-  the GHCR namespace has not been created. A later change adding any of
-  the three adds a new job that depends on this pipeline's existing
-  `verify` and `changelog-gate` stages; it does not need to change them.
+- **No GHCR or Homebrew publication.** Each is separate, later work, and
+  each uses the same name, `controlloop`, as the PyPI project. The
+  Homebrew tap repository now exists
+  (`controlloop-security/homebrew-controlloop`, reserved, no formula yet),
+  but the GHCR namespace has not been created. A later change adding
+  either adds a new job that depends on this pipeline's existing `verify`
+  and `changelog-gate` stages; it does not need to change them.
 - **No macOS code signing or notarization, and no macOS x86_64 (Intel)
   binary.** Standalone binaries themselves are now built, smoke-tested,
   checksummed, and every published artifact now also

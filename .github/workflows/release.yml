@@ -5,12 +5,22 @@ name: Release
 #
 # SCOPE: this workflow publishes a GitHub Release carrying the CLI's own
 # `uv build` wheel/sdist output and a release manifest, using only this
-# repository's own GITHUB_TOKEN. It deliberately does NOT publish to PyPI,
-# GHCR, or a Homebrew tap -- each of those waits on the package namespace
-# being reserved first. Adding one means a new job that
+# repository's own GITHUB_TOKEN, and then `publish-pypi` uploads the same
+# wheel and sdist to PyPI. It deliberately does NOT publish to GHCR or a
+# Homebrew tap -- each of those waits on its namespace being set up first.
+# Adding one means a new job that
 # `needs: [derive-version, verify, changelog-gate]` alongside
 # `publish-github-release`; it does not need to change anything above
 # that line.
+#
+# `publish-pypi` uses PyPI trusted publishing: PyPI accepts a short-lived
+# OIDC token GitHub issues to this workflow's run, so no PyPI API token is
+# stored anywhere. It runs only after `publish-github-release` succeeds,
+# because a PyPI upload cannot be replaced: a version number, once used,
+# can never be uploaded again, so it goes last. It runs in the `pypi`
+# environment, which PyPI's trusted publisher entry names; a maintainer
+# can add required reviewers to that environment to hold every upload for
+# approval. Full setup is in `docs/reference/release-pipeline.md`.
 #
 # `publish-schemas` publishes every packaged JSON Schema file -- every
 # version of every family, including frozen historical ones -- to GitHub
@@ -451,3 +461,25 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5.0.0
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [derive-version, publish-github-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+    environment:
+      name: pypi
+      url: https://pypi.org/project/controlloop/${{ needs.derive-version.outputs.version }}/
+    steps:
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4.1.8
+        with:
+          name: release-dist
+          path: release-dist
+
+      - name: Publish the wheel and sdist to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.14.2
+        with:
+          packages-dir: release-dist/dist/

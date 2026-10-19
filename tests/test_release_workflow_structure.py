@@ -6,9 +6,10 @@ These tests never execute the workflow -- they parse the real YAML file with
 `yaml.safe_load` (already a project dependency, `pyyaml`) and assert its
 structure matches the release pipeline's design: a tag-only trigger, a
 `needs` graph that makes every publish step depend on verification and the
-changelog gate, no reference to a PyPI/GHCR/Homebrew credential this
-repository does not have, and every third-party action pinned to an exact
-version. This mirrors the existing drift-guard pattern in
+changelog gate, PyPI publication through trusted publishing rather than a
+stored token, no reference to a GHCR/Homebrew credential this repository
+does not have, and every third-party action pinned to an exact version.
+This mirrors the existing drift-guard pattern in
 `test_fixture_corpus_doc.py`: real repository content, asserted against, not
 merely described in a docstring.
 """
@@ -29,7 +30,6 @@ _VERIFY_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "verify.yml"
 #: every credential this repository is known NOT to have) informs the
 #: negative assertions below.
 _FORBIDDEN_SECRET_SUBSTRINGS = (
-    "PYPI",
     "GHCR",
     "HOMEBREW",
     "DOCKER",
@@ -87,6 +87,7 @@ class TestReleaseWorkflowJobGraph:
             "attest-artifacts",
             "publish-github-release",
             "publish-schemas",
+            "publish-pypi",
         }
 
     def test_verify_and_changelog_gate_depend_on_derive_version(self) -> None:
@@ -157,9 +158,9 @@ class TestReleaseWorkflowJobGraph:
 
 class TestReleaseWorkflowScopeBoundary:
     def test_no_channel_this_story_defers_is_referenced(self) -> None:
-        """PyPI, a container registry, and Homebrew are separate,
+        """A container registry and Homebrew are separate,
         not-yet-implemented distribution channels blocked on an open
-        package-namespace decision -- this workflow's real,
+        namespace decision -- this workflow's real,
         executable content (jobs: steps, env, secrets -- never a comment,
         which YAML parsing already strips) must not reference credentials
         for any of them."""
@@ -485,3 +486,63 @@ class TestReleaseWorkflowMajorVersionTagStaysManual:
             run = step.get("run", "")
             assert "git tag" not in run
             assert "git push" not in run
+
+
+class TestReleaseWorkflowPyPIPublish:
+    """`publish-pypi` uploads the wheel and sdist with PyPI trusted
+    publishing. A PyPI version can never be uploaded twice, so the job
+    runs last, holds only the OIDC permission, and never reads a stored
+    token."""
+
+    def test_runs_only_after_the_github_release_is_published(self) -> None:
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+
+        needs = jobs["publish-pypi"]["needs"]
+        assert set(needs) == {"derive-version", "publish-github-release"}
+
+    def test_only_holds_the_id_token_permission(self) -> None:
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+
+        assert jobs["publish-pypi"]["permissions"] == {"id-token": "write"}
+
+    def test_runs_in_the_pypi_environment(self) -> None:
+        """PyPI's trusted publisher entry names this environment, so a
+        rename here silently breaks every upload."""
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+
+        assert jobs["publish-pypi"]["environment"]["name"] == "pypi"
+
+    def test_uses_the_pypa_action_without_a_stored_token(self) -> None:
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+        steps = jobs["publish-pypi"]["steps"]
+
+        publish = [
+            step
+            for step in steps
+            if step.get("uses", "").startswith("pypa/gh-action-pypi-publish@")
+        ]
+        assert len(publish) == 1
+        inputs = publish[0].get("with", {})
+        assert "password" not in inputs
+        assert "user" not in inputs
+        assert "repository-url" not in inputs
+        assert "secrets." not in str(jobs["publish-pypi"])
+
+    def test_uploads_only_the_built_wheel_and_sdist(self) -> None:
+        """The release manifest sits beside `dist/` in the downloaded
+        artifact; PyPI must only ever see the distributions."""
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+        steps = jobs["publish-pypi"]["steps"]
+
+        download = [
+            step
+            for step in steps
+            if step.get("uses", "").startswith("actions/download-artifact@")
+        ]
+        assert [step["with"]["name"] for step in download] == ["release-dist"]
+        publish = next(
+            step
+            for step in steps
+            if step.get("uses", "").startswith("pypa/gh-action-pypi-publish@")
+        )
+        assert publish["with"]["packages-dir"] == "release-dist/dist/"

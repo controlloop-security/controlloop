@@ -18,6 +18,13 @@ dependencies = [
     "typer>=0.21,<1",
 ]
 
+[project.urls]
+Homepage = "https://controlloop.ai"
+Documentation = "https://github.com/controlloop-security/controlloop/blob/main/docs/readme.md"
+Repository = "https://github.com/controlloop-security/controlloop"
+Issues = "https://github.com/controlloop-security/controlloop/issues"
+Changelog = "https://github.com/controlloop-security/controlloop/blob/main/CHANGELOG.md"
+
 [project.scripts]
 controlloop = "controlloop.cli:main"
 
