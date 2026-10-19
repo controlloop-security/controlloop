@@ -215,10 +215,10 @@ def build_finding(
     honor_approval: bool = True,
 ) -> Finding:
     """A finding about `node`. An approval in the manifest that names the
-    component (owner decision, 2026-10-17) keeps the finding for the record
-    but lowers it to `info`, which never blocks; the caller supplies only
-    approvals active at evaluation time. `honor_approval=False` is for a
-    finding a repository's own manifest must not clear, such as one an
+    component keeps the finding for the record but lowers it to `info`,
+    which never blocks; the caller supplies only approvals active at
+    evaluation time. `honor_approval=False` is for a finding a
+    repository's own manifest must not clear, such as one an
     organization's approved list decides."""
 
     path = host_path(context, node)

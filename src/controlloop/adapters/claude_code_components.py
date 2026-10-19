@@ -47,7 +47,6 @@ from controlloop.adapters.claude_code import (
 from controlloop.adapters.framework import DetectionResult, DiscoveryResult, ScanContext
 from controlloop.adapters.mcp import discover_mcp_config, inline_server_node
 from controlloop.bounded_recursion import bounded_recursion
-from controlloop.repository import walk_repository
 
 _NAME = "claude-code-components"
 _DISPLAY_NAME = "Claude Code"
@@ -401,11 +400,7 @@ class ClaudeCodeComponentsAdapter:
     supported_versions: tuple[str, ...] = _SUPPORTED_VERSIONS
 
     def _paths(self, context: ScanContext) -> list[str]:
-        paths: list[str] = []
-        for item in walk_repository(context.root):
-            if isinstance(item, Path):
-                paths.append(item.relative_to(context.root.path).as_posix())
-        return sorted(paths)
+        return sorted(file.relative for file in context.repository_files())
 
     def detect(self, context: ScanContext) -> DetectionResult:
         claimed = [

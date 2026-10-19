@@ -16,6 +16,17 @@ The first public release of the ControlLoop CLI.
   branch only as a remote-tracking ref, so the Action's own default
   (`$GITHUB_BASE_REF`) failed with exit `2` on every pull request.
 
+### Changed
+
+- **One repository walk per scan.** `scan`, `bom`, `diff`, and `gate`
+  walk the repository once per scan instead of once per discovery
+  adapter. Every adapter now reads one cached file list from
+  `ScanContext.repository_files()`, and `bom`'s own walk seeds it when it
+  used the default bounds adapters have always seen. On the
+  100,000-line benchmark repository a scan goes from 1.84 s to 1.35 s
+  wall clock with byte-identical output. Adapters still walk with
+  default bounds, as before.
+
 ### Added
 
 - **Commands:** `scan`, `gate`, `diff`, `bom`, `init`, `rules`, and

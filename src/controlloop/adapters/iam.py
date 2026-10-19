@@ -19,7 +19,6 @@ from __future__ import annotations
 import contextlib
 import json
 import re
-from pathlib import Path
 from typing import Any
 
 import hcl2  # type: ignore[import-untyped]
@@ -36,7 +35,6 @@ from controlloop.acbom.completeness import incomplete_diagnostic
 from controlloop.acbom.identity import NodeIdentityMaterial, SemanticIdentity, node_id
 from controlloop.adapters.framework import DetectionResult, DiscoveryResult, ScanContext
 from controlloop.bounded_recursion import bounded_recursion
-from controlloop.repository import walk_repository
 
 # python-hcl2 lazily builds its LALR grammar on first use and caches it to a
 # file inside its own package directory (hcl2/parser.py, memoized with
@@ -433,12 +431,11 @@ def _discover_terraform_file(
 
 def _candidate_paths(context: ScanContext) -> tuple[str, ...]:
     found = set()
-    for item in walk_repository(context.root):
-        if not isinstance(item, Path):
-            continue
+    for file in context.repository_files():
+        item = file.path
         suffix = item.suffix.lower()
         if suffix == ".tf":
-            found.add(item.relative_to(context.root.path).as_posix())
+            found.add(file.relative)
         elif suffix == ".json":
             try:
                 with bounded_recursion(margin=500):
@@ -450,7 +447,7 @@ def _candidate_paths(context: ScanContext) -> tuple[str, ...]:
                 or _is_gcp_shaped(document)
                 or _is_azure_shaped(document)
             ):
-                found.add(item.relative_to(context.root.path).as_posix())
+                found.add(file.relative)
     return tuple(sorted(found))
 
 

@@ -19,7 +19,6 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import yaml
@@ -38,7 +37,6 @@ from controlloop.acbom import (
 from controlloop.adapters import agent_authority as aa
 from controlloop.adapters.framework import DetectionResult, DiscoveryResult, ScanContext
 from controlloop.bounded_recursion import bounded_recursion
-from controlloop.repository import walk_repository
 
 _NAME = "agent-workflows"
 _SUPPORTED_VERSIONS: tuple[str, ...] = ("github-actions",)
@@ -118,15 +116,14 @@ _WRITE_SCOPES = ("contents", "pull-requests", "id-token")
 
 def _claimed_paths(context: ScanContext) -> tuple[str, ...]:
     found: set[str] = set()
-    for item in walk_repository(context.root):
-        if isinstance(item, Path):
-            relative = item.relative_to(context.root.path).as_posix()
-            if (
-                relative.startswith(_WORKFLOW_DIRECTORY)
-                and "/" not in relative[len(_WORKFLOW_DIRECTORY) :]
-                and relative.endswith((".yml", ".yaml"))
-            ):
-                found.add(relative)
+    for file in context.repository_files():
+        relative = file.relative
+        if (
+            relative.startswith(_WORKFLOW_DIRECTORY)
+            and "/" not in relative[len(_WORKFLOW_DIRECTORY) :]
+            and relative.endswith((".yml", ".yaml"))
+        ):
+            found.add(relative)
     return tuple(sorted(found))
 
 

@@ -29,7 +29,12 @@ The adapter framework itself -- the one interface every future adapter
 implements -- is implemented foundation, not a shipped format:
 
 - `ScanContext` wraps a `RepositoryRoot` (the already-bounded, contained
-  path primitive), never a raw filesystem or network handle.
+  path primitive), never a raw filesystem or network handle. An adapter
+  lists files with `context.repository_files()`, which walks the
+  repository once per scan with default bounds and gives every adapter
+  the same immutable list of paths and their repository-relative forms.
+  An adapter never calls the walker itself;
+  `tests/adapters/test_shared_walk.py` fails if one does.
 - `DiscoveryAdapter` (`detect`/`discover`) is the one interface every
   adapter implements; `DetectionResult` and `DiscoveryResult` are its typed
   input/output shapes.
