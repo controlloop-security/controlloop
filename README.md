@@ -11,7 +11,7 @@ one graph of its capabilities, compares it to the state you approved, and
 fails the build when the agent's authority grows past the ceiling you
 declared. It never runs your code and never sends your source anywhere.
 
-[![Watch the gate block a pull request](docs/assets/readme/hero-poster.jpg)](https://controlloop.ai/#video)
+[![Play the one-minute overview: ControlLoop blocks a pull request that widens an agent's authority](docs/assets/readme/hero-poster.jpg)](https://controlloop.ai/#video)
 
 Watch: [the gate in a minute](https://controlloop.ai/#video) · Read: [the example walkthrough](docs/guides/example-walkthrough.md)
 
