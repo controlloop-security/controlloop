@@ -126,6 +126,57 @@ class TestResolveMergeBase:
         assert resolution.default_branch_ref == "main"
         assert resolution.merge_base_commit == shared_commit
 
+    def test_explicit_default_branch_falls_back_to_its_remote_tracking_ref(
+        self, tmp_path: Path
+    ) -> None:
+        # The shape actions/checkout leaves on a pull_request event: HEAD
+        # detached at the pull request's commit, the target branch present
+        # only as origin/main, and no local main branch at all.
+        origin = tmp_path / "origin"
+        origin.mkdir()
+        _init_repo(origin)
+        (origin / "a.txt").write_text("a\n")
+        _commit_all(origin, "c1")
+        shared_commit = _head(origin)
+
+        dest = tmp_path / "dest"
+        _clone(origin, dest)
+        _checkout_new_branch(dest, "feature")
+        (dest / "b.txt").write_text("b\n")
+        _commit_all(dest, "c2 on feature")
+        _checkout(dest, "--detach")
+        subprocess.run(
+            ["git", "branch", "-q", "-D", "main", "feature"], cwd=dest, check=True
+        )
+
+        root = resolve_repository_root(dest)
+        resolution = resolve_merge_base(root, default_branch="main")
+
+        assert resolution.default_branch_ref == "origin/main"
+        assert resolution.merge_base_commit == shared_commit
+
+    def test_explicit_default_branch_prefers_the_name_as_given(
+        self, tmp_path: Path
+    ) -> None:
+        origin = tmp_path / "origin"
+        origin.mkdir()
+        _init_repo(origin)
+        (origin / "a.txt").write_text("a\n")
+        _commit_all(origin, "c1")
+
+        dest = tmp_path / "dest"
+        _clone(origin, dest)
+        (origin / "c.txt").write_text("c\n")
+        _commit_all(origin, "c3 on origin only")
+        subprocess.run(["git", "fetch", "-q"], cwd=dest, check=True)
+        local_main = _head(dest)
+
+        root = resolve_repository_root(dest)
+        resolution = resolve_merge_base(root, default_branch="main")
+
+        assert resolution.default_branch_ref == "main"
+        assert resolution.merge_base_commit == local_main
+
     def test_explicit_default_branch_that_does_not_exist_raises(
         self, tmp_path: Path
     ) -> None:

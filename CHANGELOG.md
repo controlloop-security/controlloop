@@ -8,6 +8,14 @@ project uses [Semantic Versioning](https://semver.org/).
 
 The first public release of the ControlLoop CLI.
 
+### Fixed
+
+- **`gate --default-branch` on a pull request.** A bare branch name such
+  as `main` that does not exist locally is now also tried as
+  `origin/main`. A pull-request checkout in GitHub Actions has the target
+  branch only as a remote-tracking ref, so the Action's own default
+  (`$GITHUB_BASE_REF`) failed with exit `2` on every pull request.
+
 ### Added
 
 - **Commands:** `scan`, `gate`, `diff`, `bom`, `init`, `rules`, and
