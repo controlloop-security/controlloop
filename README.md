@@ -2,6 +2,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](#requirements)
 [![Docs](https://img.shields.io/badge/docs-controlloop-3157d5.svg)](docs/readme.md)
+[![Discord](https://img.shields.io/badge/discord-join-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/Ef4VuTvUFn)
 
 > *Know what your agents can do. Before they do it.*
 
@@ -518,8 +519,17 @@ Start with the [documentation index](docs/readme.md).
 - [Privacy, security, and limitations](docs/reference/privacy-security.md)
 - [Your first Team gate](docs/guides/first-team-gate.md) and [What a Team gate sends](docs/reference/team-envelope.md)
 
+## Support and questions
+
+Have a question, need help getting set up, or want to share how you use
+ControlLoop? Join us on
+[Discord](https://discord.gg/Ef4VuTvUFn).
+
+[![Discord](https://img.shields.io/badge/discord-join-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/Ef4VuTvUFn)
+
 ## Community
 
+- [Discord](https://discord.gg/Ef4VuTvUFn) for questions and help
 - [GitHub Issues](https://github.com/controlloop-security/controlloop/issues) for bugs and feature requests
 - [SECURITY.md](SECURITY.md) for reporting a vulnerability
 - [CHANGELOG.md](CHANGELOG.md) for what changed
