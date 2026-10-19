@@ -1,0 +1,657 @@
+{
+  "components": {
+    "schemas": {
+      "ApprovedComponentDeltaRequest": {
+        "description": "A repository's own approved component, as the gate applied it.",
+        "properties": {
+          "command_pattern": {
+            "description": "Constraint for `hook` entries only: the command the hook runs, with an optional single trailing `*`.",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "digest": {
+            "description": "Constraint: `sha256:` and 7 to 64 lowercase hex characters; a prefix matches.",
+            "maxLength": 71,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name_pattern": {
+            "description": "Normalized name or pattern. Case-insensitive; a single trailing `*` matches any suffix. Unchanged by the constraint fields.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "package": {
+            "description": "Constraint: the package the component is installed from.",
+            "maxLength": 214,
+            "minLength": 1,
+            "type": "string"
+          },
+          "pin_required": {
+            "description": "Constraint: the component must be pinned to an exact version or digest.",
+            "type": "boolean"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ComponentType"
+          },
+          "version_range": {
+            "description": "Constraint: one syntax only \u2014 exact (`1.0.15`), wildcard minor or patch (`1.0.x`, `2.x`), or bounded (`>=1.0.0 <1.1.0`). Versions are MAJOR.MINOR.PATCH with no pre-release or build part. Validated as data, never evaluated; see `version_range_vectors.json`.",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name_pattern",
+          "type"
+        ],
+        "type": "object"
+      },
+      "ApprovedComponentRequest": {
+        "description": "An organization's approved component, with the optional\nconstraints. See `ApprovedComponentFieldsSerializer`.",
+        "properties": {
+          "command_pattern": {
+            "description": "Constraint for `hook` entries only: the command the hook runs, with an optional single trailing `*`.",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "digest": {
+            "description": "Constraint: `sha256:` and 7 to 64 lowercase hex characters; a prefix matches.",
+            "maxLength": 71,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name_pattern": {
+            "description": "Normalized name or pattern. Case-insensitive; a single trailing `*` matches any suffix. Unchanged by the constraint fields.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "package": {
+            "description": "Constraint: the package the component is installed from.",
+            "maxLength": 214,
+            "minLength": 1,
+            "type": "string"
+          },
+          "pin_required": {
+            "description": "Constraint: the component must be pinned to an exact version or digest.",
+            "type": "boolean"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ComponentType"
+          },
+          "version_range": {
+            "description": "Constraint: one syntax only \u2014 exact (`1.0.15`), wildcard minor or patch (`1.0.x`, `2.x`), or bounded (`>=1.0.0 <1.1.0`). Versions are MAJOR.MINOR.PATCH with no pre-release or build part. Validated as data, never evaluated; see `version_range_vectors.json`.",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name_pattern",
+          "type"
+        ],
+        "type": "object"
+      },
+      "AuthorityDeltaEntryRequest": {
+        "description": "One new, changed, or removed grant of authority to an agent,\nin the shape the scanner's authority statement emits. Plain language and locations only: never a command's\noutput, an environment value, or a file's contents.",
+        "properties": {
+          "approval_recorded": {
+            "description": "Whether the repository's manifest records an approval for this grant.",
+            "type": "boolean"
+          },
+          "component_stable_id": {
+            "description": "The stable id of the component that carries the grant, as it appears in `components`, so the grant can be shown with that component's sanction state. Optional; without it the state is not determined.",
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/Confidence"
+          },
+          "detail": {
+            "description": "A short, bounded grant label, e.g. `hook SessionStart`.",
+            "maxLength": 120,
+            "type": "string"
+          },
+          "evidence_path": {
+            "description": "Repository-relative file that declares the grant.",
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "grant": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ComponentType"
+              }
+            ],
+            "description": "The kind of component that carries the grant, e.g. `hook`.\n\n* `agent` - agent\n* `tool` - tool\n* `mcp_server` - mcp_server\n* `resource` - resource\n* `identity` - identity\n* `host` - host\n* `subagent` - subagent\n* `hook` - hook\n* `helper_command` - helper_command\n* `plugin` - plugin\n* `marketplace` - marketplace\n* `skill` - skill\n* `workflow_runtime` - workflow_runtime\n* `permission_rule` - permission_rule"
+          },
+          "host_id": {
+            "description": "The host node's stable id, or null when the scanner could not attribute the grant to a host (the scanner emits null; the platform never guesses one).",
+            "maxLength": 255,
+            "minLength": 1,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "host_name": {
+            "description": "E.g. `Claude Code`.",
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "key_path": {
+            "description": "Where in that file, e.g. `hooks.SessionStart[0]`.",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/KindEnum"
+          },
+          "material_class": {
+            "$ref": "#/components/schemas/CapabilityClassesEnum"
+          },
+          "statement": {
+            "description": "The scanner's plain-language statement of what the grant lets the agent do.",
+            "maxLength": 300,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "approval_recorded",
+          "confidence",
+          "evidence_path",
+          "grant",
+          "host_id",
+          "host_name",
+          "key_path",
+          "kind",
+          "material_class",
+          "statement"
+        ],
+        "type": "object"
+      },
+      "CapabilityClassesEnum": {
+        "description": "* `unclassified` - unclassified\n* `destructive-action` - destructive-action\n* `financial-action` - financial-action\n* `code-execution` - code-execution\n* `external-communication` - external-communication\n* `sensitive-data-access` - sensitive-data-access\n* `delegation` - delegation\n* `write-access` - write-access",
+        "enum": [
+          "unclassified",
+          "destructive-action",
+          "financial-action",
+          "code-execution",
+          "external-communication",
+          "sensitive-data-access",
+          "delegation",
+          "write-access"
+        ],
+        "type": "string"
+      },
+      "CapabilityPathEdgesEnum": {
+        "description": "* `invokes` - invokes\n* `reads` - reads\n* `writes` - writes\n* `authenticates-as` - authenticates-as\n* `permitted-by` - permitted-by\n* `delegates-to` - delegates-to\n* `declares` - declares",
+        "enum": [
+          "invokes",
+          "reads",
+          "writes",
+          "authenticates-as",
+          "permitted-by",
+          "delegates-to",
+          "declares"
+        ],
+        "type": "string"
+      },
+      "ComponentFlagsRequest": {
+        "description": "The ACBOM's security flags (`SecurityAttributes`), as the\nenvelope carries them. Each is true, false, or null, and null\nmeans the scanner could not tell \u2014 never \"no\".",
+        "properties": {
+          "bypass_mode": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "code_execution": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "pinned": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "untrusted_input": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "wildcard": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ComponentType": {
+        "description": "* `agent` - agent\n* `tool` - tool\n* `mcp_server` - mcp_server\n* `resource` - resource\n* `identity` - identity\n* `host` - host\n* `subagent` - subagent\n* `hook` - hook\n* `helper_command` - helper_command\n* `plugin` - plugin\n* `marketplace` - marketplace\n* `skill` - skill\n* `workflow_runtime` - workflow_runtime\n* `permission_rule` - permission_rule",
+        "enum": [
+          "agent",
+          "tool",
+          "mcp_server",
+          "resource",
+          "identity",
+          "host",
+          "subagent",
+          "hook",
+          "helper_command",
+          "plugin",
+          "marketplace",
+          "skill",
+          "workflow_runtime",
+          "permission_rule"
+        ],
+        "type": "string"
+      },
+      "Confidence": {
+        "description": "* `low` - low\n* `medium` - medium\n* `high` - high",
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "type": "string"
+      },
+      "KindEnum": {
+        "description": "* `added` - added\n* `changed` - changed\n* `removed` - removed",
+        "enum": [
+          "added",
+          "changed",
+          "removed"
+        ],
+        "type": "string"
+      },
+      "NormalizedComponentRequest": {
+        "properties": {
+          "attributes": {
+            "additionalProperties": {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            "description": "Envelope 1.1.0. The component's value-free security attributes, mirroring the ACBOM's `Node.attributes`: at most 32 keys matching `^[a-z][a-z0-9_]*$`, values of 1 to 512 characters, and no key that names a value category (secret, token, password, credential, key value, environment value). The approved-component matcher reads the reserved keys `package`, `version`, `digest`, and `command`.",
+            "type": "object"
+          },
+          "capability_classes": {
+            "description": "What kind of power this component confers, in the scanner's own taxonomy. Computed from the capability graph, which this service does not have.",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityClassesEnum"
+            },
+            "type": "array"
+          },
+          "current_value": {
+            "description": "And what it changed to.",
+            "maxLength": 255,
+            "type": "string"
+          },
+          "evidence_reference": {
+            "description": "Where the component was found: a repository-relative path and line range, e.g. `cli/agents/support.py:88`. **A location, never the code at it** \u2014 this service stores no source.",
+            "maxLength": 512,
+            "type": "string"
+          },
+          "flags": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ComponentFlagsRequest"
+              }
+            ],
+            "description": "Envelope 1.1.0. The ACBOM's security flags; null means unknown."
+          },
+          "name": {
+            "description": "Normalized display name. Never a secret value.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "previous_value": {
+            "description": "What a changed capability changed from, e.g. `orders:read`.",
+            "maxLength": 255,
+            "type": "string"
+          },
+          "reachable_by_agent_count": {
+            "description": "How many agents can reach this component. **Null means not reported**, which is different from zero \u2014 zero is a real finding.",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "stable_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ComponentType"
+          }
+        },
+        "required": [
+          "name",
+          "stable_id",
+          "type"
+        ],
+        "type": "object"
+      },
+      "NormalizedFindingRequest": {
+        "properties": {
+          "capability_path": {
+            "description": "Node identifiers along the capability path, normalized. Never file contents.",
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "capability_path_edges": {
+            "description": "The relationships between `capability_path`'s nodes, in order \u2014 one fewer than the node count.",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityPathEdgesEnum"
+            },
+            "type": "array"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/Confidence"
+          },
+          "documentation_url": {
+            "description": "Where the rule is documented. Recorded, never fetched.",
+            "oneOf": [
+              {
+                "format": "uri",
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "maxLength": 0,
+                "type": "string"
+              }
+            ]
+          },
+          "evidence_reference": {
+            "description": "Repository-relative sanitized path and locator. Never the evidence text.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "fingerprint": {
+            "description": "Stable identity of the finding across scans.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "remediation": {
+            "description": "How to clear this finding, **authored by the scanner's rule pack** and carried through unchanged. This service writes no security advice.",
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "rule_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "rule_version": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "title": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability_path",
+          "confidence",
+          "evidence_reference",
+          "fingerprint",
+          "rule_id",
+          "rule_version",
+          "severity",
+          "title"
+        ],
+        "type": "object"
+      },
+      "PolicyBundleCreateRequest": {
+        "properties": {
+          "approved_components": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovedComponentRequest"
+            },
+            "type": "array"
+          },
+          "publish": {
+            "default": false,
+            "description": "Publish immediately, making this version immutable.",
+            "type": "boolean"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleConfigurationRequest"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "approved_components",
+          "rules"
+        ],
+        "type": "object"
+      },
+      "RepositoryPolicyDeltaRequest": {
+        "description": "The repository's own policy, as the gate applied it.\n\nSent so the **server** computes the effective policy rather than\ntrusting the client's account of what it enforced. A delta that\nweakens a mandatory organization rule is refused at ingestion.",
+        "properties": {
+          "approved_components": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovedComponentDeltaRequest"
+            },
+            "type": "array"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleOverrideRequest"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "RuleConfigurationRequest": {
+        "properties": {
+          "action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              }
+            ],
+            "default": "fail",
+            "description": "What a finding from this rule does to the gate verdict. `fail` blocks, `warn` reports without blocking, `require_review` marks the scan as needing a human, and `pass` means the rule runs and reports but never affects the verdict \u2014 monitor mode, which is different from disabling the rule, where it does not run at all.\n\n* `pass` - pass\n* `warn` - warn\n* `require_review` - require_review\n* `fail` - fail"
+          },
+          "description": {
+            "minLength": 1,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "mandatory": {
+            "description": "Repository policy may strengthen a mandatory rule but never weaken it.",
+            "type": "boolean"
+          },
+          "name": {
+            "minLength": 1,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rule_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "severity_floor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Severity"
+              }
+            ],
+            "description": "Lowest severity this rule may report under this bundle.\n\n* `info` - info\n* `low` - low\n* `medium` - medium\n* `high` - high\n* `critical` - critical"
+          }
+        },
+        "required": [
+          "enabled",
+          "mandatory",
+          "rule_id",
+          "severity_floor"
+        ],
+        "type": "object"
+      },
+      "RuleOverrideRequest": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "rule_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "severity_floor": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": [
+          "rule_id"
+        ],
+        "type": "object"
+      },
+      "ScanEnvelopeRequest": {
+        "description": "What the CLI submits. Validated against a versioned schema\nand rejected outright when it carries prohibited content.\n\n**Unknown fields are refused**, not ignored. A serializer that\nsilently drops what it does not recognize would let a payload smuggle\ncontent past every per-field check by putting it in a field the\nschema never declared.",
+        "properties": {
+          "acbom_digest": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "authority_delta": {
+            "description": "Envelope 1.1.0. Each new, changed, or removed grant of authority to an agent, against the repository's baseline. Absent when nothing changed.",
+            "items": {
+              "$ref": "#/components/schemas/AuthorityDeltaEntryRequest"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "branch": {
+            "minLength": 1,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "commit_sha": {
+            "minLength": 1,
+            "pattern": "^[0-9a-f]{40}$",
+            "type": "string"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/NormalizedComponentRequest"
+            },
+            "type": "array"
+          },
+          "envelope_version": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/NormalizedFindingRequest"
+            },
+            "type": "array"
+          },
+          "policy_version": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "project_id": {
+            "description": "Optional, and never trusted: identity comes from the project token. When present it must match, or the envelope is refused.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "pull_request_number": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "pull_request_title": {
+            "maxLength": 255,
+            "type": "string"
+          },
+          "repository_policy": {
+            "$ref": "#/components/schemas/RepositoryPolicyDeltaRequest"
+          },
+          "scanner_version": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict"
+          }
+        },
+        "required": [
+          "acbom_digest",
+          "commit_sha",
+          "components",
+          "envelope_version",
+          "findings",
+          "policy_version",
+          "scanner_version",
+          "verdict"
+        ],
+        "type": "object"
+      },
+      "Severity": {
+        "description": "* `info` - info\n* `low` - low\n* `medium` - medium\n* `high` - high\n* `critical` - critical",
+        "enum": [
+          "info",
+          "low",
+          "medium",
+          "high",
+          "critical"
+        ],
+        "type": "string"
+      },
+      "Verdict": {
+        "description": "* `pass` - pass\n* `warn` - warn\n* `require_review` - require_review\n* `fail` - fail",
+        "enum": [
+          "pass",
+          "warn",
+          "require_review",
+          "fail"
+        ],
+        "type": "string"
+      }
+    }
+  },
+  "info": {
+    "title": "ControlLoop platform contract (subset)",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0"
+}

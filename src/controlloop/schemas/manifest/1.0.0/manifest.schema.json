@@ -1,0 +1,408 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.controlloop.ai/manifest/1.0.0/manifest.schema.json",
+  "title": "ControlLoop Security Manifest",
+  "description": "Canonical controlloop.yaml security manifest for ControlLoop schema version 1.0.0.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "owner"
+  ],
+  "properties": {
+    "schema_version": {
+      "maxLength": 64,
+      "minLength": 5,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "owner": {
+      "maxLength": 256,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+      "title": "Owner",
+      "type": "string"
+    },
+    "trust_boundaries": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/TrustBoundary"
+      },
+      "title": "Trust Boundaries",
+      "type": "array"
+    },
+    "approvals": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Approval"
+      },
+      "title": "Approvals",
+      "type": "array"
+    },
+    "prohibited_capabilities": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ProhibitedCapability"
+      },
+      "title": "Prohibited Capabilities",
+      "type": "array"
+    },
+    "allowed_delegation": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/AllowedDelegation"
+      },
+      "title": "Allowed Delegation",
+      "type": "array"
+    },
+    "data_classification": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/DataClassificationDeclaration"
+      },
+      "title": "Data Classification",
+      "type": "array"
+    },
+    "ceilings": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/CapabilityCeiling"
+      },
+      "title": "Ceilings",
+      "type": "array"
+    },
+    "logged_tools": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ToolLoggingDeclaration"
+      },
+      "title": "Logged Tools",
+      "type": "array"
+    },
+    "suppressions": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Suppression"
+      },
+      "title": "Suppressions",
+      "type": "array"
+    }
+  },
+  "$defs": {
+    "AllowedDelegation": {
+      "additionalProperties": false,
+      "description": "The set of delegation targets an agent is permitted to reach.",
+      "properties": {
+        "agent": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Agent",
+          "type": "string"
+        },
+        "targets": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+            "type": "string"
+          },
+          "title": "Targets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "agent",
+        "targets"
+      ],
+      "title": "AllowedDelegation",
+      "type": "object"
+    },
+    "Approval": {
+      "additionalProperties": false,
+      "description": "A human-owned approval record for a named capability.\n\n`expires_at` (an additive extension that kept schema version `1.0.0`\n-- a new optional field is minor-compatible, not breaking, the same\nprecedent the `ceilings` field already set) is the approval's\nexpiration\ntimestamp exactly as supplied, expected to be RFC 3339 (for example\n`2026-12-31T00:00:00Z`) but not strictly enforced here -- the same\nlenient-but-honest posture `controlloop.baseline.models.ApprovalProvenance\n.approved_at` already established, so one malformed value does not\nreject an otherwise-valid manifest at parse time. `None` means the\napproval never expires. Whether an approval \"is currently active\" is\na semantic judgment a caller makes with an explicit reference time\n(`controlloop.manifest.approvals.is_approval_active`/\n`active_approvals`), never a Pydantic validation outcome and never\nsomething this model or the deterministic rule engine decides using\nits own clock -- see that module's own docstring.",
+      "properties": {
+        "capability": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Capability",
+          "type": "string"
+        },
+        "approver": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Approver",
+          "type": "string"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "maxLength": 1024,
+              "minLength": 1,
+              "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        }
+      },
+      "required": [
+        "capability",
+        "approver"
+      ],
+      "title": "Approval",
+      "type": "object"
+    },
+    "CapabilityCeiling": {
+      "additionalProperties": false,
+      "description": "The maximum authority an agent (or, with `agent` unset, every\nagent in the repository) may ever hold.\n`edge_type` reuses the ACBOM's own vocabulary for \"actions\" rather\nthan a parallel taxonomy; `sensitivity` reuses `Sensitivity` for\n\"data classes\" the same way `DataClassificationDeclaration` does.\n\"External destinations\" have no existing canonical shape to reuse,\nso they are free-form `SafeIdentifier` strings (a domain or\nendpoint identifier).",
+      "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent"
+        },
+        "prohibited_resources": {
+          "default": [],
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+            "type": "string"
+          },
+          "title": "Prohibited Resources",
+          "type": "array"
+        },
+        "prohibited_actions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/EdgeType"
+          },
+          "title": "Prohibited Actions",
+          "type": "array"
+        },
+        "prohibited_external_destinations": {
+          "default": [],
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+            "type": "string"
+          },
+          "title": "Prohibited External Destinations",
+          "type": "array"
+        },
+        "prohibited_data_classes": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Sensitivity"
+          },
+          "title": "Prohibited Data Classes",
+          "type": "array"
+        },
+        "prohibited_delegation_targets": {
+          "default": [],
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+            "type": "string"
+          },
+          "title": "Prohibited Delegation Targets",
+          "type": "array"
+        }
+      },
+      "title": "CapabilityCeiling",
+      "type": "object"
+    },
+    "DataClassificationDeclaration": {
+      "additionalProperties": false,
+      "description": "A declared sensitivity classification for a named resource.",
+      "properties": {
+        "resource": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Resource",
+          "type": "string"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        }
+      },
+      "required": [
+        "resource",
+        "sensitivity"
+      ],
+      "title": "DataClassificationDeclaration",
+      "type": "object"
+    },
+    "EdgeType": {
+      "description": "Canonical ACBOM edge relationship types.",
+      "enum": [
+        "invokes",
+        "reads",
+        "writes",
+        "authenticates-as",
+        "permitted-by",
+        "delegates-to",
+        "receives-from",
+        "constrained-by"
+      ],
+      "title": "EdgeType",
+      "type": "string"
+    },
+    "ProhibitedCapability": {
+      "additionalProperties": false,
+      "description": "A capability an agent must never hold, named by the same\nagent/target-name vocabulary discovery already uses.",
+      "properties": {
+        "agent": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Agent",
+          "type": "string"
+        },
+        "edge_type": {
+          "$ref": "#/$defs/EdgeType"
+        },
+        "target": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent",
+        "edge_type",
+        "target"
+      ],
+      "title": "ProhibitedCapability",
+      "type": "object"
+    },
+    "Sensitivity": {
+      "description": "Classification of data sensitivity.",
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "restricted",
+        "unknown"
+      ],
+      "title": "Sensitivity",
+      "type": "string"
+    },
+    "Suppression": {
+      "additionalProperties": false,
+      "description": "One repo-local, expiring suppression of a specific finding.\n\nEvery field is required with no default (\"a suppression\nrequires rule identifier, a scoped target, a written reason, and an\nexpiry date; any missing field returns exit 2\" -- an omitted field\nis a missing required field, which Pydantic's own strict,\ndefaultless-field behavior already rejects at parse time through\n`controlloop.manifest.parser.load_manifest`'s existing\n`ManifestValidationError` path, `exit_code = ExitCode.INVALID_INPUT`,\nwith no new error-handling code needed here).\n\n`rule_id` and `target` together are this suppression's entire\nmatching contract: a real `Finding` is suppressed only when *both*\n`finding.rule_id == rule_id` and `finding.id == target` -- exact\nstring equality, evaluated in\n`controlloop.policy.suppressions.apply_suppressions`. `target`'s own\ntype (`SuppressionTarget`) is already shape-constrained to a real\n`Finding.id` pattern, so this suppression can never name a finding\nthat could not exist; combined with exact-equality matching (never\na prefix, glob, or wildcard anywhere in this codebase), \"cannot\nbroaden beyond its declared scope\" holds by construction,\nnot merely by convention -- there is no mechanism here a suppression\nauthor could even attempt to broaden.\n\n`rule_id` is not redundant with `target` despite `target` already\nuniquely identifying one finding (whose own identity already embeds\nits rule): it is this declaration's own human-auditable statement of\n*which* rule the author believes they are suppressing. A `rule_id`\nthat disagrees with `target`'s real, embedded rule can never match\nany real finding (`apply_suppressions` requires both to agree), so a\ncopy-paste or typo error here fails safe -- reported as `STALE`\n(`controlloop.policy.suppressions.SuppressionStatus`), never as a\nsilent, wrong match.\n\n\"Suppressions cannot suppress ceiling breaches unless the ceiling\nitself is amended\" is enforced the same way, structurally,\nin `apply_suppressions`: a suppression whose `rule_id` equals\n`controlloop.policy.rules.capability_ceiling.RULE_ID` is always\nreported `CEILING_PROTECTED` and never removes its target finding\nfrom evaluation, regardless of expiry or match -- the only real\nlever that changes a ceiling breach's outcome is amending\n`ManifestDocument.ceilings` itself.",
+      "properties": {
+        "rule_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "target": {
+          "pattern": "^clp:finding:sha256:[0-9a-f]{64}$",
+          "title": "Target",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+          "title": "Reason",
+          "type": "string"
+        },
+        "expires_at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "title": "Expires At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id",
+        "target",
+        "reason",
+        "expires_at"
+      ],
+      "title": "Suppression",
+      "type": "object"
+    },
+    "ToolLoggingDeclaration": {
+      "additionalProperties": false,
+      "description": "A declared logging or audit path for a named tool.\n`audit_path` is a free-form `SafeIdentifier`: a\nrepository-relative log path or a system identifier (for example\n`datadog:agent-audit-log`), never validated against a real\nfilesystem or service -- this manifest is a declaration, not\nsomething this scanner verifies by connecting to anything.",
+      "properties": {
+        "tool": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Tool",
+          "type": "string"
+        },
+        "audit_path": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Audit Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool",
+        "audit_path"
+      ],
+      "title": "ToolLoggingDeclaration",
+      "type": "object"
+    },
+    "TrustBoundary": {
+      "additionalProperties": false,
+      "description": "A named boundary an agent belongs to.",
+      "properties": {
+        "name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "agents": {
+          "default": [],
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+            "type": "string"
+          },
+          "title": "Agents",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "TrustBoundary",
+      "type": "object"
+    }
+  }
+}

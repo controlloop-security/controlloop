@@ -1,0 +1,607 @@
+{
+  "$comment": "Shared strengthen-only policy merge vectors, recorded from the ControlLoop platform's own merge and asserted against controlloop.team.policy.merge_policy by tests/team/test_policy_merge.py. See docs/reference/policy-merge-semantics.md for the semantics these encode.",
+  "merge_semantics_version": "1.0.0",
+  "vectors": [
+    {
+      "name": "empty-organization-bundle-and-no-repository-policy",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [],
+        "approved_components": []
+      },
+      "repository": {
+        "rules": [],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [],
+        "approved_components": [],
+        "rejections": []
+      }
+    },
+    {
+      "name": "organization-bundle-passes-through-untouched",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [
+          {
+            "rule_id": "capability.new-tool",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": true
+          },
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [
+          {
+            "type": "tool",
+            "name_pattern": "requests"
+          }
+        ]
+      },
+      "repository": {
+        "rules": [],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "capability.new-tool",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": true
+          },
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [
+          {
+            "type": "tool",
+            "name_pattern": "requests"
+          }
+        ],
+        "rejections": []
+      }
+    },
+    {
+      "name": "repository-raises-a-severity-floor",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "low",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "repository": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "critical",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "critical",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [],
+        "rejections": []
+      }
+    },
+    {
+      "name": "repository-lowers-a-severity-floor",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "high",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "repository": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "low",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "high",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [],
+        "rejections": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "organization_bundle_version": "7",
+            "reason": "Repository policy lowers the severity floor of `secrets.hardcoded` from `high` to `low`, which organization policy version 7 does not permit. A repository may raise a floor, never lower it."
+          }
+        ]
+      }
+    },
+    {
+      "name": "repository-disables-a-non-mandatory-rule",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [
+          {
+            "rule_id": "capability.new-tool",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "repository": {
+        "rules": [
+          {
+            "rule_id": "capability.new-tool",
+            "enabled": false,
+            "severity_floor": "medium",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "capability.new-tool",
+            "enabled": false,
+            "severity_floor": "medium",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [],
+        "rejections": []
+      }
+    },
+    {
+      "name": "repository-disables-a-mandatory-rule",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [
+          {
+            "rule_id": "capability.new-tool",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": true
+          }
+        ],
+        "approved_components": []
+      },
+      "repository": {
+        "rules": [
+          {
+            "rule_id": "capability.new-tool",
+            "enabled": false,
+            "severity_floor": "medium",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "capability.new-tool",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": true
+          }
+        ],
+        "approved_components": [],
+        "rejections": [
+          {
+            "rule_id": "capability.new-tool",
+            "organization_bundle_version": "7",
+            "reason": "Repository policy disables `capability.new-tool`, which organization policy version 7 marks mandatory. Repository policy may tighten a mandatory rule but never disable it."
+          }
+        ]
+      }
+    },
+    {
+      "name": "repository-adds-a-rule-the-organization-never-configured",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "repository": {
+        "rules": [
+          {
+            "rule_id": "delegation.unauthorized",
+            "enabled": true,
+            "severity_floor": "high",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "delegation.unauthorized",
+            "enabled": true,
+            "severity_floor": "high",
+            "mandatory": false
+          },
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [],
+        "rejections": []
+      }
+    },
+    {
+      "name": "repository-removes-an-approved-component",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [],
+        "approved_components": [
+          {
+            "type": "tool",
+            "name_pattern": "requests"
+          },
+          {
+            "type": "tool",
+            "name_pattern": "boto3"
+          }
+        ]
+      },
+      "repository": {
+        "rules": [],
+        "approved_components": [
+          {
+            "type": "tool",
+            "name_pattern": "requests"
+          }
+        ]
+      },
+      "expected": {
+        "rules": [],
+        "approved_components": [
+          {
+            "type": "tool",
+            "name_pattern": "requests"
+          }
+        ],
+        "rejections": []
+      }
+    },
+    {
+      "name": "repository-adds-an-approved-component",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [],
+        "approved_components": [
+          {
+            "type": "tool",
+            "name_pattern": "requests"
+          }
+        ]
+      },
+      "repository": {
+        "rules": [],
+        "approved_components": [
+          {
+            "type": "tool",
+            "name_pattern": "requests"
+          },
+          {
+            "type": "mcp_server",
+            "name_pattern": "shell"
+          }
+        ]
+      },
+      "expected": {
+        "rules": [],
+        "approved_components": [
+          {
+            "type": "tool",
+            "name_pattern": "requests"
+          }
+        ],
+        "rejections": [
+          {
+            "rule_id": "approved-component:mcp_server:shell",
+            "organization_bundle_version": "7",
+            "reason": "Repository policy approves the mcp_server `shell`, which organization policy version 7 does not list. A repository may remove an approved component, never add one."
+          }
+        ]
+      }
+    },
+    {
+      "name": "repository-proposes-an-unrecognized-severity",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "repository": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "catastrophic",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [],
+        "rejections": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "organization_bundle_version": "7",
+            "reason": "Repository policy lowers the severity floor of `secrets.hardcoded` from `medium` to `catastrophic`, which organization policy version 7 does not permit. A repository may raise a floor, never lower it."
+          }
+        ]
+      }
+    },
+    {
+      "name": "a-refused-override-is-refused-whole",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [
+          {
+            "rule_id": "capability.new-tool",
+            "enabled": true,
+            "severity_floor": "low",
+            "mandatory": true
+          }
+        ],
+        "approved_components": []
+      },
+      "repository": {
+        "rules": [
+          {
+            "rule_id": "capability.new-tool",
+            "enabled": false,
+            "severity_floor": "critical",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "capability.new-tool",
+            "enabled": true,
+            "severity_floor": "low",
+            "mandatory": true
+          }
+        ],
+        "approved_components": [],
+        "rejections": [
+          {
+            "rule_id": "capability.new-tool",
+            "organization_bundle_version": "7",
+            "reason": "Repository policy disables `capability.new-tool`, which organization policy version 7 marks mandatory. Repository policy may tighten a mandatory rule but never disable it."
+          }
+        ]
+      }
+    },
+    {
+      "name": "several-weakenings-are-all-reported",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [
+          {
+            "rule_id": "capability.new-tool",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": true
+          },
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "high",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "repository": {
+        "rules": [
+          {
+            "rule_id": "capability.new-tool",
+            "enabled": false,
+            "severity_floor": "medium",
+            "mandatory": false
+          },
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "info",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [
+          {
+            "type": "tool",
+            "name_pattern": "shell"
+          }
+        ]
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "capability.new-tool",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": true
+          },
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "high",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [],
+        "rejections": [
+          {
+            "rule_id": "approved-component:tool:shell",
+            "organization_bundle_version": "7",
+            "reason": "Repository policy approves the tool `shell`, which organization policy version 7 does not list. A repository may remove an approved component, never add one."
+          },
+          {
+            "rule_id": "capability.new-tool",
+            "organization_bundle_version": "7",
+            "reason": "Repository policy disables `capability.new-tool`, which organization policy version 7 marks mandatory. Repository policy may tighten a mandatory rule but never disable it."
+          },
+          {
+            "rule_id": "secrets.hardcoded",
+            "organization_bundle_version": "7",
+            "reason": "Repository policy lowers the severity floor of `secrets.hardcoded` from `high` to `info`, which organization policy version 7 does not permit. A repository may raise a floor, never lower it."
+          }
+        ]
+      }
+    },
+    {
+      "name": "input-order-does-not-change-the-result",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [
+          {
+            "rule_id": "zzz.last",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": false
+          },
+          {
+            "rule_id": "aaa.first",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": false
+          },
+          {
+            "rule_id": "mmm.middle",
+            "enabled": true,
+            "severity_floor": "low",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [
+          {
+            "type": "tool",
+            "name_pattern": "zeta"
+          },
+          {
+            "type": "agent",
+            "name_pattern": "alpha"
+          }
+        ]
+      },
+      "repository": {
+        "rules": [
+          {
+            "rule_id": "mmm.middle",
+            "enabled": true,
+            "severity_floor": "high",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "aaa.first",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": false
+          },
+          {
+            "rule_id": "mmm.middle",
+            "enabled": true,
+            "severity_floor": "high",
+            "mandatory": false
+          },
+          {
+            "rule_id": "zzz.last",
+            "enabled": true,
+            "severity_floor": "medium",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [
+          {
+            "type": "agent",
+            "name_pattern": "alpha"
+          },
+          {
+            "type": "tool",
+            "name_pattern": "zeta"
+          }
+        ],
+        "rejections": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "_comment": "Committed baseline for the regression-margin check. Never auto-updated by CI -- only a human, deliberately. Re-measured on 2026-10-18 on the same 10-CPU arm64 development machine as the 2026-08-20 original (p50 0.5086 s, p95 0.5785 s), after the adapters, rules, and secret scan added since made every scan do more work; see the module docstring of test_benchmark.py for the history.",
+  "p50_seconds": 1.9434390212409198,
+  "p95_seconds": 2.271135666873306
+}

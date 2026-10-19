@@ -1,0 +1,481 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.controlloop.ai/acbom/1.1.0/acbom.schema.json",
+  "title": "ControlLoop Agent Capability Bill of Materials",
+  "description": "Canonical, deterministic, and sanitized ACBOM document for ControlLoop schema version 1.1.0.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generator",
+    "repository",
+    "nodes",
+    "edges",
+    "diagnostics",
+    "digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "$ref": "#/$defs/semanticVersion"
+    },
+    "generator": {
+      "$ref": "#/$defs/generator"
+    },
+    "repository": {
+      "$ref": "#/$defs/repository"
+    },
+    "nodes": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "edges": {
+      "type": "array",
+      "maxItems": 50000,
+      "items": {
+        "$ref": "#/$defs/edge"
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "$ref": "#/$defs/diagnostic"
+      }
+    },
+    "digest": {
+      "$ref": "#/$defs/sha256Digest"
+    },
+    "schema_url": {
+      "$ref": "#/$defs/schemaUrl"
+    }
+  },
+  "$defs": {
+    "sha256Digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "safeIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$"
+    },
+    "safeText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))[^\\u0000-\\u001f\\u007f]+$"
+    },
+    "semanticVersion": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low",
+        "unknown"
+      ]
+    },
+    "nodeType": {
+      "type": "string",
+      "enum": [
+        "agent",
+        "tool",
+        "resource",
+        "identity",
+        "permission",
+        "data-class",
+        "trigger",
+        "policy-boundary"
+      ]
+    },
+    "nodeId": {
+      "type": "string",
+      "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$"
+    },
+    "edgeId": {
+      "type": "string",
+      "pattern": "^clp:edge:sha256:[0-9a-f]{64}$"
+    },
+    "edgeType": {
+      "type": "string",
+      "enum": [
+        "invokes",
+        "reads",
+        "writes",
+        "authenticates-as",
+        "permitted-by",
+        "delegates-to",
+        "receives-from",
+        "constrained-by"
+      ]
+    },
+    "knownBoolean": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "const": "unknown"
+        }
+      ]
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/safeIdentifier"
+        },
+        "version": {
+          "$ref": "#/$defs/semanticVersion"
+        }
+      }
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "root_digest"
+      ],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$"
+        },
+        "root_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        }
+      }
+    },
+    "standardIdentifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "identifier"
+      ],
+      "properties": {
+        "namespace": {
+          "$ref": "#/$defs/safeIdentifier"
+        },
+        "identifier": {
+          "$ref": "#/$defs/safeIdentifier"
+        }
+      }
+    },
+    "securityAttributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "trusted": {
+          "$ref": "#/$defs/knownBoolean"
+        },
+        "destructive": {
+          "$ref": "#/$defs/knownBoolean"
+        },
+        "read_only": {
+          "$ref": "#/$defs/knownBoolean"
+        },
+        "requires_approval": {
+          "$ref": "#/$defs/knownBoolean"
+        },
+        "approval_present": {
+          "$ref": "#/$defs/knownBoolean"
+        },
+        "privileged": {
+          "$ref": "#/$defs/knownBoolean"
+        },
+        "financial_action": {
+          "$ref": "#/$defs/knownBoolean"
+        },
+        "external_communication": {
+          "$ref": "#/$defs/knownBoolean"
+        },
+        "code_execution": {
+          "$ref": "#/$defs/knownBoolean"
+        },
+        "sensitivity": {
+          "type": "string",
+          "enum": [
+            "public",
+            "internal",
+            "confidential",
+            "restricted",
+            "unknown"
+          ]
+        },
+        "data_classifications": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/safeIdentifier"
+          }
+        },
+        "permission_scopes": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/safeIdentifier"
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter"
+      ],
+      "properties": {
+        "adapter": {
+          "$ref": "#/$defs/safeIdentifier"
+        },
+        "path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "line_start": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000000
+        },
+        "line_end": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000000
+        },
+        "parser": {
+          "$ref": "#/$defs/safeIdentifier"
+        },
+        "schema_id": {
+          "$ref": "#/$defs/safeIdentifier"
+        },
+        "document_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        }
+      },
+      "allOf": [
+        {
+          "anyOf": [
+            {
+              "required": [
+                "path"
+              ]
+            },
+            {
+              "required": [
+                "document_digest"
+              ]
+            }
+          ]
+        },
+        {
+          "if": {
+            "required": [
+              "line_start"
+            ]
+          },
+          "then": {
+            "required": [
+              "path"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "line_end"
+            ]
+          },
+          "then": {
+            "required": [
+              "path",
+              "line_start"
+            ]
+          }
+        }
+      ]
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "name",
+        "security_attributes",
+        "confidence",
+        "evidence"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nodeId"
+        },
+        "type": {
+          "$ref": "#/$defs/nodeType"
+        },
+        "subtype": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-z][a-z0-9._-]*$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+        },
+        "security_attributes": {
+          "$ref": "#/$defs/securityAttributes"
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "standards_identifiers": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/standardIdentifier"
+          }
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "source",
+        "target",
+        "type",
+        "status",
+        "security_attributes",
+        "confidence",
+        "evidence"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/edgeId"
+        },
+        "source": {
+          "$ref": "#/$defs/nodeId"
+        },
+        "target": {
+          "$ref": "#/$defs/nodeId"
+        },
+        "type": {
+          "$ref": "#/$defs/edgeType"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "direct",
+            "inferred",
+            "unknown"
+          ]
+        },
+        "security_attributes": {
+          "$ref": "#/$defs/securityAttributes"
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "severity",
+        "message",
+        "confidence",
+        "incomplete",
+        "evidence"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$"
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ]
+        },
+        "message": {
+          "$ref": "#/$defs/safeText"
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "incomplete": {
+          "type": "boolean"
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        }
+      }
+    },
+    "schemaUrl": {
+      "type": "string",
+      "minLength": 9,
+      "maxLength": 2048,
+      "pattern": "^https://[^\\u0000-\\u001f\\u007f\\s]+$"
+    }
+  }
+}

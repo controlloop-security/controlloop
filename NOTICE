@@ -1,0 +1,20 @@
+ControlLoop
+Copyright 2026 ControlLoop
+
+This product includes software developed as part of the ControlLoop
+project (https://github.com/controlloop-security/controlloop),
+licensed under the Apache License, Version 2.0.
+
+The source distribution's test suite includes unmodified copies of the
+following third-party JSON schemas. They are test fixtures only and are
+not part of the installed controlloop package.
+
+- tests/fixtures/cyclonedx/bom-1.6.schema.json and
+  tests/fixtures/cyclonedx/jsf-0.82.schema.json: the CycloneDX Bill of
+  Materials and JSON Signature Format schemas, published by the OWASP
+  CycloneDX project under the Apache License, Version 2.0.
+- tests/fixtures/cyclonedx/spdx.schema.json: the CycloneDX project's
+  enumeration of SPDX license identifiers.
+- tests/fixtures/sarif/sarif-schema-2.1.0.json: the OASIS Static Analysis
+  Results Interchange Format (SARIF) 2.1.0 schema, published by OASIS
+  Open. See tests/fixtures/sarif/README.md for its provenance.

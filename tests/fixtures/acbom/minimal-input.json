@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.2.0",
+  "schema_url": "https://schemas.controlloop.ai/acbom/1.2.0/acbom.schema.json",
+  "generator": {
+    "name": "controlloop",
+    "version": "0.1.0"
+  },
+  "repository": {
+    "commit": "abc123",
+    "root_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "nodes": [
+    {
+      "id": "clp:agent:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "type": "agent",
+      "name": "Refund agent",
+      "security_attributes": {},
+      "confidence": "high",
+      "evidence": [
+        {
+          "adapter": "a2a",
+          "path": ".well-known/agent-card.json"
+        }
+      ]
+    },
+    {
+      "id": "clp:tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "type": "tool",
+      "name": "Lookup refund",
+      "security_attributes": {
+        "read_only": true
+      },
+      "confidence": "high",
+      "evidence": [
+        {
+          "adapter": "mcp",
+          "path": "mcp/tools-list.json"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "clp:edge:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source": "clp:agent:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "target": "clp:tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "type": "invokes",
+      "status": "direct",
+      "security_attributes": {},
+      "confidence": "high",
+      "evidence": [
+        {
+          "adapter": "mcp",
+          "path": "mcp/tools-list.json"
+        }
+      ]
+    }
+  ],
+  "diagnostics": [],
+  "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+}

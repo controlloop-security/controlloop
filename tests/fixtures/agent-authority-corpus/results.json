@@ -1,0 +1,521 @@
+{
+  "_about": "Recorded gate results for the benign agent-configuration corpus. Regenerate with `uv run python tests/test_agent_authority_corpus.py`.",
+  "cases": {
+    "01-prettier-after-edit": {
+      "as_introduced": {
+        "findings": [
+          [
+            "policy.agent-hook-command-change",
+            "high"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "deployment_blocked"
+      },
+      "as_present": {
+        "findings": [
+          [
+            "policy.agent-hook-command-change",
+            "low"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".claude/settings.json"
+      ]
+    },
+    "02-eslint-fix-after-edit": {
+      "as_introduced": {
+        "findings": [
+          [
+            "policy.agent-hook-command-change",
+            "high"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "deployment_blocked"
+      },
+      "as_present": {
+        "findings": [
+          [
+            "policy.agent-hook-command-change",
+            "low"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".claude/settings.json"
+      ]
+    },
+    "03-ruff-format-after-edit": {
+      "as_introduced": {
+        "findings": [
+          [
+            "policy.agent-hook-command-change",
+            "high"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "deployment_blocked"
+      },
+      "as_present": {
+        "findings": [
+          [
+            "policy.agent-hook-command-change",
+            "low"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".claude/settings.json"
+      ]
+    },
+    "04-desktop-notification": {
+      "as_introduced": {
+        "findings": [
+          [
+            "policy.agent-hook-command-change",
+            "high"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "deployment_blocked"
+      },
+      "as_present": {
+        "findings": [
+          [
+            "policy.agent-hook-command-change",
+            "low"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".claude/settings.json"
+      ]
+    },
+    "05-session-start-context": {
+      "as_introduced": {
+        "findings": [
+          [
+            "policy.agent-hook-command-change",
+            "high"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "deployment_blocked"
+      },
+      "as_present": {
+        "findings": [
+          [
+            "policy.agent-hook-command-change",
+            "low"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".claude/settings.json"
+      ]
+    },
+    "06-narrow-allow-rules": {
+      "as_introduced": {
+        "findings": [
+          [
+            "policy.widened-permission-rule",
+            "high"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "deployment_blocked"
+      },
+      "as_present": {
+        "findings": [
+          [
+            "policy.widened-permission-rule",
+            "low"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".claude/settings.json"
+      ]
+    },
+    "07-deny-secrets-plan-mode": {
+      "as_introduced": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "as_present": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".claude/settings.json"
+      ]
+    },
+    "08-pinned-marketplace-plugin": {
+      "as_introduced": {
+        "findings": [
+          [
+            "policy.unpinned-agent-component",
+            "low"
+          ],
+          [
+            "policy.unpinned-agent-component",
+            "medium"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "as_present": {
+        "findings": [
+          [
+            "policy.unpinned-agent-component",
+            "low"
+          ],
+          [
+            "policy.unpinned-agent-component",
+            "low"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".claude/settings.json"
+      ]
+    },
+    "09-skill-release-notes": {
+      "as_introduced": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "as_present": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".claude/skills/release-notes/SKILL.md"
+      ]
+    },
+    "10-skill-test-runner": {
+      "as_introduced": {
+        "findings": [
+          [
+            "policy.component-self-grant",
+            "medium"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "as_present": {
+        "findings": [
+          [
+            "policy.component-self-grant",
+            "low"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".claude/skills/test-runner/SKILL.md"
+      ]
+    },
+    "11-subagent-code-reviewer": {
+      "as_introduced": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "as_present": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".claude/agents/code-reviewer.md"
+      ]
+    },
+    "12-subagent-docs-writer": {
+      "as_introduced": {
+        "findings": [
+          [
+            "policy.component-self-grant",
+            "medium"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "as_present": {
+        "findings": [
+          [
+            "policy.component-self-grant",
+            "low"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".claude/agents/docs-writer.md"
+      ]
+    },
+    "13-slash-command-changelog": {
+      "as_introduced": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "as_present": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".claude/commands/changelog.md"
+      ]
+    },
+    "14-workflow-review-read-only": {
+      "as_introduced": {
+        "findings": [
+          [
+            "policy.widened-permission-rule",
+            "medium"
+          ],
+          [
+            "policy.widened-permission-rule",
+            "medium"
+          ],
+          [
+            "policy.widened-permission-rule",
+            "medium"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "as_present": {
+        "findings": [
+          [
+            "policy.widened-permission-rule",
+            "low"
+          ],
+          [
+            "policy.widened-permission-rule",
+            "low"
+          ],
+          [
+            "policy.widened-permission-rule",
+            "low"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".github/workflows/claude-review.yml"
+      ]
+    },
+    "15-workflow-review-comments": {
+      "as_introduced": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "as_present": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".github/workflows/claude-pr-comments.yml"
+      ]
+    },
+    "16-workflow-codex-read-only": {
+      "as_introduced": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "as_present": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".github/workflows/codex-review.yml"
+      ]
+    },
+    "17-workflow-gemini-triage": {
+      "as_introduced": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "as_present": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".github/workflows/gemini-triage.yml"
+      ]
+    },
+    "18-codex-on-request": {
+      "as_introduced": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "as_present": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".codex/config.toml"
+      ]
+    },
+    "19-gemini-read-tools": {
+      "as_introduced": {
+        "findings": [
+          [
+            "policy.widened-permission-rule",
+            "medium"
+          ],
+          [
+            "policy.widened-permission-rule",
+            "medium"
+          ],
+          [
+            "policy.widened-permission-rule",
+            "medium"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "as_present": {
+        "findings": [
+          [
+            "policy.widened-permission-rule",
+            "low"
+          ],
+          [
+            "policy.widened-permission-rule",
+            "low"
+          ],
+          [
+            "policy.widened-permission-rule",
+            "low"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".gemini/settings.json"
+      ]
+    },
+    "20-cursor-format-hook": {
+      "as_introduced": {
+        "findings": [
+          [
+            "policy.agent-hook-command-change",
+            "high"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "deployment_blocked"
+      },
+      "as_present": {
+        "findings": [
+          [
+            "policy.agent-hook-command-change",
+            "low"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".cursor/hooks.json"
+      ]
+    },
+    "21-kiro-format-on-save": {
+      "as_introduced": {
+        "findings": [
+          [
+            "policy.agent-hook-command-change",
+            "high"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "deployment_blocked"
+      },
+      "as_present": {
+        "findings": [
+          [
+            "policy.agent-hook-command-change",
+            "low"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".kiro/hooks/format.json"
+      ]
+    },
+    "22-mcp-pinned-filesystem": {
+      "as_introduced": {
+        "findings": [
+          [
+            "policy.mcp-server-identity-change",
+            "medium"
+          ]
+        ],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "as_present": {
+        "findings": [],
+        "incomplete": [],
+        "verdict": "passed"
+      },
+      "files": [
+        ".mcp.json"
+      ]
+    }
+  },
+  "summary": {
+    "as_introduced": {
+      "deployment_blocked": 8,
+      "passed_with_warnings": 0
+    },
+    "as_present": {
+      "deployment_blocked": 0,
+      "passed_with_warnings": 0
+    },
+    "cases": 22
+  }
+}

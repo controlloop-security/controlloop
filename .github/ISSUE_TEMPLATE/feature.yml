@@ -1,0 +1,30 @@
+name: Feature request
+description: A capability you would like ControlLoop to have
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: How you would like ControlLoop to behave, ideally with an example command and its output.
+    validations:
+      required: true
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Files or agent hosts involved
+      description: For new discovery, the file formats or agent hosts ControlLoop should read, with a public example if there is one.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you have considered

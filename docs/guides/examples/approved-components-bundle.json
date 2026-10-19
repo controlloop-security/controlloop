@@ -1,0 +1,44 @@
+{
+  "rules": [
+    {
+      "rule_id": "policy.unsanctioned-agent-component",
+      "enabled": true,
+      "severity_floor": "medium",
+      "mandatory": true
+    }
+  ],
+  "approved_components": [
+    {
+      "type": "mcp_server",
+      "name_pattern": "catalog-docs",
+      "package": "@widgetworks-example/catalog-docs-mcp",
+      "version_range": "1.4.x",
+      "note": "Product docs search; patch releases only."
+    },
+    {
+      "type": "mcp_server",
+      "name_pattern": "catalog-search",
+      "package": "@widgetworks-example/catalog-search-mcp",
+      "version_range": ">=2.1.0 <2.2.0",
+      "digest": "sha256:5143fff499ec",
+      "note": "Pinned to the declaration the security team reviewed."
+    },
+    {
+      "type": "mcp_server",
+      "name_pattern": "web-fetch",
+      "package": "@widgetworks-example/web-fetch-mcp",
+      "version_range": "1.x"
+    },
+    {
+      "type": "hook",
+      "name_pattern": "PostToolUse",
+      "command_pattern": "npx prettier *"
+    },
+    {
+      "type": "marketplace",
+      "name_pattern": "widgetworks-*",
+      "pin_required": true
+    }
+  ],
+  "publish": false
+}

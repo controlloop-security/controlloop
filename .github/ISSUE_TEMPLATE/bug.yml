@@ -1,0 +1,49 @@
+name: Bug report
+description: Something ControlLoop did that it should not have, or did not do that it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please use synthetic data: no real credentials,
+        customer data, private prompts, or proprietary repositories. To report
+        a security vulnerability, use a private security advisory instead (see
+        SECURITY.md).
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `controlloop --version`.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The command you ran and the smallest repository or files that show the problem.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: The output, exit code, and any diagnostics. Redact anything sensitive.
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Python version, and how you installed ControlLoop.

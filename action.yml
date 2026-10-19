@@ -1,0 +1,249 @@
+name: ControlLoop gate
+description: >-
+  Run `controlloop gate` against a checked-out repository and fail the
+  check on a blocking verdict. Requires `fetch-depth: 0` in your own
+  `actions/checkout` step (or enough depth to include the merge-base with
+  your default/target branch) -- `gate` needs real git history to compute
+  an automatic baseline; the shallow default (`fetch-depth: 1`) will fail
+  with a clear, actionable message rather than silently skipping the
+  comparison. Pin this action to a tagged release or commit SHA
+  (`uses: controlloop-security/controlloop@<ref>`); it installs the CLI from
+  that exact, immutable checkout's own locked dependencies -- never from
+  an unpinned or "latest" source.
+author: ControlLoop
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  path:
+    description: >-
+      Repository directory to scan (also where controlloop.toml and
+      controlloop.yaml, if present, are resolved from). Defaults to the
+      caller's own checkout root.
+    required: false
+    default: ${{ github.workspace }}
+  default-branch:
+    description: >-
+      Override the branch merge-base baseline resolution treats as the
+      default/target branch. Defaults to $GITHUB_BASE_REF on a
+      pull_request event (the PR's real target branch); left empty on
+      any other event, letting `gate` auto-detect (origin/HEAD, falling
+      back to common candidate names).
+    required: false
+    default: ""
+  severity-threshold:
+    description: >-
+      Minimum finding severity that blocks the gate: info, low, medium,
+      high, or critical. Leave empty to use the repository's own
+      controlloop.toml / CONTROLLOOP_SEVERITY_THRESHOLD (default: high).
+    required: false
+    default: ""
+  fail-on-incomplete:
+    description: >-
+      Whether an incomplete-analysis verdict (gate's exit code 3, no
+      blocking finding but analysis could not fully complete) fails this
+      check. When false, the check still passes but emits a workflow
+      warning annotation naming the incomplete-analysis condition. Every
+      other verdict (pass, warn, fail) is unaffected by this input.
+    required: false
+    default: "true"
+  evidence-path:
+    description: Path (relative to `path`) to write the retainable evidence artifact to.
+    required: false
+    default: evidence.json
+  format:
+    description: "Output format for the rendered summary: text, json, or sarif."
+    required: false
+    default: text
+  sarif-path:
+    description: >-
+      Path (relative to `path`) to write the SARIF 2.1.0 log document to.
+      Always written, independent of `format` -- used by this action's
+      own upload-to-code-scanning and check-summary steps below.
+    required: false
+    default: sarif.json
+  upload-sarif:
+    description: >-
+      Whether to upload the SARIF document to GitHub code scanning.
+      Requires the calling workflow to grant `security-events: write`.
+      Upload failure (for example, code scanning not enabled on a
+      private repository without GitHub Advanced Security) degrades to
+      a workflow warning and never changes this check's own pass/fail
+      -- disable this input entirely if your
+      workflow does not have `security-events: write` and you would
+      rather skip the attempt than see the warning.
+    required: false
+    default: "true"
+  pr-comment:
+    description: >-
+      Whether to keep one change-only comment on the pull request with
+      the authority statement. It is
+      posted only when the pull request gives an agent new power, edited
+      in place on later pushes, and needs `pull-requests: write` on the
+      calling workflow; without it, on a fork, or on an event that is
+      not a pull request, the step is skipped with a notice. It never
+      changes this check's pass/fail. Set to "false" to turn it off.
+    required: false
+    default: "true"
+  github-token:
+    description: >-
+      Token used only by the pull-request comment step. Defaults to the
+      workflow's own token; the CLI never sees it.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  verdict:
+    description: "One of: passed, passed_with_warnings, review_required, deployment_blocked."
+    value: ${{ steps.run-gate.outputs.verdict }}
+  exit-code:
+    description: The real exit code `controlloop gate` returned.
+    value: ${{ steps.run-gate.outputs.exit-code }}
+  evidence-path:
+    description: Absolute path to the written evidence artifact.
+    value: ${{ steps.run-gate.outputs.evidence-path }}
+  sarif-path:
+    description: Absolute path to the written SARIF log document.
+    value: ${{ steps.run-gate.outputs.sarif-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@v10.0.1
+      with:
+        version: "0.9.30"
+        python-version: "3.12"
+
+    - name: Install ControlLoop from this action's own pinned checkout
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: uv sync --locked --all-groups
+
+    - name: Run controlloop gate
+      id: run-gate
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        CL_ACTION_PATH: ${{ inputs.path }}
+        CL_DEFAULT_BRANCH: ${{ inputs.default-branch }}
+        CL_SEVERITY_THRESHOLD: ${{ inputs.severity-threshold }}
+        CL_FAIL_ON_INCOMPLETE: ${{ inputs.fail-on-incomplete }}
+        CL_EVIDENCE_PATH: ${{ inputs.evidence-path }}
+        CL_SARIF_PATH: ${{ inputs.sarif-path }}
+        CL_FORMAT: ${{ inputs.format }}
+        GITHUB_BASE_REF: ${{ github.base_ref }}
+        CONTROLLOOP_SEVERITY_THRESHOLD: ${{ inputs.severity-threshold }}
+      run: |
+        set +e
+
+        default_branch="$CL_DEFAULT_BRANCH"
+        if [ -z "$default_branch" ] && [ -n "$GITHUB_BASE_REF" ]; then
+          default_branch="$GITHUB_BASE_REF"
+        fi
+
+        evidence_path="$CL_ACTION_PATH/$CL_EVIDENCE_PATH"
+        sarif_path="$CL_ACTION_PATH/$CL_SARIF_PATH"
+
+        args=(gate "$CL_ACTION_PATH" --evidence-path "$evidence_path" --sarif-path "$sarif_path" --format "$CL_FORMAT")
+        if [ -n "$default_branch" ]; then
+          args+=(--default-branch "$default_branch")
+        fi
+
+        if [ -z "$CL_SEVERITY_THRESHOLD" ]; then
+          unset CONTROLLOOP_SEVERITY_THRESHOLD
+        fi
+
+        uv run controlloop "${args[@]}"
+        code=$?
+
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        echo "evidence-path=$evidence_path" >> "$GITHUB_OUTPUT"
+        echo "sarif-path=$sarif_path" >> "$GITHUB_OUTPUT"
+
+        verdict=""
+        if [ -f "$evidence_path" ]; then
+          verdict=$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['verdict'])" "$evidence_path" 2>/dev/null || true)
+        fi
+        echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+
+        if [ "$code" -eq 3 ] && [ "$CL_FAIL_ON_INCOMPLETE" = "false" ]; then
+          echo "::warning::controlloop gate reported an incomplete analysis (exit 3), but fail-on-incomplete is false -- not failing this check. See the uploaded evidence artifact for what could not be fully analyzed."
+          exit 0
+        fi
+
+        exit "$code"
+
+    - name: Upload SARIF to code scanning
+      if: always() && inputs.upload-sarif == 'true' && steps.run-gate.outputs.sarif-path != ''
+      id: upload-sarif
+      continue-on-error: true
+      uses: github/codeql-action/upload-sarif@v4.37.7
+      with:
+        sarif_file: ${{ steps.run-gate.outputs.sarif-path }}
+        category: controlloop
+
+    - name: Warn if the SARIF upload did not succeed
+      if: always() && inputs.upload-sarif == 'true' && steps.upload-sarif.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "::warning::SARIF upload to code scanning did not succeed -- findings are still in the gate log output and the uploaded evidence artifact below. This does not affect the gate's own pass/fail result. Common cause: code scanning is not enabled for this repository (private repositories need GitHub Advanced Security)."
+
+    - name: Write the check summary
+      if: always() && steps.run-gate.outputs.sarif-path != ''
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        CL_SARIF_PATH: ${{ steps.run-gate.outputs.sarif-path }}
+        CL_VERDICT: ${{ steps.run-gate.outputs.verdict }}
+        CL_EVIDENCE_PATH: ${{ steps.run-gate.outputs.evidence-path }}
+      run: |
+        # The blast-radius statement, read straight out of the SARIF
+        # document this action already wrote
+        # (runs[0].properties.controlloop.blastRadius, via
+        # action-scripts/blast_radius_summary.py) -- no second `gate`
+        # invocation needed to recover it.
+        #
+        # Runs after the SARIF upload step deliberately: a real run of
+        # this action showed the "Upload SARIF to code scanning" step's
+        # own summary write clobbers -- not appends to --
+        # $GITHUB_STEP_SUMMARY, wiping out anything
+        # written before it in the same job. Writing this content last
+        # guarantees it survives regardless of that step's own behavior.
+        {
+          echo "### ControlLoop"
+          echo
+          echo "**Verdict:** \`${CL_VERDICT:-unknown}\`"
+          echo
+          uv run python "${{ github.action_path }}/action-scripts/blast_radius_summary.py" "$CL_SARIF_PATH"
+          echo
+          echo "Evidence: \`${CL_EVIDENCE_PATH:-unknown}\`"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Keep the pull-request comment current
+      # One change-only comment carrying the
+      # authority statement. Reads only the SARIF document `gate` wrote
+      # and the verdict; the CLI itself makes no network call. The
+      # script always exits 0 and this step is continue-on-error, so a
+      # failed post can never change the gate's verdict or exit code.
+      # On an event that is not a pull request the script prints a notice
+      # and does nothing, so the skip is visible rather than silent.
+      if: always() && inputs.pr-comment == 'true' && steps.run-gate.outputs.sarif-path != ''
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        CL_SARIF_PATH: ${{ steps.run-gate.outputs.sarif-path }}
+        CL_VERDICT: ${{ steps.run-gate.outputs.verdict }}
+        CONTROLLOOP_GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        uv run python "${{ github.action_path }}/action-scripts/pr_comment.py" "$CL_SARIF_PATH" "$CL_VERDICT"
+
+    - name: Upload evidence artifact
+      if: always() && steps.run-gate.outputs.evidence-path != ''
+      uses: actions/upload-artifact@v4.3.6
+      with:
+        name: controlloop-evidence
+        path: ${{ steps.run-gate.outputs.evidence-path }}
+        if-no-files-found: warn

@@ -1,0 +1,16 @@
+# An example, not a workflow GitHub runs: it lives under examples/.
+name: Agent review
+on:
+  pull_request:
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: --dangerously-skip-permissions

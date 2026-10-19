@@ -1,0 +1,28 @@
+name: DCO
+
+# Every commit in a pull request must be signed off by its author under the
+# Developer Certificate of Origin. See CONTRIBUTING.md and
+# scripts/check-dco.sh.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dco:
+    name: Every commit is signed off
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pull request with its history
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Check Signed-off-by on every commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash scripts/check-dco.sh "$BASE_SHA" "$HEAD_SHA"

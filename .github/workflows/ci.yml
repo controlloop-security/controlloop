@@ -1,0 +1,20 @@
+name: CI
+
+# Calls the shared verified command surface for this package on every
+# pull request and every push to main. The actual job definition lives in
+# verify.yml (a reusable `workflow_call` workflow) so pull-request CI and
+# the release pipeline (release.yml) can never drift apart.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  cli:
+    name: CLI checks
+    uses: ./.github/workflows/verify.yml

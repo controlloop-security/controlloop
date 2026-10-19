@@ -1,0 +1,269 @@
+name: Action end-to-end test
+
+# A real, pull_request-triggered proof that the ControlLoop GitHub Action
+# (action.yml, repository root) genuinely blocks a real ceiling breach,
+# genuinely passes a clean scan, and genuinely retains the evidence
+# artifact -- not a unit test calling the action's internals. It also
+# asserts that the SARIF upload is genuinely attempted (and, in a
+# repository without GitHub Advanced Security code scanning enabled,
+# genuinely degrades without affecting the job's own outcome -- the
+# upload-success path cannot be demonstrated live there), and that the
+# SARIF document the check summary reads from genuinely carries the
+# blast-radius property. Confirming that property actually renders in the
+# job's own Summary tab is a human, visual check against this run --
+# $GITHUB_STEP_SUMMARY is a fresh per-step file, so a later workflow step
+# in the same job cannot read back what an earlier one wrote to it to
+# assert on automatically; see the blast-radius assertion steps below for
+# the full reasoning, discovered empirically on a real run.
+#
+# Fixtures are built fresh into $RUNNER_TEMP at run time, outside this
+# repository's own checked-out tree, deliberately: nesting a scan target
+# inside this repository's own git worktree makes controlloop's baseline
+# resolution silently discover and archive THIS repository's own history
+# instead of treating the fixture as having no git history of its own (a
+# real bug found while authoring this workflow -- tracked separately, not
+# fixed here, since it is unrelated to the action itself).
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  should-block:
+    name: Action blocks a real ceiling breach
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Build the should-block fixture
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/should-block"
+          cat > "$RUNNER_TEMP/should-block/agent-card.json" <<'JSON'
+          {"name": "refund-agent", "skills": [{"id": "delete-database", "name": "delete-database"}]}
+          JSON
+          cat > "$RUNNER_TEMP/should-block/controlloop.yaml" <<'YAML'
+          schema_version: '1.0.0'
+          owner: security-team
+          ceilings:
+            - agent: refund-agent
+              prohibited_resources: [delete-database]
+          YAML
+
+      - name: Run the action against the should-block fixture
+        id: gate
+        continue-on-error: true
+        uses: ./
+        with:
+          path: ${{ runner.temp }}/should-block
+
+      - name: Assert the action actually blocked
+        shell: bash
+        run: |
+          echo "outcome: ${{ steps.gate.outcome }}"
+          echo "verdict: ${{ steps.gate.outputs.verdict }}"
+          echo "exit-code: ${{ steps.gate.outputs.exit-code }}"
+          if [ "${{ steps.gate.outcome }}" != "failure" ]; then
+            echo "::error::expected the action to fail on a known ceiling breach, but it reported outcome='${{ steps.gate.outcome }}' (verdict='${{ steps.gate.outputs.verdict }}') -- the blocking mechanism has regressed"
+            exit 1
+          fi
+          if [ "${{ steps.gate.outputs.verdict }}" != "deployment_blocked" ]; then
+            echo "::error::expected verdict deployment_blocked, got '${{ steps.gate.outputs.verdict }}'"
+            exit 1
+          fi
+
+      - name: Assert SARIF was attempted and the upload degrades safely
+        shell: bash
+        run: |
+          echo "sarif-path: ${{ steps.gate.outputs.sarif-path }}"
+          if [ -z "${{ steps.gate.outputs.sarif-path }}" ]; then
+            echo "::error::expected a sarif-path output -- the action never attempted to produce a SARIF document"
+            exit 1
+          fi
+          # Whatever the SARIF upload step's own outcome was
+          # (this repository has no GitHub Advanced Security enabled,
+          # so it is expected to fail here), the job's own outcome above
+          # was already asserted to depend only on the real gate verdict
+          # -- the composite action's own internal continue-on-error on
+          # its upload step is what makes that true, not anything this
+          # workflow does. This step exists only to make the SARIF
+          # attempt itself visible as real, recorded evidence.
+
+      - name: Assert the summary step wrote the blast-radius property
+        shell: bash
+        run: |
+          # GITHUB_STEP_SUMMARY is a fresh, per-step file -- confirmed
+          # empirically on a real run: a later step in the
+          # same job cannot read what an earlier step (including one
+          # inside a composite action) wrote to it, since the runner
+          # only concatenates every step's own summary fragment into
+          # the final rendered job summary after the job completes.
+          # There is no documented API this workflow can use to read
+          # that final rendering back mid-job either. What this step
+          # *can* verify, honestly, is the data the "Write the check
+          # summary" step (inside action.yml) actually consumed: the
+          # SARIF file it read from really does carry the blast-radius
+          # property, using the identical script that step uses.
+          # Visual confirmation that the rendered summary itself shows
+          # this content is a human check against this run's own
+          # Summary tab, not an automated one.
+          uv run --project "${{ github.workspace }}" python "${{ github.workspace }}/action-scripts/blast_radius_summary.py" "${{ steps.gate.outputs.sarif-path }}" > /tmp/blast_radius_lines.txt
+          cat /tmp/blast_radius_lines.txt
+          if ! grep -q "material capability" /tmp/blast_radius_lines.txt; then
+            echo "::error::expected the SARIF document's embedded blast-radius property to be non-empty and mention 'material capability'"
+            exit 1
+          fi
+
+  should-pass:
+    name: Action passes a clean scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Build the should-pass fixture
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/should-pass"
+          cat > "$RUNNER_TEMP/should-pass/agent-card.json" <<'JSON'
+          {"name": "report-agent", "skills": [{"id": "read-quarterly-metrics", "name": "read-quarterly-metrics"}]}
+          JSON
+
+      - name: Run the action against the should-pass fixture
+        id: gate
+        uses: ./
+        with:
+          path: ${{ runner.temp }}/should-pass
+
+      - name: Assert the action passed
+        shell: bash
+        run: |
+          echo "verdict: ${{ steps.gate.outputs.verdict }}"
+          case "${{ steps.gate.outputs.verdict }}" in
+            passed|passed_with_warnings) ;;
+            *)
+              echo "::error::expected a passing verdict, got '${{ steps.gate.outputs.verdict }}'"
+              exit 1
+              ;;
+          esac
+
+      - name: Assert the summary step wrote the blast-radius property
+        shell: bash
+        run: |
+          # See the identical step in the should-block job above for why
+          # this checks the SARIF document's own embedded property
+          # rather than reading back $GITHUB_STEP_SUMMARY.
+          uv run --project "${{ github.workspace }}" python "${{ github.workspace }}/action-scripts/blast_radius_summary.py" "${{ steps.gate.outputs.sarif-path }}" > /tmp/blast_radius_lines.txt
+          cat /tmp/blast_radius_lines.txt
+          if ! grep -q "material capability" /tmp/blast_radius_lines.txt; then
+            echo "::error::expected the SARIF document's embedded blast-radius property to be non-empty and mention 'material capability'"
+            exit 1
+          fi
+
+  pr-comment:
+    # The change-only pull-request comment, end to end through the real
+    # action, against an intercepting API server so no real pull request
+    # is touched. Three runs over one fixture repository: a hook added (create), its command changed
+    # (update in place), and the change reverted (the empty-delta update).
+    name: Action keeps one change-only pull-request comment current
+    # A fork's pull request is skipped by design (its token cannot write),
+    # so this proof runs on same-repository pull requests only.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Start the intercepting API server
+        shell: bash
+        run: |
+          port=$(python3 -c "import socket; s=socket.socket(); s.bind(('127.0.0.1', 0)); print(s.getsockname()[1])")
+          python3 action-scripts/fake_github_api.py "$port" "$RUNNER_TEMP/api-state.json" &
+          for _ in $(seq 1 50); do
+            [ -f "$RUNNER_TEMP/api-state.json" ] && break
+            sleep 0.1
+          done
+          # The action's comment step reads this instead of GITHUB_API_URL,
+          # which a workflow cannot override.
+          echo "CONTROLLOOP_GITHUB_API_URL=http://127.0.0.1:$port" >> "$GITHUB_ENV"
+
+      - name: Build the fixture repository (a hook added on a branch)
+        shell: bash
+        run: |
+          fixture="$RUNNER_TEMP/pr-comment"
+          mkdir -p "$fixture" && cd "$fixture"
+          git init -q -b main
+          git config user.email e2e@example.invalid
+          git config user.name e2e
+          echo "# fixture" > README.md
+          git add -A && git commit -q -m base
+          git switch -q -c change
+          mkdir .claude
+          printf '%s' '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"node .github/setup.js"}]}]}}' > .claude/settings.json
+          git add -A && git commit -q -m "add a hook"
+
+      - name: First run (expected to create the comment)
+        uses: ./
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/pr-comment
+          default-branch: main
+          upload-sarif: "false"
+
+      - name: Change the hook's command
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/pr-comment"
+          printf '%s' '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"node .github/other.js"}]}]}}' > .claude/settings.json
+          git add -A && git commit -q -m "change the hook"
+
+      - name: Second run (expected to edit the same comment)
+        uses: ./
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/pr-comment
+          default-branch: main
+          upload-sarif: "false"
+
+      - name: Revert the change
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/pr-comment"
+          git rm -q -r .claude
+          git commit -q -m "revert"
+
+      - name: Third run (expected to say the PR no longer changes authority)
+        uses: ./
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/pr-comment
+          default-branch: main
+          upload-sarif: "false"
+
+      - name: Assert one comment, created once and edited twice
+        shell: bash
+        run: |
+          python3 - "$RUNNER_TEMP/api-state.json" <<'PY'
+          import json, sys
+          state = json.load(open(sys.argv[1]))
+          methods = [request["method"] for request in state["requests"]]
+          print("requests:", methods)
+          comments = state["comments"]
+          assert len(comments) == 1, f"expected one comment, got {len(comments)}"
+          assert methods.count("POST") == 1, methods
+          assert methods.count("PATCH") == 2, methods
+          body = comments[0]["body"]
+          assert body.startswith("<!-- controlloop:authority-statement -->"), body
+          assert "no longer changes agent authority" in body, body
+          assert "setup.js" not in body and "other.js" not in body, body
+          print("ok: created once, edited in place, cleared on an empty delta")
+          PY

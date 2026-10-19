@@ -1,0 +1,784 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.controlloop.dev/report/1.0.0/report.schema.json",
+  "title": "ControlLoop Scan Report",
+  "description": "Stable, versioned, machine-readable scan report for ControlLoop report schema version 1.0.0.",
+  "$defs": {
+    "BlastRadiusStatement": {
+      "additionalProperties": false,
+      "description": "The single worst-ranked reachable action in a graph, as a\ndiscrete, independently serializable field -- never folded into\nprose-only text.",
+      "properties": {
+        "schema_version": {
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "material_class": {
+          "$ref": "#/$defs/MaterialCapabilityClass"
+        },
+        "agent_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "agent_name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+          "title": "Agent Name",
+          "type": "string"
+        },
+        "action": {
+          "$ref": "#/$defs/EdgeType"
+        },
+        "target_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+          "title": "Target Name",
+          "type": "string"
+        },
+        "permitting_identity_id": {
+          "anyOf": [
+            {
+              "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Permitting Identity Id"
+        },
+        "permitting_identity_name": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Permitting Identity Name"
+        },
+        "transitive": {
+          "title": "Transitive",
+          "type": "boolean"
+        },
+        "path": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PathHop"
+          },
+          "title": "Path",
+          "type": "array"
+        },
+        "incomplete": {
+          "title": "Incomplete",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version",
+        "material_class",
+        "agent_id",
+        "agent_name",
+        "action",
+        "target_id",
+        "target_name",
+        "transitive",
+        "incomplete"
+      ],
+      "title": "BlastRadiusStatement",
+      "type": "object"
+    },
+    "CapabilityPath": {
+      "additionalProperties": false,
+      "description": "A path from an agent to a tool, resource, identity, permission,\nor data-class node, naming the full sequence of hops that produced\nit. `hops` is plural and ordered so a direct path (one hop) and a\nbounded transitive path (more than one) share one shape.",
+      "properties": {
+        "schema_version": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "agent_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "target_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_type": {
+          "$ref": "#/$defs/NodeType"
+        },
+        "hops": {
+          "items": {
+            "$ref": "#/$defs/PathHop"
+          },
+          "minItems": 1,
+          "title": "Hops",
+          "type": "array"
+        },
+        "confidence": {
+          "$ref": "#/$defs/Confidence"
+        }
+      },
+      "required": [
+        "schema_version",
+        "agent_id",
+        "target_id",
+        "target_type",
+        "hops",
+        "confidence"
+      ],
+      "title": "CapabilityPath",
+      "type": "object"
+    },
+    "Confidence": {
+      "description": "Confidence assigned to canonical discoveries.",
+      "enum": [
+        "high",
+        "medium",
+        "low",
+        "unknown"
+      ],
+      "title": "Confidence",
+      "type": "string"
+    },
+    "Diagnostic": {
+      "additionalProperties": false,
+      "description": "Sanitized analysis diagnostic.",
+      "properties": {
+        "code": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$",
+          "title": "Code",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/DiagnosticSeverity"
+        },
+        "message": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+          "title": "Message",
+          "type": "string"
+        },
+        "confidence": {
+          "$ref": "#/$defs/Confidence"
+        },
+        "incomplete": {
+          "title": "Incomplete",
+          "type": "boolean"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "message",
+        "confidence",
+        "incomplete",
+        "evidence"
+      ],
+      "title": "Diagnostic",
+      "type": "object"
+    },
+    "DiagnosticSeverity": {
+      "description": "Severity of a non-finding analysis diagnostic.",
+      "enum": [
+        "info",
+        "warning",
+        "error"
+      ],
+      "title": "DiagnosticSeverity",
+      "type": "string"
+    },
+    "EdgeType": {
+      "description": "Canonical ACBOM edge relationship types.",
+      "enum": [
+        "invokes",
+        "reads",
+        "writes",
+        "authenticates-as",
+        "permitted-by",
+        "delegates-to",
+        "receives-from",
+        "constrained-by"
+      ],
+      "title": "EdgeType",
+      "type": "string"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "description": "Sanitized provenance for a discovery or diagnostic.",
+      "properties": {
+        "adapter": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Adapter",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "line_start": {
+          "anyOf": [
+            {
+              "maximum": 10000000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line Start"
+        },
+        "line_end": {
+          "anyOf": [
+            {
+              "maximum": 10000000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line End"
+        },
+        "parser": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parser"
+        },
+        "schema_id": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schema Id"
+        },
+        "document_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Document Digest"
+        }
+      },
+      "required": [
+        "adapter"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Finding": {
+      "additionalProperties": false,
+      "description": "A complete, self-describing security or policy finding. Frozen,\n`extra=\"forbid\"`, `strict=True`, matching every other\ncanonical/computed-report model in this codebase.\n\nEvery core field is required with no default, so omitting any of\nthem raises `pydantic.ValidationError` at construction rather than\nproducing a partially-populated `Finding`; this codebase has no\ncustom validation-error wrapper for that guarantee anywhere else\n(`Node`, `Edge`, `Diagnostic`, `RuleObservation` all rely on\nPydantic's own strict, defaultless required fields), and this model\nfollows the same precedent rather than inventing one.\n\n`message` is included even though the core field list does not\nseparately name it: without it, a `Finding` would name a rule and a\nseverity but never describe, in words, what was actually found.\n\n`id` is a required, precomputed field, not derived by a validator\non this model -- matching `Node.id`/`Edge.id`'s own precedent of\nbeing precomputed identity material supplied to a frozen model.\nConstruct a `Finding` via `finding_from_observation` (below) for\nthe common case, which always computes `id` via\n`controlloop.findings.identity.finding_id` first; a caller may also\nconstruct one directly, supplying an already-computed `id`.",
+      "properties": {
+        "schema_version": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^clp:finding:sha256:[0-9a-f]{64}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "rule_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "rule_version": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+          "title": "Rule Version",
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/FindingSeverity"
+        },
+        "confidence": {
+          "$ref": "#/$defs/Confidence"
+        },
+        "affected_agent": {
+          "pattern": "^clp:agent:sha256:[0-9a-f]{64}$",
+          "title": "Affected Agent",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "capability_path": {
+          "$ref": "#/$defs/CapabilityPath"
+        },
+        "change_state": {
+          "$ref": "#/$defs/FindingChangeState"
+        },
+        "remediation": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+          "title": "Remediation",
+          "type": "string"
+        },
+        "documentation_url": {
+          "maxLength": 2048,
+          "minLength": 9,
+          "pattern": "^https://[^\\x00-\\x1f\\x7f\\s]+$",
+          "title": "Documentation Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "id",
+        "rule_id",
+        "rule_version",
+        "message",
+        "severity",
+        "confidence",
+        "affected_agent",
+        "evidence",
+        "capability_path",
+        "change_state",
+        "remediation",
+        "documentation_url"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "FindingChangeState": {
+      "description": "How the capability this finding concerns classifies against a\nbaseline. Mirrors `controlloop.diff.models.ChangeKind`'s\nfour members one-for-one (`ADDED`, `REMOVED`, `CHANGED`, `UNKNOWN`)\nwithout importing or modifying that type, plus one honest fifth\nstate: `NOT_COMPARED`.\n\n`controlloop.policy.models.RuleContext.diff` is `DiffResult | None`\n-- a rule may run with no baseline at all, and every finding must\nstill carry a `change_state`.\nCollapsing \"no baseline was compared\" into `ChangeKind.UNKNOWN`\nwould contradict that member's own documented meaning (a specific\nclaim about a completed comparison whose confidence dropped, not an\nabsent one) and would violate this repository's \"unknown, never\nomitted\" invariant -- the same reasoning\n`controlloop.diff.report.ComparisonScope` already applied, in the\nsame non-invasive way (a new enum layered on top, not a change to\n`controlloop.diff.models`), to keep \"not evaluated\" distinct from\n\"confirmed unchanged\".",
+      "enum": [
+        "added",
+        "removed",
+        "changed",
+        "unknown",
+        "not-compared"
+      ],
+      "title": "FindingChangeState",
+      "type": "string"
+    },
+    "FindingSeverity": {
+      "description": "The minimal severity scale a finding requires, in ascending\ndeclared order. No ranking function, comparison operator, or\nconfigurable gate threshold is defined here -- see this module's\nown docstring, first scope boundary. `controlloop.policy.thresholds`\nowns that policy layer and consumes this same enum rather than\ndefining a parallel one.",
+      "enum": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "FindingSeverity",
+      "type": "string"
+    },
+    "Generator": {
+      "additionalProperties": false,
+      "description": "Generator identity recorded in an ACBOM envelope.",
+      "properties": {
+        "name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "title": "Generator",
+      "type": "object"
+    },
+    "MaterialCapabilityClass": {
+      "description": "The taxonomy's eight members: the seven named material\ncapability classes, plus `UNCLASSIFIED` for a capability this\ntaxonomy could not resolve one way or the other.",
+      "enum": [
+        "unclassified",
+        "destructive-action",
+        "financial-action",
+        "code-execution",
+        "external-communication",
+        "sensitive-data-access",
+        "delegation",
+        "write-access"
+      ],
+      "title": "MaterialCapabilityClass",
+      "type": "string"
+    },
+    "MaterialChange": {
+      "additionalProperties": false,
+      "description": "One material capability's classification against the baseline.\n`agent_name`/`target_name` are the resolved `Node.name` display\nstrings at the time this was computed -- denormalized here\n(rather than requiring a caller to re-resolve `agent_id`/`target_id`\nagainst a node set just to render a sentence) so the \"generated from\nstructured data\" summary can name something a person\nrecognizes, not only a content-addressed ID.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/MaterialChangeKind"
+        },
+        "material_class": {
+          "$ref": "#/$defs/MaterialCapabilityClass"
+        },
+        "agent_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "agent_name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+          "title": "Agent Name",
+          "type": "string"
+        },
+        "action": {
+          "$ref": "#/$defs/EdgeType"
+        },
+        "target_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+          "title": "Target Name",
+          "type": "string"
+        },
+        "transitive": {
+          "title": "Transitive",
+          "type": "boolean"
+        },
+        "path": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PathHop"
+          },
+          "title": "Path",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "material_class",
+        "agent_id",
+        "agent_name",
+        "action",
+        "target_id",
+        "target_name",
+        "transitive"
+      ],
+      "title": "MaterialChange",
+      "type": "object"
+    },
+    "MaterialChangeKind": {
+      "description": "How one material capability changed against the baseline,\nmirroring `controlloop.diff.models.ChangeKind` one-for-one but\nnamed for this summary's own vocabulary (\"gained authority\")\nrather than the generic diff vocabulary.",
+      "enum": [
+        "gained",
+        "lost",
+        "changed",
+        "unknown"
+      ],
+      "title": "MaterialChangeKind",
+      "type": "string"
+    },
+    "MaterialChangeSummary": {
+      "additionalProperties": false,
+      "description": "Complete material capability change summary. Contains only\nchanges with at least one matched material class -- \"no material\nchange\" is `is_empty` being `True`, not a separate\nsentinel entry.",
+      "properties": {
+        "schema_version": {
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "changes": {
+          "items": {
+            "$ref": "#/$defs/MaterialChange"
+          },
+          "title": "Changes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "changes"
+      ],
+      "title": "MaterialChangeSummary",
+      "type": "object"
+    },
+    "NodeType": {
+      "description": "Canonical ACBOM node types.",
+      "enum": [
+        "agent",
+        "tool",
+        "resource",
+        "identity",
+        "permission",
+        "data-class",
+        "trigger",
+        "policy-boundary"
+      ],
+      "title": "NodeType",
+      "type": "string"
+    },
+    "PathHop": {
+      "additionalProperties": false,
+      "description": "One edge traversed on a capability path, carried explicitly so\nevery path element resolves to its own evidence, not just the\npath's endpoints.",
+      "properties": {
+        "edge_id": {
+          "pattern": "^clp:edge:sha256:[0-9a-f]{64}$",
+          "title": "Edge Id",
+          "type": "string"
+        },
+        "edge_type": {
+          "$ref": "#/$defs/EdgeType"
+        },
+        "source_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "target_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "edge_id",
+        "edge_type",
+        "source_id",
+        "target_id",
+        "evidence"
+      ],
+      "title": "PathHop",
+      "type": "object"
+    },
+    "ReportVersions": {
+      "additionalProperties": false,
+      "description": "The report's versions: the scanner's own identity (`Generator`,\nmatching the ACBOM envelope's own field of the same shape) plus\nevery versioned contract this report's content depends on, so a\nconsumer can tell exactly which schema and policy generation to\nexpect without inferring it from content shape.",
+      "properties": {
+        "scanner": {
+          "$ref": "#/$defs/Generator"
+        },
+        "acbom_schema_version": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+          "title": "Acbom Schema Version",
+          "type": "string"
+        },
+        "report_schema_version": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+          "title": "Report Schema Version",
+          "type": "string"
+        },
+        "policy_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Policy Version"
+        }
+      },
+      "required": [
+        "scanner",
+        "acbom_schema_version",
+        "report_schema_version"
+      ],
+      "title": "ReportVersions",
+      "type": "object"
+    },
+    "Verdict": {
+      "description": "The five canonical gate verdicts, in a fixed order and wording.\nSee this module's own docstring: computing *which* one applies is\nout of scope here.",
+      "enum": [
+        "passed",
+        "passed_with_warnings",
+        "review_required",
+        "deployment_blocked",
+        "not_evaluated"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "maxLength": 64,
+      "minLength": 5,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "verdict": {
+      "$ref": "#/$defs/Verdict"
+    },
+    "blast_radius": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BlastRadiusStatement"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "material_changes": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MaterialChangeSummary"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "findings": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Findings"
+    },
+    "diagnostics": {
+      "items": {
+        "$ref": "#/$defs/Diagnostic"
+      },
+      "title": "Diagnostics",
+      "type": "array"
+    },
+    "suppressions": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Suppressions",
+      "type": "array"
+    },
+    "versions": {
+      "$ref": "#/$defs/ReportVersions"
+    }
+  },
+  "required": [
+    "schema_version",
+    "verdict",
+    "blast_radius",
+    "material_changes",
+    "findings",
+    "diagnostics",
+    "versions"
+  ],
+  "type": "object"
+}

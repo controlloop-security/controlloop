@@ -1,0 +1,12 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "trigger": "PostFileSave",
+      "action": {
+        "type": "command",
+        "command": "npm run format"
+      }
+    }
+  ]
+}

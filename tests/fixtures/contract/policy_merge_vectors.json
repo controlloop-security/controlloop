@@ -1,0 +1,131 @@
+{
+  "description": "Golden vectors for the strengthen-only merge of approved components and their constraints. Shared with the CLI gate: both sides must produce exactly these effective lists and rejection ids.",
+  "semantics_version": 1,
+  "organization_bundle_version": "7",
+  "cases": [
+    {
+      "name": "no repository list keeps the organization list",
+      "organization": [{"type": "mcp_server", "name_pattern": "github", "version_range": "1.x"}],
+      "repository": [],
+      "effective": [{"type": "mcp_server", "name_pattern": "github", "version_range": "1.x"}],
+      "rejections": []
+    },
+    {
+      "name": "an omitted entry is removed",
+      "organization": [
+        {"type": "mcp_server", "name_pattern": "github"},
+        {"type": "plugin", "name_pattern": "formatter"}
+      ],
+      "repository": [{"type": "mcp_server", "name_pattern": "github"}],
+      "effective": [{"type": "mcp_server", "name_pattern": "github"}],
+      "rejections": []
+    },
+    {
+      "name": "an entry the organization does not list is refused",
+      "organization": [{"type": "mcp_server", "name_pattern": "github"}],
+      "repository": [{"type": "mcp_server", "name_pattern": "slack"}],
+      "effective": [],
+      "rejections": ["approved-component:mcp_server:slack"]
+    },
+    {
+      "name": "omitting a constraint inherits it",
+      "organization": [{"type": "mcp_server", "name_pattern": "github", "digest": "sha256:9f3c1a2", "pin_required": true}],
+      "repository": [{"type": "mcp_server", "name_pattern": "github"}],
+      "effective": [{"type": "mcp_server", "name_pattern": "github", "digest": "sha256:9f3c1a2", "pin_required": true}],
+      "rejections": []
+    },
+    {
+      "name": "narrowing a range is applied",
+      "organization": [{"type": "mcp_server", "name_pattern": "github", "version_range": ">=1.0.0 <2.0.0"}],
+      "repository": [{"type": "mcp_server", "name_pattern": "github", "version_range": "1.4.x"}],
+      "effective": [{"type": "mcp_server", "name_pattern": "github", "version_range": "1.4.x"}],
+      "rejections": []
+    },
+    {
+      "name": "widening a range is refused",
+      "organization": [{"type": "mcp_server", "name_pattern": "github", "version_range": "1.4.x"}],
+      "repository": [{"type": "mcp_server", "name_pattern": "github", "version_range": "1.x"}],
+      "effective": [{"type": "mcp_server", "name_pattern": "github", "version_range": "1.4.x"}],
+      "rejections": ["approved-component:mcp_server:github"]
+    },
+    {
+      "name": "an inclusive upper bound past an exclusive one is refused",
+      "organization": [{"type": "mcp_server", "name_pattern": "github", "version_range": ">=1.0.0 <2.0.0"}],
+      "repository": [{"type": "mcp_server", "name_pattern": "github", "version_range": ">=1.0.0 <=2.0.0"}],
+      "effective": [{"type": "mcp_server", "name_pattern": "github", "version_range": ">=1.0.0 <2.0.0"}],
+      "rejections": ["approved-component:mcp_server:github"]
+    },
+    {
+      "name": "setting a range where none was set is applied",
+      "organization": [{"type": "mcp_server", "name_pattern": "github"}],
+      "repository": [{"type": "mcp_server", "name_pattern": "github", "version_range": "2.x"}],
+      "effective": [{"type": "mcp_server", "name_pattern": "github", "version_range": "2.x"}],
+      "rejections": []
+    },
+    {
+      "name": "a different package is refused",
+      "organization": [{"type": "mcp_server", "name_pattern": "github", "package": "@modelcontextprotocol/server-github"}],
+      "repository": [{"type": "mcp_server", "name_pattern": "github", "package": "github-mcp-fork"}],
+      "effective": [{"type": "mcp_server", "name_pattern": "github", "package": "@modelcontextprotocol/server-github"}],
+      "rejections": ["approved-component:mcp_server:github"]
+    },
+    {
+      "name": "extending a digest prefix is applied",
+      "organization": [{"type": "plugin", "name_pattern": "formatter", "digest": "sha256:9f3c1a2"}],
+      "repository": [{"type": "plugin", "name_pattern": "formatter", "digest": "sha256:9f3c1a2e4b5d"}],
+      "effective": [{"type": "plugin", "name_pattern": "formatter", "digest": "sha256:9f3c1a2e4b5d"}],
+      "rejections": []
+    },
+    {
+      "name": "an unrelated digest is refused",
+      "organization": [{"type": "plugin", "name_pattern": "formatter", "digest": "sha256:9f3c1a2"}],
+      "repository": [{"type": "plugin", "name_pattern": "formatter", "digest": "sha256:0000000"}],
+      "effective": [{"type": "plugin", "name_pattern": "formatter", "digest": "sha256:9f3c1a2"}],
+      "rejections": ["approved-component:plugin:formatter"]
+    },
+    {
+      "name": "a covered command pattern is applied",
+      "organization": [{"type": "hook", "name_pattern": "SessionStart", "command_pattern": "node .github/*"}],
+      "repository": [{"type": "hook", "name_pattern": "SessionStart", "command_pattern": "node .github/setup.js"}],
+      "effective": [{"type": "hook", "name_pattern": "SessionStart", "command_pattern": "node .github/setup.js"}],
+      "rejections": []
+    },
+    {
+      "name": "an uncovered command pattern is refused",
+      "organization": [{"type": "hook", "name_pattern": "SessionStart", "command_pattern": "node .github/*"}],
+      "repository": [{"type": "hook", "name_pattern": "SessionStart", "command_pattern": "node *"}],
+      "effective": [{"type": "hook", "name_pattern": "SessionStart", "command_pattern": "node .github/*"}],
+      "rejections": ["approved-component:hook:SessionStart"]
+    },
+    {
+      "name": "requiring a pin is applied",
+      "organization": [{"type": "marketplace", "name_pattern": "acme-plugins"}],
+      "repository": [{"type": "marketplace", "name_pattern": "acme-plugins", "pin_required": true}],
+      "effective": [{"type": "marketplace", "name_pattern": "acme-plugins", "pin_required": true}],
+      "rejections": []
+    },
+    {
+      "name": "relaxing a pin requirement is refused",
+      "organization": [{"type": "marketplace", "name_pattern": "acme-plugins", "pin_required": true}],
+      "repository": [{"type": "marketplace", "name_pattern": "acme-plugins", "pin_required": false}],
+      "effective": [{"type": "marketplace", "name_pattern": "acme-plugins", "pin_required": true}],
+      "rejections": ["approved-component:marketplace:acme-plugins"]
+    },
+    {
+      "name": "a refused entry keeps the organization entry and the others still narrow",
+      "organization": [
+        {"type": "mcp_server", "name_pattern": "github", "version_range": "1.4.x"},
+        {"type": "hook", "name_pattern": "SessionStart"}
+      ],
+      "repository": [
+        {"type": "mcp_server", "name_pattern": "github", "version_range": "2.x"},
+        {"type": "hook", "name_pattern": "SessionStart", "command_pattern": "node setup.js"}
+      ],
+      "effective": [
+        {"type": "hook", "name_pattern": "SessionStart", "command_pattern": "node setup.js"},
+        {"type": "mcp_server", "name_pattern": "github", "version_range": "1.4.x"}
+      ],
+      "rejections": ["approved-component:mcp_server:github"]
+    }
+  ]
+}

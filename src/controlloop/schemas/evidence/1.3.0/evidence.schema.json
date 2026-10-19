@@ -1,0 +1,1098 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.controlloop.ai/evidence/1.3.0/evidence.schema.json",
+  "title": "ControlLoop Evidence Artifact",
+  "description": "Single retainable artifact that fully explains a gate verdict after the fact, for ControlLoop evidence schema version 1.3.0.",
+  "$defs": {
+    "ApprovalProvenance": {
+      "additionalProperties": false,
+      "description": "Who approved this baseline's capability set, when, and at what\ncommit.\n\nEvery field is optional bounded free text (`SafeText`: 1-1024\ncharacters, no control characters -- already used elsewhere in this\ncodebase, e.g. `controlloop.acbom.models.Diagnostic.message`), and\ndeliberately *not* a closed enum or a pattern-constrained identifier\nlike `Repository.commit`'s `CommitIdentifier`, even though\n`approver_source` only has two meaningful values\n(`ApproverSource.SUPPLIED`/`ApproverSource.INFERRED`) and\n`approved_commit` is conceptually a commit reference. A stricter\ntype on any of these fields would make a malformed value reject the\n*entire* baseline document at parse time -- but a baseline with\nmissing or malformed provenance must be usable but reported as\nunattributed, not rejected outright. Whether this provenance is\ncomplete, well-formed, and therefore attributable is a semantic\njudgment `controlloop.baseline.provenance.describe_provenance` makes\non the already-loaded values, never a Pydantic validation failure.\n\n`None` on `BaselineDocument.provenance` itself means no provenance\nwas ever recorded at all (the \"missing\" case, including every\nbaseline written under schema 1.0.0). A present\n`ApprovalProvenance` with some fields `None`, or a value that\nfails to parse as what it claims to be (e.g. `approved_at` that is\nnot a real timestamp), is the \"malformed\" case -- still a valid,\nloadable document.",
+      "properties": {
+        "approver": {
+          "anyOf": [
+            {
+              "maxLength": 1024,
+              "minLength": 1,
+              "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approver"
+        },
+        "approver_source": {
+          "anyOf": [
+            {
+              "maxLength": 1024,
+              "minLength": 1,
+              "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approver Source"
+        },
+        "approved_at": {
+          "anyOf": [
+            {
+              "maxLength": 1024,
+              "minLength": 1,
+              "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approved At"
+        },
+        "approved_commit": {
+          "anyOf": [
+            {
+              "maxLength": 1024,
+              "minLength": 1,
+              "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approved Commit"
+        }
+      },
+      "title": "ApprovalProvenance",
+      "type": "object"
+    },
+    "ApprovedComponentRecord": {
+      "additionalProperties": false,
+      "description": "One sanctioned component entry in the effective policy.",
+      "properties": {
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "name_pattern": {
+          "title": "Name Pattern",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "name_pattern"
+      ],
+      "title": "ApprovedComponentRecord",
+      "type": "object"
+    },
+    "CapabilityPath": {
+      "additionalProperties": false,
+      "description": "A path from an agent to a tool, resource, identity, permission,\nor data-class node, naming the full sequence of hops that produced\nit. `hops` is plural and ordered so a direct path (one hop) and a\nbounded transitive path (more than one) share one shape.",
+      "properties": {
+        "schema_version": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "agent_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "target_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_type": {
+          "$ref": "#/$defs/NodeType"
+        },
+        "hops": {
+          "items": {
+            "$ref": "#/$defs/PathHop"
+          },
+          "minItems": 1,
+          "title": "Hops",
+          "type": "array"
+        },
+        "confidence": {
+          "$ref": "#/$defs/Confidence"
+        }
+      },
+      "required": [
+        "schema_version",
+        "agent_id",
+        "target_id",
+        "target_type",
+        "hops",
+        "confidence"
+      ],
+      "title": "CapabilityPath",
+      "type": "object"
+    },
+    "ChangeKind": {
+      "description": "One of the four states every node, edge, and effective capability\nbe classified into against a baseline.\n\n`UNKNOWN` is deliberately distinct from `REMOVED`: it means the same\nidentity is present on both sides, and confidently known on the\nbaseline side, but its current-side confidence dropped to\n`Confidence.UNKNOWN` -- analysis could no longer confirm what it\nonce confirmed, which is not the same claim as \"this no longer\nexists.\" An identity present in the baseline and genuinely absent\nfrom the current side -- vanished entirely, not merely downgraded --\nis `REMOVED`, without exception; this module does not speculate\nabout *why* an identity disappeared (a real removal vs. an unrelated\nanalysis gap), since nothing in this module connects a vanished key\nback to a specific incompleteness diagnostic.",
+      "enum": [
+        "added",
+        "removed",
+        "changed",
+        "unknown"
+      ],
+      "title": "ChangeKind",
+      "type": "string"
+    },
+    "CompletenessEnforcement": {
+      "description": "Whether incomplete analysis blocks a `gate` verdict. This module\ndoes not itself decide *which* verdict or exit code an incomplete\nanalysis produces -- that mapping is `controlloop.cli`'s\n`_gate_classify` -- it only carries the resolved setting, the same\n\"decision core exposes the fact; the command applies it\" split\n`severity_threshold`/`low_confidence_action` already establish.",
+      "enum": [
+        "warn",
+        "enforce"
+      ],
+      "title": "CompletenessEnforcement",
+      "type": "string"
+    },
+    "Confidence": {
+      "description": "Confidence assigned to canonical discoveries.",
+      "enum": [
+        "high",
+        "medium",
+        "low",
+        "unknown"
+      ],
+      "title": "Confidence",
+      "type": "string"
+    },
+    "ConfigSource": {
+      "description": "Which of the four precedence tiers supplied a resolved value.",
+      "enum": [
+        "default",
+        "repository file",
+        "environment",
+        "flag"
+      ],
+      "title": "ConfigSource",
+      "type": "string"
+    },
+    "Diagnostic": {
+      "additionalProperties": false,
+      "description": "Sanitized analysis diagnostic.",
+      "properties": {
+        "code": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$",
+          "title": "Code",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/DiagnosticSeverity"
+        },
+        "message": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+          "title": "Message",
+          "type": "string"
+        },
+        "confidence": {
+          "$ref": "#/$defs/Confidence"
+        },
+        "incomplete": {
+          "title": "Incomplete",
+          "type": "boolean"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "message",
+        "confidence",
+        "incomplete",
+        "evidence"
+      ],
+      "title": "Diagnostic",
+      "type": "object"
+    },
+    "DiagnosticSeverity": {
+      "description": "Severity of a non-finding analysis diagnostic.",
+      "enum": [
+        "info",
+        "warning",
+        "error"
+      ],
+      "title": "DiagnosticSeverity",
+      "type": "string"
+    },
+    "EdgeType": {
+      "description": "Canonical ACBOM edge relationship types.",
+      "enum": [
+        "invokes",
+        "reads",
+        "writes",
+        "authenticates-as",
+        "permitted-by",
+        "delegates-to",
+        "receives-from",
+        "constrained-by"
+      ],
+      "title": "EdgeType",
+      "type": "string"
+    },
+    "EffectiveAuthorityChange": {
+      "additionalProperties": false,
+      "description": "One effective-capability fact's classification against the\nbaseline.\n\nKeyed by `(agent_id, action, resource_id)` -- deliberately *not*\nincluding `permitting_identity_id`, unlike\n`EffectiveAuthorityEntry`'s own dedup key\n(`BaselineDocument.validate_effective_authority_is_deduplicated`).\nThe capability this reports on is \"this agent can act on this\nresource\"; which identity permits it and how confidently are\nproperties *of* that capability's current state, not a separate\nfact. Keying on the narrower triple is what makes the \"confidence\ndropped to unknown\" rule work: an agent's fact that keeps existing\nbut loses its permitting identity (confidence drops to\n`Confidence.UNKNOWN`) is one `UNKNOWN` entry, not a `REMOVED` entry\nfor the old identity paired with an unrelated `ADDED` entry for the\nsame fact now missing one.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ChangeKind"
+        },
+        "agent_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "action": {
+          "$ref": "#/$defs/EdgeType"
+        },
+        "resource_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "before": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EffectiveAuthorityEntry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "after": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EffectiveAuthorityEntry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind",
+        "agent_id",
+        "action",
+        "resource_id"
+      ],
+      "title": "EffectiveAuthorityChange",
+      "type": "object"
+    },
+    "EffectiveAuthorityEntry": {
+      "additionalProperties": false,
+      "description": "One agent-to-action-on-resource fact, with the identity that\npermits it if known. `permitting_identity_id=None` means the\npermitting identity is unknown, never that no identity grants the\naction.",
+      "properties": {
+        "schema_version": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "agent_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "action": {
+          "$ref": "#/$defs/EdgeType"
+        },
+        "resource_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "permitting_identity_id": {
+          "anyOf": [
+            {
+              "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Permitting Identity Id"
+        },
+        "confidence": {
+          "$ref": "#/$defs/Confidence"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "agent_id",
+        "action",
+        "resource_id",
+        "confidence",
+        "evidence"
+      ],
+      "title": "EffectiveAuthorityEntry",
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "description": "Sanitized provenance for a discovery or diagnostic.",
+      "properties": {
+        "adapter": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Adapter",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "line_start": {
+          "anyOf": [
+            {
+              "maximum": 10000000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line Start"
+        },
+        "line_end": {
+          "anyOf": [
+            {
+              "maximum": 10000000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line End"
+        },
+        "parser": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parser"
+        },
+        "schema_id": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schema Id"
+        },
+        "document_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Document Digest"
+        }
+      },
+      "required": [
+        "adapter"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "EvidenceVersions": {
+      "additionalProperties": false,
+      "description": "All component versions: every versioned contract this\nartifact's content depends on, kept as its own model (not a reuse\nof `controlloop.reporting.report.ReportVersions`) so a future\nbreaking change to the report schema and to this evidence schema\nremain independent events, the same reasoning\n`BaselineDocument.acbom_schema_version` already documents for\nrecording the ACBOM schema version separately from its own.",
+      "properties": {
+        "scanner": {
+          "$ref": "#/$defs/Generator"
+        },
+        "acbom_schema_version": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+          "title": "Acbom Schema Version",
+          "type": "string"
+        },
+        "baseline_schema_version": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 5,
+              "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Baseline Schema Version"
+        },
+        "evidence_schema_version": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+          "title": "Evidence Schema Version",
+          "type": "string"
+        },
+        "policy_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Policy Version"
+        }
+      },
+      "required": [
+        "scanner",
+        "acbom_schema_version",
+        "evidence_schema_version"
+      ],
+      "title": "EvidenceVersions",
+      "type": "object"
+    },
+    "ExceptionRecord": {
+      "additionalProperties": false,
+      "description": "One exception's auditable disposition, embedded in the evidence\nartifact.\n\nA Pydantic model with the same discipline as `SuppressionRecord`, for\nthe same reason: it is embedded in `EvidenceArtifact`, and every type\nembedded there shares one serialization and validation contract.",
+      "properties": {
+        "finding_fingerprint": {
+          "title": "Finding Fingerprint",
+          "type": "string"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/ExceptionState"
+        }
+      },
+      "required": [
+        "finding_fingerprint",
+        "expires_at",
+        "state"
+      ],
+      "title": "ExceptionRecord",
+      "type": "object"
+    },
+    "ExceptionState": {
+      "description": "One exception's disposition for this gate run.",
+      "enum": [
+        "applied",
+        "expired",
+        "unmatched"
+      ],
+      "title": "ExceptionState",
+      "type": "string"
+    },
+    "Finding": {
+      "additionalProperties": false,
+      "description": "A complete, self-describing security or policy finding. Frozen,\n`extra=\"forbid\"`, `strict=True`, matching every other\ncanonical/computed-report model in this codebase.\n\nEvery core field is required with no default, so omitting any of\nthem raises `pydantic.ValidationError` at construction rather than\nproducing a partially-populated `Finding`; this codebase has no\ncustom validation-error wrapper for that guarantee anywhere else\n(`Node`, `Edge`, `Diagnostic`, `RuleObservation` all rely on\nPydantic's own strict, defaultless required fields), and this model\nfollows the same precedent rather than inventing one.\n\n`message` is included even though the core field list does not\nseparately name it: without it, a `Finding` would name a rule and a\nseverity but never describe, in words, what was actually found.\n\n`id` is a required, precomputed field, not derived by a validator\non this model -- matching `Node.id`/`Edge.id`'s own precedent of\nbeing precomputed identity material supplied to a frozen model.\nConstruct a `Finding` via `finding_from_observation` (below) for\nthe common case, which always computes `id` via\n`controlloop.findings.identity.finding_id` first; a caller may also\nconstruct one directly, supplying an already-computed `id`.",
+      "properties": {
+        "schema_version": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^clp:finding:sha256:[0-9a-f]{64}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "rule_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "rule_version": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+          "title": "Rule Version",
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/FindingSeverity"
+        },
+        "confidence": {
+          "$ref": "#/$defs/Confidence"
+        },
+        "affected_agent": {
+          "anyOf": [
+            {
+              "pattern": "^clp:agent:sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Affected Agent"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "capability_path": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CapabilityPath"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "change_state": {
+          "$ref": "#/$defs/FindingChangeState"
+        },
+        "remediation": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+          "title": "Remediation",
+          "type": "string"
+        },
+        "documentation_url": {
+          "maxLength": 2048,
+          "minLength": 9,
+          "pattern": "^https://[^\\x00-\\x1f\\x7f\\s]+$",
+          "title": "Documentation Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "id",
+        "rule_id",
+        "rule_version",
+        "message",
+        "severity",
+        "confidence",
+        "evidence",
+        "change_state",
+        "remediation",
+        "documentation_url"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "FindingChangeState": {
+      "description": "How the capability this finding concerns classifies against a\nbaseline. Mirrors `controlloop.diff.models.ChangeKind`'s\nfour members one-for-one (`ADDED`, `REMOVED`, `CHANGED`, `UNKNOWN`)\nwithout importing or modifying that type, plus one honest fifth\nstate: `NOT_COMPARED`.\n\n`controlloop.policy.models.RuleContext.diff` is `DiffResult | None`\n-- a rule may run with no baseline at all, and every finding must\nstill carry a `change_state`.\nCollapsing \"no baseline was compared\" into `ChangeKind.UNKNOWN`\nwould contradict that member's own documented meaning (a specific\nclaim about a completed comparison whose confidence dropped, not an\nabsent one) and would violate this repository's \"unknown, never\nomitted\" invariant -- the same reasoning\n`controlloop.diff.report.ComparisonScope` already applied, in the\nsame non-invasive way (a new enum layered on top, not a change to\n`controlloop.diff.models`), to keep \"not evaluated\" distinct from\n\"confirmed unchanged\".",
+      "enum": [
+        "added",
+        "removed",
+        "changed",
+        "unknown",
+        "not-compared"
+      ],
+      "title": "FindingChangeState",
+      "type": "string"
+    },
+    "FindingSeverity": {
+      "description": "The minimal severity scale a finding requires, in ascending\ndeclared order. No ranking function, comparison operator, or\nconfigurable gate threshold is defined here -- see this module's\nown docstring, first scope boundary. `controlloop.policy.thresholds`\nowns that policy layer and consumes this same enum rather than\ndefining a parallel one.",
+      "enum": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "FindingSeverity",
+      "type": "string"
+    },
+    "Generator": {
+      "additionalProperties": false,
+      "description": "Generator identity recorded in an ACBOM envelope.",
+      "properties": {
+        "name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "title": "Generator",
+      "type": "object"
+    },
+    "NodeType": {
+      "description": "Canonical ACBOM node types.",
+      "enum": [
+        "agent",
+        "tool",
+        "resource",
+        "identity",
+        "permission",
+        "data-class",
+        "trigger",
+        "policy-boundary"
+      ],
+      "title": "NodeType",
+      "type": "string"
+    },
+    "PathHop": {
+      "additionalProperties": false,
+      "description": "One edge traversed on a capability path, carried explicitly so\nevery path element resolves to its own evidence, not just the\npath's endpoints.",
+      "properties": {
+        "edge_id": {
+          "pattern": "^clp:edge:sha256:[0-9a-f]{64}$",
+          "title": "Edge Id",
+          "type": "string"
+        },
+        "edge_type": {
+          "$ref": "#/$defs/EdgeType"
+        },
+        "source_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "target_id": {
+          "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "edge_id",
+        "edge_type",
+        "source_id",
+        "target_id",
+        "evidence"
+      ],
+      "title": "PathHop",
+      "type": "object"
+    },
+    "PolicyRejectionRecord": {
+      "additionalProperties": false,
+      "description": "One weakening the merge refused.\n\nRecorded even though a rejection means the gate did not enforce the\nrepository's requested policy: \"what was asked for and refused\" is\npart of explaining what was enforced.",
+      "properties": {
+        "rule_id": {
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "organization_bundle_version": {
+          "title": "Organization Bundle Version",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id",
+        "organization_bundle_version",
+        "reason"
+      ],
+      "title": "PolicyRejectionRecord",
+      "type": "object"
+    },
+    "PolicyRuleRecord": {
+      "additionalProperties": false,
+      "description": "One rule as the effective policy configured it.",
+      "properties": {
+        "rule_id": {
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "severity_floor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Severity Floor"
+        },
+        "mandatory": {
+          "default": false,
+          "title": "Mandatory",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "rule_id",
+        "enabled"
+      ],
+      "title": "PolicyRuleRecord",
+      "type": "object"
+    },
+    "SuppressionRecord": {
+      "additionalProperties": false,
+      "description": "One declared suppression's full, human-auditable disposition --\nthe \"visible\" record, carried unchanged from the\n`Suppression` this repository declared plus the `SuppressionStatus`\nthis module computed for it. Every field here is already\nredaction-safe: `rule_id`/`target`/`expires_at` are shape-constrained\nidentifiers or dates, never raw repository content, and `reason` is\nexactly the human-authored text a repository owner chose to publish\nin their own `controlloop.yaml` -- not scanner-discovered evidence.\n\nA real Pydantic model (`extra=\"forbid\", frozen=True, strict=True`),\nmatching every other canonical/computed-report model in this\ncodebase (`Finding`, `Diagnostic`, ...), rather than a plain\ndataclass -- this type is embedded directly in\n`controlloop.reporting.report.ScanReport.suppressions` and\n`controlloop.reporting.evidence.EvidenceArtifact.suppressions`, both\nof which require every embedded type to share this\nsame serialization and validation discipline.",
+      "properties": {
+        "rule_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$",
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "target": {
+          "pattern": "^clp:finding:sha256:[0-9a-f]{64}$",
+          "title": "Target",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+          "title": "Reason",
+          "type": "string"
+        },
+        "expires_at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/SuppressionStatus"
+        }
+      },
+      "required": [
+        "rule_id",
+        "target",
+        "reason",
+        "expires_at",
+        "status"
+      ],
+      "title": "SuppressionRecord",
+      "type": "object"
+    },
+    "SuppressionStatus": {
+      "description": "One declared suppression's real, observable effect (\"active\nsuppressions are listed in every scan and gate result, never hidden\"\n-- extended here to every status, not only `ACTIVE`, since a\nrepository author needs to see an `EXPIRED`/`STALE`/\n`CEILING_PROTECTED` suppression exactly as much as an effective one:\nan expired suppression is reported as expired, a stale one as\nstale).",
+      "enum": [
+        "active",
+        "expired",
+        "stale",
+        "ceiling-protected"
+      ],
+      "title": "SuppressionStatus",
+      "type": "string"
+    },
+    "TeamEvidence": {
+      "additionalProperties": false,
+      "description": "Everything the platform contributed to one verdict.\n\n`policy_source` says where the effective policy came from: `fetched`\nfor a live read, `cache` for a fresh cached copy, `stale_cache` for a\ncopy used past its lifetime because the service was unreachable and\n`team_fail_mode` is `open`. That distinction belongs in evidence: a\nverdict decided against a three-day-old bundle is a different fact\nfrom one decided against the current bundle, and an auditor should not\nhave to infer which happened.",
+      "properties": {
+        "organization_bundle_version": {
+          "title": "Organization Bundle Version",
+          "type": "string"
+        },
+        "merge_semantics_version": {
+          "title": "Merge Semantics Version",
+          "type": "string"
+        },
+        "policy_source": {
+          "title": "Policy Source",
+          "type": "string"
+        },
+        "entitlement_state": {
+          "title": "Entitlement State",
+          "type": "string"
+        },
+        "repository_delta": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PolicyRuleRecord"
+          },
+          "title": "Repository Delta",
+          "type": "array"
+        },
+        "effective_policy": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PolicyRuleRecord"
+          },
+          "title": "Effective Policy",
+          "type": "array"
+        },
+        "approved_components": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ApprovedComponentRecord"
+          },
+          "title": "Approved Components",
+          "type": "array"
+        },
+        "rejections": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PolicyRejectionRecord"
+          },
+          "title": "Rejections",
+          "type": "array"
+        },
+        "applied_exceptions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ExceptionRecord"
+          },
+          "title": "Applied Exceptions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "organization_bundle_version",
+        "merge_semantics_version",
+        "policy_source",
+        "entitlement_state"
+      ],
+      "title": "TeamEvidence",
+      "type": "object"
+    },
+    "Verdict": {
+      "description": "The five canonical gate verdicts, in a fixed order and wording.\nSee this module's own docstring: computing *which* one applies is\nout of scope here.",
+      "enum": [
+        "passed",
+        "passed_with_warnings",
+        "review_required",
+        "deployment_blocked",
+        "not_evaluated"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "maxLength": 64,
+      "minLength": 5,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "acbom_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Acbom Digest",
+      "type": "string"
+    },
+    "baseline_digest": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Baseline Digest"
+    },
+    "baseline_provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ApprovalProvenance"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "effective_authority_diff": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/EffectiveAuthorityChange"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Effective Authority Diff"
+    },
+    "findings": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Findings"
+    },
+    "completeness": {
+      "items": {
+        "$ref": "#/$defs/Diagnostic"
+      },
+      "title": "Completeness",
+      "type": "array"
+    },
+    "completeness_enforcement": {
+      "$ref": "#/$defs/CompletenessEnforcement",
+      "default": "warn"
+    },
+    "completeness_enforcement_source": {
+      "$ref": "#/$defs/ConfigSource",
+      "default": "default"
+    },
+    "suppressions": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SuppressionRecord"
+      },
+      "title": "Suppressions",
+      "type": "array"
+    },
+    "team": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TeamEvidence"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "verdict": {
+      "$ref": "#/$defs/Verdict"
+    },
+    "versions": {
+      "$ref": "#/$defs/EvidenceVersions"
+    }
+  },
+  "required": [
+    "schema_version",
+    "acbom_digest",
+    "baseline_digest",
+    "baseline_provenance",
+    "effective_authority_diff",
+    "findings",
+    "completeness",
+    "verdict",
+    "versions"
+  ],
+  "type": "object"
+}

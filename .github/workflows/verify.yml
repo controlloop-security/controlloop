@@ -1,0 +1,85 @@
+name: Verify
+
+# The verified command surface for this package, factored out as a
+# reusable workflow so both ci.yml (every pull request and every push to
+# main) and release.yml (every release-tag push) call the exact same one
+# job definition. The release pipeline depends on there being exactly one
+# place this command surface is defined, so a release can never diverge
+# from what pull-request CI already verified. This is also how the offline
+# enforcement harness (tests/conftest.py) runs: it is autouse across the whole pytest suite, so running
+# `uv run pytest` here is sufficient -- no separate "offline" job is needed.
+#
+# The `cli` job below runs across a real cross-platform build matrix:
+# Linux x86_64, Linux arm64, and macOS arm64 -- every combination
+# available on GitHub's standard, free-tier hosted runner fleet. macOS x86_64 (Intel) is a disclosed gap, not an oversight:
+# every current GitHub-hosted macOS x86_64 image label is now `-large`/
+# `-intel` only (checked directly against actions/runner-images on
+# 2026-08-21), meaning free-tier macOS runners are Apple Silicon (arm64)
+# only -- Intel coverage requires GitHub's paid "larger runners" tier, a
+# billing decision this workflow does not make. Windows is not tested
+# and is documented as unsupported -- see
+# docs/reference/supported-platforms.md for the full disclosure.
+#
+# "Identical scan output is asserted across the matrix for the same
+# fixture" is satisfied by existing test content, not by anything in this
+# file: tests/test_gate_determinism_regression.py already asserts a literal, hardcoded golden digest
+# unconditionally, with no platform-conditional skip. Once that same
+# `uv run pytest` run happens independently on every leg below, each leg
+# passing that one assertion is the proof all three produced an identical
+# digest for that fixture.
+
+on:
+  workflow_call:
+
+jobs:
+  cli:
+    name: CLI checks (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux-x86_64
+          - os: ubuntu-24.04-arm
+            label: linux-arm64
+          - os: macos-15
+            label: macos-arm64
+    # A real, documented time budget. Recent
+    # real runs completed in 30-67s wall clock on ubuntu-latest (see
+    # docs/reference/fixture-corpus.md); this ceiling gives roughly 9x
+    # headroom over the worst observed run so it catches a genuine
+    # regression into minutes-long hangs without producing false failures
+    # from ordinary runner variance. Kept the same across every matrix leg
+    # for now; a leg that proves it needs materially more headroom (a
+    # slower-provisioning runner type, for example) should get its own
+    # documented, evidence-based budget rather than a silently loosened
+    # shared one.
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          version: "0.9.30"
+          python-version: "3.12"
+
+      - name: Install locked dependencies
+        run: uv sync --locked --all-groups
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Type check
+        run: uv run mypy
+
+      - name: Test
+        run: uv run pytest
+
+      - name: Build
+        run: uv build

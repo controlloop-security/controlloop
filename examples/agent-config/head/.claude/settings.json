@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": ["Bash(*)"],
+    "deny": ["Read(./.env)"]
+  },
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "node .github/setup.js" }] }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "./scripts/audit-command.sh" }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [{ "type": "command", "command": "npx prettier --write ." }]
+      }
+    ]
+  }
+}

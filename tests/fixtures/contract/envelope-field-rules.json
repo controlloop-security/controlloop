@@ -1,0 +1,29 @@
+{
+  "AUTHORITY_COMPONENT_TYPES": [
+    "host",
+    "subagent",
+    "hook",
+    "helper_command",
+    "plugin",
+    "marketplace",
+    "skill",
+    "workflow_runtime",
+    "permission_rule"
+  ],
+  "COMMAND_PATTERN": "^[^*]{1,255}\\*?$",
+  "DIGEST_PATTERN": "^sha256:[0-9a-f]{7,64}$",
+  "MAX_ATTRIBUTE_VALUE_LENGTH": 512,
+  "MAX_AUTHORITY_DELTA_ENTRIES": 200,
+  "MAX_COMPONENT_ATTRIBUTES": 32,
+  "PROHIBITED_ATTRIBUTE_KEY_FRAGMENTS": [
+    "secret",
+    "token",
+    "password",
+    "passwd",
+    "credential",
+    "api_key",
+    "private_key",
+    "env_value",
+    "environment_value"
+  ]
+}

@@ -1,0 +1,319 @@
+name: Reference scenario proof
+
+# Every reference scenario, run end to end against the real reference
+# repository, through the PUBLISHED Action, on a schedule and on every
+# release.
+#
+# "Using the published Action, not a local checkout" is why the gate step
+# below is `uses: controlloop-security/controlloop@<ref>` rather than
+# `uses: ./`, unlike action-e2e.yml which deliberately tests the working
+# tree. This workflow proves the thing a user actually gets.
+#
+# The Action's own README asks consumers to pin to a tagged release or a
+# commit SHA. No tag exists yet -- the release pipeline is merged but no
+# release has been cut -- so this pins to `main` for now, which is still
+# the published repository and not this checkout. Swap it for the tag
+# once the first release exists.
+#
+# No credential beyond the default workflow token. There is no
+# `secrets:` reference anywhere in this file, and `permissions:` is
+# read-only. The reference repository is public, so the default token
+# reads it without any grant at all. That is the free public path this
+# workflow exists to prove.
+#
+# SCOPE, stated plainly: the goal is every scenario. The matrix below
+# covers the ceiling breach, the capability expansion, the capability
+# reduction, and the CrewAI, LangGraph, and OpenAI Agents unresolved-
+# capability scenarios. A scenario for a `receives-from` edge is not
+# here, because nothing produces that edge yet. The `scenario` matrix is
+# the single place to add one -- a data change, not a rewrite.
+#
+# Five agent-configuration scenarios run on
+# `scenarios/storefront-agent-config`, one branch each: four incident
+# patterns that must block, and a pinned plugin that must pass. They
+# assert the rules that fired and the authority statements too, so they
+# need a published Action that includes the agent-authority rules.
+#
+# Three Team scenarios run on the same storefront: a sanctioned grant
+# that passes, an unsanctioned one that requires review (exit 3), and no
+# published bundle, which judges nothing. Each branch commits
+# `controlloop.toml` with an endpoint nothing listens on and
+# `team_fail_mode = "open"`, plus the organization bundle in the Team
+# policy cache, so the paid gate runs with no platform deployed. A Team
+# gate refuses to start without `CONTROLLOOP_TEAM_TOKEN`, so the gate step
+# sets it to a fixed value that is plainly not a credential: no request
+# reaches a server, so it authenticates nothing. The Community scenarios
+# never enable Team and never read it.
+
+on:
+  schedule:
+    # 06:00 UTC daily. A drift in the published Action, the reference
+    # repository, or the CLI should surface within a day, not at the
+    # next release.
+    - cron: "0 6 * * *"
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reference-scenarios-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  scenario:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      # Never cancel a sibling scenario because one regressed -- a
+      # release-blocking run should report every failure it found, not
+      # only the first.
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ceiling breach with no matching rule
+            # `id` is the filesystem-safe name for artifacts and anything
+            # else that cannot take a slash. `branch` keeps the slash
+            # because the checkout genuinely needs the real ref.
+            id: ceiling-breach
+            # The string that proves this scenario is still itself.
+            # Merging main into a scenario branch deletes its content
+            # outright, and a gutted scenario should fail saying what
+            # went missing rather than producing a confusing verdict
+            # mismatch.
+            guard-file: scenarios/order-support-agent/agent-card.json
+            guard-text: customer-payment-methods
+            branch: scenario/ceiling-breach
+            expected: scenarios/order-support-agent/expected/ceiling-breach.json
+            path: scenarios/order-support-agent
+            run: blocking_run
+            expect-blocked: true
+
+          - name: Capability expansion
+            id: capability-expansion
+            guard-file: scenarios/order-support-agent/agent-card.json
+            guard-text: bulk-refund-orders
+            branch: scenario/capability-expansion
+            expected: scenarios/order-support-agent/expected/capability-expansion.json
+            path: scenarios/order-support-agent
+            run: blocking_run
+            expect-blocked: true
+
+          - name: CrewAI unresolved capability
+            # The only non-blocking scenario in the matrix, and
+            # deliberately so. Its manifest approves everything and no
+            # rule fires, so the gate passes with exit 0 -- while the
+            # blast radius still names an unclassified capability the
+            # researcher reaches transitively through delegation. A
+            # regression that silently dropped an unresolvable tool
+            # would turn this row's blast-radius assertion red, which is
+            # the whole reason it is asserted rather than only
+            # documented.
+            id: crewai-incomplete
+            guard-file: scenarios/research-crew/src/research_crew/crew.py
+            guard-text: tools_for_environment
+            branch: main
+            expected: scenarios/research-crew/expected/crewai-incomplete.json
+            path: scenarios/research-crew
+            run: warn_run
+            expect-blocked: false
+
+          - name: Capability reduction
+            # The only scenario whose point is that the gate *passes*
+            # while still saying something. Its expectations assert the
+            # blast radius, so a regression that stopped reporting
+            # reductions turns this row red rather than quietly passing.
+            id: capability-reduction
+            branch: scenario/capability-reduction
+            expected: scenarios/support-triage-agent/expected/capability-reduction.json
+            path: scenarios/support-triage-agent
+            run: reduction_run
+            expect-blocked: false
+            guard-file: scenarios/support-triage-agent/agent-card.json
+            guard-text: read-customer-record
+
+          - name: LangGraph unresolved binding
+            id: langgraph-incomplete
+            branch: main
+            expected: scenarios/research-graph/expected/langgraph-incomplete.json
+            path: scenarios/research-graph
+            run: warn_run
+            expect-blocked: false
+            guard-file: scenarios/research-graph/graph.py
+            guard-text: build_publish_tools
+
+          - name: OpenAI Agents handoff chain
+            id: openai-agents-chain
+            branch: main
+            expected: scenarios/support-desk/expected/openai-agents-chain.json
+            path: scenarios/support-desk
+            run: warn_run
+            expect-blocked: false
+            guard-file: scenarios/support-desk/desk.py
+            guard-text: load_channel_tools
+
+          - name: SessionStart hook that runs a harvester-shaped script
+            id: session-start-harvester-hook
+            branch: scenario/session-start-harvester-hook
+            expected: scenarios/storefront-agent-config/expected/session-start-harvester-hook.json
+            path: scenarios/storefront-agent-config
+            run: blocking_run
+            expect-blocked: true
+            guard-file: scenarios/storefront-agent-config/.github/setup.js
+            guard-text: "Inert stand-in for a credential harvester"
+
+          - name: MCP server package version drift behind a trusted name
+            id: mcp-package-drift
+            branch: scenario/mcp-package-drift
+            expected: scenarios/storefront-agent-config/expected/mcp-package-drift.json
+            path: scenarios/storefront-agent-config
+            run: blocking_run
+            expect-blocked: true
+            guard-file: scenarios/storefront-agent-config/.mcp.json
+            guard-text: "catalog-docs-mcp@1.5.0"
+
+          - name: Allow list widened to Bash(*)
+            id: allow-list-widened
+            branch: scenario/allow-list-widened
+            expected: scenarios/storefront-agent-config/expected/allow-list-widened.json
+            path: scenarios/storefront-agent-config
+            run: blocking_run
+            expect-blocked: true
+            guard-file: scenarios/storefront-agent-config/.claude/settings.json
+            guard-text: "Bash(*)"
+
+          - name: Agent workflow with id-token write and skipped permissions
+            id: agent-workflow-id-token
+            branch: scenario/agent-workflow-id-token
+            expected: scenarios/storefront-agent-config/expected/agent-workflow-id-token.json
+            path: scenarios/storefront-agent-config
+            run: blocking_run
+            expect-blocked: true
+            guard-file: scenarios/storefront-agent-config/.github/workflows/claude-review.yml
+            guard-text: "dangerously-skip-permissions"
+
+          - name: Pinned plugin added, must not fail
+            id: pinned-plugin-added
+            branch: scenario/pinned-plugin-added
+            expected: scenarios/storefront-agent-config/expected/pinned-plugin-added.json
+            path: scenarios/storefront-agent-config
+            run: pass_run
+            expect-blocked: false
+            guard-file: scenarios/storefront-agent-config/.claude-plugin/marketplace.json
+            guard-text: "release-notes-plugin"
+
+          - name: Team gate passes a sanctioned grant
+            id: team-sanctioned-grant
+            branch: scenario/team-sanctioned-grant
+            expected: scenarios/storefront-agent-config/expected/team-sanctioned-grant.json
+            path: scenarios/storefront-agent-config
+            run: pass_run
+            expect-blocked: false
+            guard-file: scenarios/storefront-agent-config/.mcp.json
+            guard-text: "catalog-search-mcp@2.1.0"
+
+          - name: Team gate requires review of an unsanctioned grant
+            id: team-unsanctioned-grant
+            branch: scenario/team-unsanctioned-grant
+            expected: scenarios/storefront-agent-config/expected/team-unsanctioned-grant.json
+            path: scenarios/storefront-agent-config
+            run: review_run
+            expect-blocked: true
+            guard-file: scenarios/storefront-agent-config/.mcp.json
+            guard-text: "@webfetch-tools/web-fetch-mcp@0.3.1"
+
+          - name: Team gate with no published bundle judges nothing
+            id: team-no-published-bundle
+            branch: scenario/team-no-published-bundle
+            expected: scenarios/storefront-agent-config/expected/team-no-published-bundle.json
+            path: scenarios/storefront-agent-config
+            run: pass_run
+            expect-blocked: false
+            guard-file: scenarios/storefront-agent-config/.controlloop/team-cache/policy.json
+            guard-text: '"organization_bundle_version": ""'
+
+    steps:
+      - name: Check out this repository (for the assertion script only)
+        uses: actions/checkout@v7.0.1
+        with:
+          path: controlloop
+
+      - name: Check out the reference scenario
+        uses: actions/checkout@v7.0.1
+        with:
+          repository: controlloop-security/controlloop-reference-agent
+          ref: ${{ matrix.branch }}
+          # gate resolves a merge-base baseline from real history; the
+          # shallow default fails with an actionable message instead of
+          # silently skipping the comparison.
+          fetch-depth: 0
+          path: reference
+
+      - name: Assert the scenario still contains its distinguishing content
+        # Merging main into a scenario branch deletes its content. A
+        # scenario branch that lost its content still runs, and still
+        # produces *a* verdict -- just not a meaningful one. This fails first, and names what is missing, so the cause
+        # is obvious rather than inferred from a verdict that drifted.
+        # No continue-on-error and no `|| true`: this decides the job.
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="${{ github.workspace }}/reference/${{ matrix.guard-file }}"
+          text='${{ matrix.guard-text }}'
+          if [ ! -f "$file" ]; then
+            echo "::error::scenario '${{ matrix.id }}' is missing ${{ matrix.guard-file }} -- the branch no longer contains this scenario (merging main into a scenario branch deletes its content)."
+            exit 1
+          fi
+          if ! grep -qF -- "$text" "$file"; then
+            echo "::error::scenario '${{ matrix.id }}' no longer contains '$text' in ${{ matrix.guard-file }} -- it has stopped demonstrating what it exists to demonstrate (merging main into a scenario branch deletes its content)."
+            exit 1
+          fi
+          echo "guard ok: ${{ matrix.id }} still contains '$text'"
+
+      - name: Run the published Action against the scenario
+        id: gate
+        # A scenario expected to block makes the Action fail the step, so
+        # the outcome is captured rather than ending the job before the
+        # assertions run. The assert step below
+        # is what actually decides this job, and it has no
+        # continue-on-error.
+        continue-on-error: ${{ matrix.expect-blocked }}
+        uses: controlloop-security/controlloop@main
+        env:
+          # Read only by the Team scenarios, whose platform is unreachable
+          # by design. Not a credential; see the header.
+          CONTROLLOOP_TEAM_TOKEN: offline-reference-scenario-not-a-secret
+        with:
+          path: ${{ github.workspace }}/reference/${{ matrix.path }}
+
+      - name: Set up uv for the assertion script
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          version: "0.9.30"
+          python-version: "3.12"
+
+      - name: Assert verdict, findings, and blast radius against committed expectations
+        shell: bash
+        run: |
+          echo "verdict:   ${{ steps.gate.outputs.verdict }}"
+          echo "exit-code: ${{ steps.gate.outputs.exit-code }}"
+          uv run --project "${{ github.workspace }}/controlloop" python \
+            "${{ github.workspace }}/controlloop/action-scripts/assert_scenario_expectations.py" \
+            --expected  "${{ github.workspace }}/reference/${{ matrix.expected }}" \
+            --evidence  "${{ steps.gate.outputs.evidence-path }}" \
+            --sarif     "${{ steps.gate.outputs.sarif-path }}" \
+            --exit-code "${{ steps.gate.outputs.exit-code }}" \
+            --run       "${{ matrix.run }}"
+
+      - name: Retain the evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-${{ matrix.id }}
+          path: |
+            ${{ steps.gate.outputs.evidence-path }}
+            ${{ steps.gate.outputs.sarif-path }}
+          if-no-files-found: warn
+          retention-days: 30

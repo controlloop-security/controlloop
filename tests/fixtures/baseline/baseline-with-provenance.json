@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.1.0",
+  "generator": {
+    "name": "controlloop",
+    "version": "0.1.0"
+  },
+  "repository": {
+    "commit": "abc123",
+    "root_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "acbom_schema_version": "1.0.0",
+  "acbom_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "effective_authority": [
+    {
+      "schema_version": "1.0.0",
+      "agent_id": "clp:agent:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "action": "invokes",
+      "resource_id": "clp:tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "permitting_identity_id": "clp:identity:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "confidence": "high",
+      "evidence": [
+        {
+          "adapter": "mcp",
+          "path": "mcp/tools-list.json"
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "approver": "reviewer@example.test",
+    "approver_source": "supplied",
+    "approved_at": "2026-08-19T00:00:00Z",
+    "approved_commit": "abc123"
+  },
+  "digest": "sha256:f069ce6162a7c5cee004f656ff361a43ed15f36eff3a522bb855bf36582bbf23"
+}

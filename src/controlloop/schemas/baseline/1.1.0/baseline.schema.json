@@ -1,0 +1,423 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.controlloop.ai/baseline/1.1.0/baseline.schema.json",
+  "title": "ControlLoop Baseline Artifact",
+  "description": "Canonical, deterministic, and sanitized baseline artifact for ControlLoop baseline schema version 1.1.0: a recorded, approved capability set, optionally with approval provenance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generator",
+    "repository",
+    "acbom_schema_version",
+    "acbom_digest",
+    "effective_authority",
+    "digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "$ref": "#/$defs/semanticVersion"
+    },
+    "generator": {
+      "$ref": "#/$defs/generator"
+    },
+    "repository": {
+      "$ref": "#/$defs/repository"
+    },
+    "acbom_schema_version": {
+      "$ref": "#/$defs/semanticVersion"
+    },
+    "acbom_digest": {
+      "$ref": "#/$defs/sha256Digest"
+    },
+    "effective_authority": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "$ref": "#/$defs/effectiveAuthorityEntry"
+      }
+    },
+    "provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/approvalProvenance"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "digest": {
+      "$ref": "#/$defs/sha256Digest"
+    }
+  },
+  "$defs": {
+    "sha256Digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "safeIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$"
+    },
+    "safeText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))[^\\u0000-\\u001f\\u007f]+$"
+    },
+    "semanticVersion": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low",
+        "unknown"
+      ]
+    },
+    "nodeId": {
+      "type": "string",
+      "pattern": "^clp:(?:agent|tool|resource|identity|permission|data-class|trigger|policy-boundary):sha256:[0-9a-f]{64}$"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "reads",
+        "writes",
+        "invokes"
+      ]
+    },
+    "commit": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$"
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/safeIdentifier"
+        },
+        "version": {
+          "$ref": "#/$defs/semanticVersion"
+        }
+      }
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "root_digest"
+      ],
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/commit"
+        },
+        "root_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter"
+      ],
+      "properties": {
+        "adapter": {
+          "$ref": "#/$defs/safeIdentifier"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/relativePath"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "line_start": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000000
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "line_end": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000000
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "parser": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/safeIdentifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "schema_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/safeIdentifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "document_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256Digest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "allOf": [
+        {
+          "anyOf": [
+            {
+              "required": [
+                "path"
+              ],
+              "properties": {
+                "path": {
+                  "not": {
+                    "type": "null"
+                  }
+                }
+              }
+            },
+            {
+              "required": [
+                "document_digest"
+              ],
+              "properties": {
+                "document_digest": {
+                  "not": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "if": {
+            "required": [
+              "line_start"
+            ],
+            "properties": {
+              "line_start": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "path"
+            ],
+            "properties": {
+              "path": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "line_end"
+            ],
+            "properties": {
+              "line_end": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          "then": {
+            "allOf": [
+              {
+                "required": [
+                  "path"
+                ],
+                "properties": {
+                  "path": {
+                    "not": {
+                      "type": "null"
+                    }
+                  }
+                }
+              },
+              {
+                "required": [
+                  "line_start"
+                ],
+                "properties": {
+                  "line_start": {
+                    "not": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "effectiveAuthorityEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "agent_id",
+        "action",
+        "resource_id",
+        "confidence",
+        "evidence"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "#/$defs/semanticVersion"
+        },
+        "agent_id": {
+          "$ref": "#/$defs/nodeId"
+        },
+        "action": {
+          "$ref": "#/$defs/action"
+        },
+        "resource_id": {
+          "$ref": "#/$defs/nodeId"
+        },
+        "permitting_identity_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/nodeId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        }
+      }
+    },
+    "approvalProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "approver": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/safeText"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approver_source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/safeText"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approved_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/safeText"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approved_commit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/safeText"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      }
+    }
+  }
+}

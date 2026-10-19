@@ -1,0 +1,65 @@
+{
+  "_about": "Recorded `controlloop gate` result for examples/agent-config: baseline/ on main, head/ on a branch. Regenerate with `uv run python tests/test_agent_config_examples.py`.",
+  "verdict": "deployment_blocked",
+  "exit_code": 1,
+  "findings": [
+    [
+      "policy.agent-hook-command-change",
+      "high",
+      "clp:finding:sha256:12f7d3437318019f86e365b169d0ec9a7ff487ad622e624ea3c16708c0d5a178"
+    ],
+    [
+      "policy.agent-hook-command-change",
+      "info",
+      "clp:finding:sha256:999017232683c3f9ba1852ef7ae36b2c9137508f039e140712db9de395ac7ff4"
+    ],
+    [
+      "policy.component-self-grant",
+      "high",
+      "clp:finding:sha256:3c532bee6b596c569d080aa83ce54713b9df7124308fb7c1cce1079e646950f1"
+    ],
+    [
+      "policy.component-self-grant",
+      "medium",
+      "clp:finding:sha256:cb243e5cf294182e0220b077cd2cd652f874aa2f3a697c8912b5d35b2068c2b0"
+    ],
+    [
+      "policy.mcp-server-identity-change",
+      "info",
+      "clp:finding:sha256:d501cf1b60db0d64b9697207185b4c9f23f73cb22d1fe5e76936710be123d48e"
+    ],
+    [
+      "policy.mcp-server-identity-change",
+      "medium",
+      "clp:finding:sha256:2f5269dd6cfdb291291f156dea792d97cb31e5221fa6620aabe67182512fa9cb"
+    ],
+    [
+      "policy.overprivileged-agent-workflow",
+      "high",
+      "clp:finding:sha256:ccba0aae30d1acb66a5d080a7347791a3c94f07478af6df96ea822214b0d9a22"
+    ],
+    [
+      "policy.permission-bypass-from-project",
+      "high",
+      "clp:finding:sha256:df455ae4c9d6ce0b7ac213e7af4771007437e397b25eedee3b01882c8284e2b4"
+    ],
+    [
+      "policy.widened-permission-rule",
+      "high",
+      "clp:finding:sha256:38a669761cc9acf4b42d3fa776b52626f0e1e193a8f1d0b63a9732f6e7df2ce9"
+    ]
+  ],
+  "authority_statements": [
+    "This change gives Claude Code the power to use `Edit` without asking (a wildcard) through subagent `reviewer` (`.claude/agents/reviewer.md`, rule `Edit`). No approval is recorded.",
+    "This change gives Claude Code the power to run subagent `reviewer` with fewer confirmations: permissionMode moved to 'bypassPermissions' (`.claude/agents/reviewer.md`, subagent `reviewer`). No approval is recorded.",
+    "This change gives Claude Code the power to run `./scripts/audit-command.sh` before every `Bash` tool call (`.claude/settings.json`, hook `PreToolUse`). Approval recorded.",
+    "This change gives Claude Code the power to run `node .github/setup.js` on every session start (`.claude/settings.json`, hook `SessionStart`). No approval is recorded.",
+    "This change gives Claude Code the power to use `Bash(*)` without asking (a wildcard) (`.claude/settings.json`, rule `Bash(*)`). No approval is recorded.",
+    "This change gives Claude Code the power to use `Bash(git push:*)` without asking (a wildcard) through skill `release-notes` (`.claude/skills/release-notes/SKILL.md`, rule `Bash(git push:*)`). No approval is recorded.",
+    "This change gives Claude Code the power to load skill `release-notes`, which may use `Read,Grep,Bash(git push:*)` without asking (`.claude/skills/release-notes/SKILL.md`, skill `release-notes`). No approval is recorded.",
+    "This change gives Claude Code the power to run in GitHub Actions workflow `agent-review` with write access to contents, pull-requests, skipping every permission prompt (`.github/workflows/agent-review.yml`, job `review`). No approval is recorded.",
+    "This change gives Claude Code the power to start MCP server `browser` by running `npx -y @example/browser-mcp@latest` (`.mcp.json`, server `browser`). No approval is recorded.",
+    "This change gives Claude Code the power to connect to MCP server `tickets` at `mcp.tickets.example` (`.mcp.json`, server `tickets`). Approval recorded.",
+    "This change gives Codex the power to act with fewer confirmations: 'approval_policy' moved from 'on-request' to 'never' (`.codex/config.toml`, setting `approval_policy`). No approval is recorded."
+  ]
+}

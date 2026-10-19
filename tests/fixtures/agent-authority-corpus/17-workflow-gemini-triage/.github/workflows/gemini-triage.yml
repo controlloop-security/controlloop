@@ -1,0 +1,15 @@
+name: Gemini triage
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+permissions:
+  contents: read
+  issues: read
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/run-gemini-cli@v0
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}

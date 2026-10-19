@@ -1,0 +1,9 @@
+# What ControlLoop's own self-gate does not scan.
+#
+# `tests/` holds the test suite's fixtures: deliberately vulnerable agent
+# configurations (hooks, wildcard permissions, unpinned plugins) and fake
+# credentials that prove secrets never reach output. `examples/` holds a
+# deliberately widened agent configuration for the walkthrough. Both are
+# there on purpose and are not this repository's own agent authority.
+tests/
+examples/

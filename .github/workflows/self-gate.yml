@@ -1,0 +1,45 @@
+name: ControlLoop self-gate
+
+# ControlLoop gates its own repository with the Action built from the same
+# commit (`uses: ./`), so every change to this repository is held to the
+# same check a user's repository gets: its agent configuration, the
+# workflows that run an agent, and committed secrets.
+#
+# What is in scope is set by `controlloop.yaml` and `.controlloopignore`
+# at the repository root. The ignore file excludes `tests/` and
+# `examples/`, which hold deliberately vulnerable agent configurations and
+# fake credentials on purpose.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: self-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: ControlLoop gates this repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # the SARIF upload to code scanning
+      pull-requests: write     # the one authority-statement comment
+    steps:
+      - name: Check out this repository
+        uses: actions/checkout@v7.0.1
+        with:
+          # The gate takes its baseline from the merge-base with the
+          # default branch, which needs real history.
+          fetch-depth: 0
+
+      - name: Run the ControlLoop gate built from this commit
+        uses: ./
+        with:
+          path: ${{ github.workspace }}
+          default-branch: main

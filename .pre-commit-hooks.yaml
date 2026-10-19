@@ -1,0 +1,34 @@
+# ControlLoop's own pre-commit hook manifest.
+#
+# Consumers reference this repository as a pre-commit hook repo, pinned to
+# a tagged release or commit SHA -- never an unpinned or "latest" ref,
+# matching this codebase's own pinning discipline for the GitHub Action
+# (action.yml):
+#
+#   repos:
+#     - repo: https://github.com/controlloop-security/controlloop
+#       rev: v0.1.0  # pin to a tagged release or commit SHA
+#       hooks:
+#         - id: controlloop-gate
+#
+# See docs/reference/pre-commit-hook.md for the full usage guide,
+# including this hook's baseline strategy and documented time budget.
+#
+# `language: script` runs `entry` directly via its own shebang, with no
+# pre-commit-managed language environment to install -- the entry script
+# below manages ControlLoop's own installation itself (via `uv`, the same
+# tool this repository's own CLI foundation and GitHub Action already
+# require), so there is nothing for pre-commit itself to set up first.
+- id: controlloop-gate
+  name: ControlLoop capability gate
+  description: >-
+    Run `controlloop gate` against your working tree and block the
+    commit on a blocking capability-expansion finding. Requires `uv` on
+    PATH (https://docs.astral.sh/uv/); installs this hook's own pinned
+    ControlLoop checkout on first run via `uv sync --locked
+    --all-groups`, the identical mechanism action.yml already uses.
+  entry: scripts/pre-commit-gate.sh
+  language: script
+  pass_filenames: false
+  always_run: true
+  stages: [pre-commit]

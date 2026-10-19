@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "defaultMode": "plan",
+    "deny": [
+      "Read(./secrets/**)",
+      "Bash(curl:*)"
+    ]
+  }
+}

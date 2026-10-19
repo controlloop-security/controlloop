@@ -1,0 +1,76 @@
+[build-system]
+requires = ["hatchling>=1.28,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "controlloop"
+version = "0.1.0"
+description = "Local-first security scanner and deterministic CI gate for AI agents"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pathspec>=1.1.1,<2",
+    "pydantic>=2.12,<3",
+    "python-hcl2>=8.1.2",
+    "pyyaml>=6.0.3",
+    "typer>=0.21,<1",
+]
+
+[project.scripts]
+controlloop = "controlloop.cli:main"
+
+[dependency-groups]
+dev = [
+    "jsonschema>=4.25,<5",
+    "mypy>=1.19,<2",
+    "pre-commit>=4,<5",
+    "pytest>=9,<10",
+    "pytest-cov>=7,<8",
+    "ruff>=0.14,<1",
+    "types-pyyaml>=6.0.12.20260815",
+]
+release = [
+    "pyinstaller>=6,<7",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/controlloop"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--cov=controlloop",
+    "--cov-fail-under=85",
+    "--cov-report=term-missing",
+    "--strict-config",
+    "--strict-markers",
+    "-ra",
+]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "B",
+    "E",
+    "F",
+    "I",
+    "RUF",
+    "SIM",
+    "UP",
+]

@@ -1,0 +1,12 @@
+{
+  "general": {
+    "defaultApprovalMode": "default"
+  },
+  "tools": {
+    "allowed": [
+      "read_file",
+      "glob",
+      "search_file_content"
+    ]
+  }
+}

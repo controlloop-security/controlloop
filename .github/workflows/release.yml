@@ -1,0 +1,453 @@
+name: Release
+
+# One tagged release builds, verifies, and publishes every artifact from
+# a single reproducible pipeline.
+#
+# SCOPE: this workflow publishes a GitHub Release carrying the CLI's own
+# `uv build` wheel/sdist output and a release manifest, using only this
+# repository's own GITHUB_TOKEN. It deliberately does NOT publish to PyPI,
+# GHCR, or a Homebrew tap -- each of those waits on the package namespace
+# being reserved first. Adding one means a new job that
+# `needs: [derive-version, verify, changelog-gate]` alongside
+# `publish-github-release`; it does not need to change anything above
+# that line.
+#
+# `publish-schemas` publishes every packaged JSON Schema file -- every
+# version of every family, including frozen historical ones -- to GitHub
+# Pages, using GitHub's own built-in `pages`/`id-token` permissions, no
+# external credential. This makes the job real and automated, but does
+# not by itself make `schemas.controlloop.ai` resolve: GitHub Pages must
+# still be enabled for this repository, and the domain's DNS must still be
+# pointed at GitHub Pages, separately, once, by a maintainer -- disclosed
+# here rather than claimed as already live, the same "real pipeline,
+# never yet triggered" honesty this whole workflow already holds itself
+# to.
+#
+# This workflow only runs when a real `vX.Y.Z` tag is pushed to this
+# repository -- a human, deliberate act. No workflow in this repository
+# ever pushes a tag itself.
+#
+# The `build-binaries` job below builds one standalone, single-file
+# `controlloop` executable per platform/architecture leg, smoke-tests it
+# with a real scan, checks it for build-to-build scan-output
+# reproducibility, then attaches it to the published release alongside
+# its SHA-256 checksum. Every disclosure -- the macOS x86_64 gap, why
+# macOS binaries are unsigned and unnotarized, and why "reproducible"
+# means identical scan output rather than identical binary bytes -- is
+# recorded in full in `docs/reference/standalone-binaries.md`. Building
+# and smoke-testing these binaries requires no tag and no publication --
+# only `publish-github-release` ever runs on a real tag push with write
+# access.
+#
+# The `attest-artifacts` job below gives every wheel, sdist,
+# `release-manifest.json`, and standalone binary this pipeline produces a
+# combined `SHA256SUMS` checksum file and a GitHub-native Sigstore
+# build-provenance attestation (`actions/attest-build-provenance`,
+# keyless, OIDC-based, no external secret or paid service -- the same
+# "GitHub's own built-in permissions" category `publish-schemas` already
+# uses). `publish-github-release` also depends on this job and attaches
+# `SHA256SUMS` to the release. Full disclosure is in
+# `docs/reference/release-verification.md`.
+#
+# A floating `vMAJOR` tag policy (e.g. `v1` tracking the latest
+# `vMAJOR.*.*` release) is documented in
+# `docs/reference/marketplace-listing.md` as a manual, maintainer-performed
+# step after each release -- deliberately NOT automated in this workflow.
+# This file's own standing invariant, unchanged: no workflow in this
+# repository ever pushes a tag itself (see
+# `TestReleaseWorkflowScopeBoundary::test_never_pushes_a_tag_or_calls_uv_publish`
+# in `tests/test_release_workflow_structure.py`), so a moving tag stays a
+# human action even though nothing here would have let it re-trigger this
+# workflow (`vMAJOR` never matches this file's own `v*.*.*` trigger glob,
+# having no dot). Also preparation for the actual GitHub Marketplace
+# listing, which itself still requires a maintainer's own publish action
+# -- full disclosure in `docs/reference/marketplace-listing.md`.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  derive-version:
+    name: Derive release version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.derive.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Derive release metadata
+        id: derive
+        run: |
+          set -euo pipefail
+          python3 release-scripts/derive_release_metadata.py \
+            "${{ github.ref_name }}" \
+            --output release-manifest.json
+          version=$(python3 -c "import json; print(json.load(open('release-manifest.json'))['package_version'])")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release manifest
+        uses: actions/upload-artifact@v4.3.6
+        with:
+          name: release-manifest
+          path: release-manifest.json
+
+  verify:
+    name: Verify
+    needs: derive-version
+    uses: ./.github/workflows/verify.yml
+
+  changelog-gate:
+    name: Changelog gate
+    needs: derive-version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Require and extract the release's changelog entry
+        run: |
+          set -euo pipefail
+          python3 release-scripts/changelog_release_notes.py \
+            "${{ needs.derive-version.outputs.version }}" \
+            > release-notes.md
+
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4.3.6
+        with:
+          name: release-notes
+          path: release-notes.md
+
+  build-binaries:
+    name: Build standalone binary (${{ matrix.label }})
+    needs: [derive-version, verify]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The same three real, free-tier GitHub-hosted legs
+        # `.github/workflows/verify.yml` already tests on, not a fourth
+        # invented one. The goal is all four platform and architecture
+        # combinations (Linux/macOS x x86_64/arm64); macOS x86_64 is a
+        # disclosed, deliberate gap here for the identical
+        # reason `verify.yml` and `docs/reference/supported-platforms.md`
+        # already document for testing: every current free-tier
+        # GitHub-hosted macOS runner is Apple Silicon (arm64) only, and
+        # enabling a paid "larger runner" for Intel macOS is a billing
+        # decision this workflow does not make. See
+        # `docs/reference/standalone-binaries.md` for the full disclosure
+        # and the macOS signing/notarization disclosure.
+        include:
+          - os: ubuntu-latest
+            label: linux-x86_64
+            platform: linux
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            label: linux-arm64
+            platform: linux
+            arch: arm64
+          - os: macos-15
+            label: macos-arm64
+            platform: macos
+            arch: arm64
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          version: "0.9.30"
+          python-version: "3.12"
+
+      - name: Install locked dependencies (including the release group)
+        run: uv sync --locked --all-groups
+
+      - name: Build standalone binary
+        run: |
+          set -euo pipefail
+          uv run python release-scripts/build_binary.py \
+            --platform "${{ matrix.platform }}" \
+            --arch "${{ matrix.arch }}" \
+            --repo-root .
+
+      - name: Smoke test -- real scan against a synthetic fixture
+        run: |
+          set -euo pipefail
+          BIN="dist-binary/controlloop-${{ matrix.platform }}-${{ matrix.arch }}"
+          chmod +x "$BIN"
+          "$BIN" --version
+          mkdir -p "$RUNNER_TEMP/controlloop-binary-fixture"
+          printf '%s' '{"name": "report-agent", "skills": [{"id": "read-quarterly-metrics", "name": "read-quarterly-metrics"}]}' \
+            > "$RUNNER_TEMP/controlloop-binary-fixture/agent-card.json"
+          "$BIN" scan "$RUNNER_TEMP/controlloop-binary-fixture" --format json \
+            > "$RUNNER_TEMP/scan-output-1.json"
+          python3 -c "
+          import json, sys
+          report = json.load(open('$RUNNER_TEMP/scan-output-1.json'))
+          sys.exit(0 if report['verdict'] == 'passed' else 1)
+          "
+
+      - name: Reproducibility -- rebuild and diff scan output
+        run: |
+          set -euo pipefail
+          rm -rf dist-binary build-binary
+          uv run python release-scripts/build_binary.py \
+            --platform "${{ matrix.platform }}" \
+            --arch "${{ matrix.arch }}" \
+            --repo-root .
+          BIN="dist-binary/controlloop-${{ matrix.platform }}-${{ matrix.arch }}"
+          chmod +x "$BIN"
+          "$BIN" scan "$RUNNER_TEMP/controlloop-binary-fixture" --format json \
+            > "$RUNNER_TEMP/scan-output-2.json"
+          diff "$RUNNER_TEMP/scan-output-1.json" "$RUNNER_TEMP/scan-output-2.json"
+          echo "two independent builds of the same commit produced identical scan output"
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4.3.6
+        with:
+          name: binary-${{ matrix.label }}
+          path: |
+            dist-binary/controlloop-${{ matrix.platform }}-${{ matrix.arch }}
+            dist-binary/controlloop-${{ matrix.platform }}-${{ matrix.arch }}.sha256
+
+  package:
+    name: Build distribution artifacts
+    needs: [derive-version, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          version: "0.9.30"
+          python-version: "3.12"
+
+      - name: Install locked dependencies
+        run: uv sync --locked --all-groups
+
+      - name: Build wheel and sdist
+        run: uv build
+
+      - name: Download release manifest
+        uses: actions/download-artifact@v4.1.8
+        with:
+          name: release-manifest
+          path: .
+
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v4.3.6
+        with:
+          name: release-dist
+          path: |
+            dist/*
+            release-manifest.json
+
+  attest-artifacts:
+    name: Attest and verify release artifacts
+    # Every published artifact gets a checksum (a combined `SHA256SUMS`,
+    # additive to the build-binaries job's own per-binary `.sha256` files) and a signature -- GitHub's own built-in artifact
+    # attestation (`actions/attest-build-provenance`), Sigstore-backed,
+    # keyless (OIDC via `id-token: write`), no external account, secret,
+    # or paid service. The same "GitHub's own built-in permissions, no
+    # external credential" category of choice `publish-schemas` already
+    # makes for `pages`/`id-token`, not a new provider selection. See
+    # `docs/reference/release-verification.md` for the full disclosure.
+    needs: [derive-version, verify, changelog-gate, package, build-binaries]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4.1.8
+        with:
+          name: release-dist
+          path: release-dist
+
+      - name: Download standalone binaries
+        uses: actions/download-artifact@v4.1.8
+        with:
+          pattern: binary-*
+          path: release-binaries
+          merge-multiple: true
+
+      - name: Stage every artifact this release publishes
+        run: |
+          set -euo pipefail
+          mkdir to-sign
+          cp release-dist/dist/* to-sign/
+          cp release-dist/release-manifest.json to-sign/
+          for f in release-binaries/*; do
+            case "$f" in
+              *.sha256) continue ;;
+            esac
+            cp "$f" to-sign/
+          done
+
+      - name: Write combined checksums file
+        run: |
+          set -euo pipefail
+          python3 release-scripts/checksums.py write --output to-sign/SHA256SUMS to-sign/*
+
+      - name: Attest build provenance for every artifact
+        uses: actions/attest-build-provenance@v4.2.2
+        with:
+          subject-path: to-sign/*
+
+      - name: Verify checksums against the just-built artifacts
+        run: |
+          set -euo pipefail
+          python3 release-scripts/checksums.py verify \
+            --checksums-file to-sign/SHA256SUMS --dir to-sign
+
+      - name: Verify attestations against the just-built artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for f in to-sign/*; do
+            gh attestation verify "$f" --repo "${{ github.repository }}"
+          done
+
+      - name: Prove a tampered artifact fails verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cp -r to-sign tampered
+          target="tampered/release-manifest.json"
+          python3 -c "
+          path = '$target'
+          data = bytearray(open(path, 'rb').read())
+          data[0] ^= 0xFF
+          open(path, 'wb').write(data)
+          "
+
+          if gh attestation verify "$target" --repo "${{ github.repository }}"; then
+            echo "::error::a tampered artifact passed attestation verification"
+            exit 1
+          fi
+          echo "confirmed: a tampered artifact fails attestation verification"
+
+          if python3 release-scripts/checksums.py verify \
+              --checksums-file tampered/SHA256SUMS --dir tampered; then
+            echo "::error::a tampered artifact passed checksum verification"
+            exit 1
+          fi
+          echo "confirmed: a tampered artifact fails checksum verification"
+
+      - name: Upload combined checksums file
+        uses: actions/upload-artifact@v4.3.6
+        with:
+          name: release-checksums
+          path: to-sign/SHA256SUMS
+
+  publish-github-release:
+    name: Publish GitHub Release
+    needs:
+      [
+        derive-version,
+        verify,
+        changelog-gate,
+        package,
+        build-binaries,
+        attest-artifacts,
+      ]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4.1.8
+        with:
+          name: release-dist
+          path: release-dist
+
+      - name: Download release notes
+        uses: actions/download-artifact@v4.1.8
+        with:
+          name: release-notes
+          path: release-notes
+
+      - name: Download standalone binaries
+        uses: actions/download-artifact@v4.1.8
+        with:
+          pattern: binary-*
+          path: release-binaries
+          merge-multiple: true
+
+      - name: Download combined checksums file
+        uses: actions/download-artifact@v4.1.8
+        with:
+          name: release-checksums
+          path: release-checksums
+
+      - name: Create the GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "$TAG" \
+            --notes-file release-notes/release-notes.md \
+            release-dist/dist/* \
+            release-dist/release-manifest.json \
+            release-binaries/* \
+            release-checksums/SHA256SUMS
+
+  publish-schemas:
+    name: Publish schemas to GitHub Pages
+    needs: [derive-version, verify, changelog-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Assemble the schema site
+        run: |
+          set -euo pipefail
+          python3 release-scripts/assemble_schema_site.py \
+            --schemas-root src/controlloop/schemas \
+            --output _schema-site
+
+      - name: Upload the schema site
+        uses: actions/upload-pages-artifact@v5.0.0
+        with:
+          path: _schema-site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5.0.0

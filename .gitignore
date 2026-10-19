@@ -1,0 +1,15 @@
+# Operating-system metadata
+.DS_Store
+# Python bytecode cache -- can appear anywhere a *.py script (for example
+# release-scripts/) is executed directly.
+__pycache__/
+*.py[cod]
+.coverage
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+dist/
+dist-binary/
+build-binary/
+*.egg-info/

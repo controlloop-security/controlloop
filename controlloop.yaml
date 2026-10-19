@@ -1,0 +1,17 @@
+# ControlLoop's own manifest: the self-gate in
+# .github/workflows/self-gate.yml holds this repository to it.
+#
+# What the gate scans is set by .controlloopignore, which leaves out the
+# deliberately vulnerable fixtures under tests/ and examples/.
+schema_version: "1.2.0"
+owner: controlloop-security
+
+suppressions:
+  # src/controlloop/secret_scan.py lists AWS's documented example access
+  # key as a known placeholder so the scanner can recognize it. The
+  # scanner still reports it, at medium confidence, by design: a
+  # placeholder lowers confidence but never hides a finding.
+  - rule_id: policy.hardcoded-secrets
+    target: clp:finding:sha256:5208ba00d814da1eb6d25c66a1b4a953870567473a71878c39f4eec70f432b69
+    reason: "AWS's documented example key, listed in secret_scan.py as a known placeholder; not a credential."
+    expires_at: "2027-10-19"
