@@ -333,7 +333,13 @@ def _resolve_default_branch_ref(
     root: RepositoryRoot, default_branch: str | None
 ) -> str:
     if default_branch is not None:
+        # A pull-request checkout (GitHub Actions' actions/checkout on a
+        # `pull_request` event) has the target branch only as a
+        # remote-tracking ref, so a bare name like `main` is also tried as
+        # `origin/main`. The name as given always wins when it resolves.
         candidates: tuple[str, ...] = (default_branch,)
+        if not default_branch.startswith(("origin/", "refs/")):
+            candidates += (f"origin/{default_branch}",)
     else:
         symbolic = _run_git(
             root, ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]

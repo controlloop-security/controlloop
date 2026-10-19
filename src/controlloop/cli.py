@@ -1974,7 +1974,9 @@ _GATE_DEFAULT_BRANCH_OPTION = typer.Option(
     help="Override the branch merge-base baseline resolution treats as "
     "the default/target branch, for example a CI "
     "checkout where origin/HEAD is unset. Omit to resolve automatically "
-    "(origin/HEAD, falling back to common candidate names). Does not "
+    "(origin/HEAD, falling back to common candidate names). A bare name "
+    "that does not resolve locally is also tried as origin/<name>, the "
+    "only form a pull-request checkout has. Does not "
     "provide diff's own explicit-file/-revision baseline override -- "
     "use diff for that.",
 )
