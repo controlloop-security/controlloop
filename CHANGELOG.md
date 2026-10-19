@@ -6,7 +6,11 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-The first public release of the ControlLoop CLI.
+## [0.1.1] - 2026-10-19
+
+The first public release of the ControlLoop CLI, published to PyPI as
+`controlloop`. Version `0.1.0` on PyPI only reserved the name and is not a
+release.
 
 ### Fixed
 

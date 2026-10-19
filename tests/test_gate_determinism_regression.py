@@ -55,9 +55,11 @@ _GOLDEN_VERDICT = "passed"
 # even though nothing about this fixture's own findings changed.
 # Updated again for 1.1.0 -> 1.2.0, for the same reason: the schema version
 # and URL are part of the canonical bytes.
+# Updated for the 0.1.0 -> 0.1.1 release: the scanner version is part of
+# the canonical bytes too, so every version bump changes this digest.
 # Stable across 3 repeated local runs before being recorded.
 _GOLDEN_DIGEST = (
-    "sha256:b8de6628a4e9f5896c7f9c6e882e516eb6c7dcf5048ca87e6abf8e1f9d7926a3"
+    "sha256:17e6390584f903ba63f16996b1e63534c3a8b844f8f715601e24729a09d8075d"
 )
 
 
