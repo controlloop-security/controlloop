@@ -6,12 +6,6 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.1.1] - 2026-10-19
-
-The first public release of the ControlLoop CLI, published to PyPI as
-`controlloop`. Version `0.1.0` on PyPI only reserved the name and is not a
-release.
-
 ### Fixed
 
 - **One suppression could silence several secrets.** Two hardcoded
@@ -34,6 +28,15 @@ release.
   `gate` text output, a finding an active suppression covers keeps its
   severity but takes the neutral `•` glyph and a closing line,
   `suppressed until YYYY-MM-DD; does not affect the verdict`.
+
+## [0.1.1] - 2026-10-19
+
+The first public release of the ControlLoop CLI, published to PyPI as
+`controlloop`. Version `0.1.0` on PyPI only reserved the name and is not a
+release.
+
+### Fixed
+
 - **`gate --default-branch` on a pull request.** A bare branch name such
   as `main` that does not exist locally is now also tried as
   `origin/main`. A pull-request checkout in GitHub Actions has the target
