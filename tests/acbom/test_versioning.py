@@ -15,8 +15,11 @@ import pytest
 from controlloop.acbom import (
     CURRENT_SCHEMA_VERSION,
     ACBOMDocument,
+    ACBOMIntegrityError,
     IncompatibleSchemaVersionError,
+    canonicalize_document,
     check_schema_version_compatible,
+    compute_digest,
     load_acbom_document,
 )
 from controlloop.exit_codes import ExitCode
@@ -110,9 +113,20 @@ class TestCheckSchemaVersionCompatible:
             check_schema_version_compatible("not-a-version", reader_version="1.0.0")
 
 
+def _with_true_digest(data: dict[str, object]) -> str:
+    """`data` as JSON with its `digest` set to the real canonical digest
+    of its content. `minimal-input.json` carries a placeholder digest
+    because it is canonicalization input, not a generated document."""
+
+    document = ACBOMDocument.model_validate_json(json.dumps(data))
+    return json.dumps(
+        {**data, "digest": compute_digest(canonicalize_document(document))}
+    )
+
+
 class TestLoadAcbomDocument:
     def test_reads_a_real_fixture_at_the_current_version(self) -> None:
-        raw = _FIXTURE_PATH.read_text()
+        raw = _with_true_digest(json.loads(_FIXTURE_PATH.read_text()))
 
         document = load_acbom_document(raw)
 
@@ -127,7 +141,7 @@ class TestLoadAcbomDocument:
         older = json.loads(_FIXTURE_PATH.read_text())
         older["schema_version"] = "1.0.0"
         del older["schema_url"]
-        raw = json.dumps(older)
+        raw = _with_true_digest(older)
 
         document = load_acbom_document(raw)
 
@@ -153,6 +167,53 @@ class TestLoadAcbomDocument:
 
         with pytest.raises(IncompatibleSchemaVersionError):
             load_acbom_document(json.dumps(fixture))
+
+
+class TestLoadAcbomDocumentIntegrity:
+    """An ACBOM is only ever returned when it is well formed and its
+    declared digest matches its content."""
+
+    def test_an_edited_document_is_rejected(self) -> None:
+        data = json.loads(_with_true_digest(json.loads(_FIXTURE_PATH.read_text())))
+        data["nodes"][0]["name"] = "renamed-after-generation"
+
+        with pytest.raises(ACBOMIntegrityError, match="digest does not match"):
+            load_acbom_document(json.dumps(data))
+
+    def test_a_placeholder_digest_is_rejected(self) -> None:
+        with pytest.raises(ACBOMIntegrityError, match="digest does not match"):
+            load_acbom_document(_FIXTURE_PATH.read_text())
+
+    def test_an_unedited_document_round_trips(self) -> None:
+        raw = _with_true_digest(json.loads(_FIXTURE_PATH.read_text()))
+
+        assert load_acbom_document(raw).digest == json.loads(raw)["digest"]
+
+    def test_a_schema_violation_is_one_line_naming_the_location(self) -> None:
+        data = json.loads(_FIXTURE_PATH.read_text())
+        data["nodes"][0]["type"] = "banana"
+
+        with pytest.raises(ACBOMIntegrityError) as excinfo:
+            load_acbom_document(json.dumps(data))
+
+        message = str(excinfo.value)
+        assert "nodes.0.type" in message
+        assert "\n" not in message
+        assert "errors.pydantic.dev" not in message
+        assert excinfo.value.exit_code is ExitCode.INVALID_INPUT
+
+    def test_several_schema_violations_are_counted(self) -> None:
+        data = json.loads(_FIXTURE_PATH.read_text())
+        data["nodes"][0]["type"] = "banana"
+        data["nodes"][0]["confidence"] = "certain"
+
+        with pytest.raises(ACBOMIntegrityError, match=r"and 1 more error\)"):
+            load_acbom_document(json.dumps(data))
+
+    @pytest.mark.parametrize("raw", ["{", "not json", b"\xff\xfe"])
+    def test_invalid_json_is_an_integrity_error(self, raw: str | bytes) -> None:
+        with pytest.raises(ACBOMIntegrityError, match="not valid JSON"):
+            load_acbom_document(raw)
 
 
 def test_packaged_schema_matches_its_golden_digest() -> None:

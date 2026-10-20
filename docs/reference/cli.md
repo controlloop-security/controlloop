@@ -152,8 +152,12 @@ Repeated generation over unchanged input produces an identical digest.
 
 `bom --validate PATH` exits `0` and prints `✓ VALID  PATH is a valid ACBOM`
 to standard output if `PATH` parses as a structurally valid ACBOM document at
-a compatible schema version; otherwise it exits `2` and reports the reason
-to standard error. It never generates or prints a document itself.
+a compatible schema version and its declared `digest` matches its content;
+otherwise it exits `2` and reports the reason on one line of standard error
+(for example `does not match the ACBOM schema at nodes.0.type`, or `digest
+does not match its content` for a document edited after it was generated).
+It never generates or prints a document itself. `diff` applies the same
+check to each ACBOM file it is given.
 
 Repository identity in the generated document is deliberately minimal:
 `repository.commit` is `git rev-parse HEAD` (local only; never touches the

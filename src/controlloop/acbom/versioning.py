@@ -14,7 +14,10 @@ from __future__ import annotations
 
 import json
 
+from pydantic import ValidationError as PydanticValidationError
+
 from controlloop.acbom.models import ACBOMDocument
+from controlloop.acbom.serialization import canonicalize_document, compute_digest
 from controlloop.exit_codes import ExitCode
 
 CURRENT_SCHEMA_VERSION = "1.2.0"
@@ -44,6 +47,39 @@ class IncompatibleSchemaVersionError(ValueError):
     def __init__(self, message: str) -> None:
         super().__init__(message)
         self.exit_code = ExitCode.INVALID_INPUT
+
+
+class ACBOMIntegrityError(ValueError):
+    """A document that is not a well-formed, untampered ACBOM: invalid
+    JSON, a structure the schema rejects, or a declared `digest` that does
+    not match a fresh recomputation.
+
+    The message is always one line of plain text, so a caller can show it
+    to an operator as-is. Carries `ExitCode.INVALID_INPUT`, like
+    `IncompatibleSchemaVersionError`.
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.exit_code = ExitCode.INVALID_INPUT
+
+
+def _schema_error_summary(error: PydanticValidationError) -> str:
+    """One line naming the first schema error's location and reason,
+    plus how many more there are -- pydantic's own rendering spans
+    several lines and links to its documentation."""
+
+    errors = error.errors(include_url=False)
+    if not errors:
+        return "the document does not match the ACBOM schema"
+    first = errors[0]
+    location = ".".join(str(part) for part in first.get("loc", ())) or "document"
+    reason = " ".join(str(first.get("msg", "invalid value")).split())
+    summary = f"the document does not match the ACBOM schema at {location}: {reason}"
+    remaining = len(errors) - 1
+    if remaining:
+        summary += f" (and {remaining} more error{'s' if remaining != 1 else ''})"
+    return summary
 
 
 def _major_minor(version: str, *, label: str) -> tuple[int, int]:
@@ -91,9 +127,22 @@ def load_acbom_document(
 ) -> ACBOMDocument:
     """Return the parsed `ACBOMDocument` in `raw`, after checking schema
     version compatibility -- never partially parsing an incompatible
-    document."""
+    document -- and its integrity.
 
-    envelope = json.loads(raw)
+    Raises `IncompatibleSchemaVersionError` for a version this reader
+    cannot read, and `ACBOMIntegrityError` for invalid JSON, a document
+    the schema rejects, or a declared `digest` that does not match the
+    document's content: an ACBOM edited after it was generated is never
+    returned as if it were the one ControlLoop produced. Both are
+    `ValueError`s with a single-line message.
+    """
+
+    try:
+        envelope = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
+        raise ACBOMIntegrityError(
+            "the document is truncated or not valid JSON"
+        ) from None
     document_version = (
         envelope.get("schema_version") if isinstance(envelope, dict) else None
     )
@@ -102,4 +151,13 @@ def load_acbom_document(
             "document has no readable schema_version field"
         )
     check_schema_version_compatible(document_version, reader_version=reader_version)
-    return ACBOMDocument.model_validate_json(raw)
+    try:
+        document = ACBOMDocument.model_validate_json(raw)
+    except PydanticValidationError as error:
+        raise ACBOMIntegrityError(_schema_error_summary(error)) from None
+    if compute_digest(canonicalize_document(document)) != document.digest:
+        raise ACBOMIntegrityError(
+            "the document's digest does not match its content -- it was "
+            "edited after it was generated, or is corrupted"
+        )
+    return document

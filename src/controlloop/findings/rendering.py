@@ -72,15 +72,22 @@ def _located_evidence(evidence: tuple[Evidence, ...]) -> tuple[Evidence, ...]:
     return tuple(item for item in evidence if item.path is not None)
 
 
-def render_finding_text(finding: Finding) -> str:
+def render_finding_text(
+    finding: Finding, *, suppressed_until: str | None = None
+) -> str:
     """Return `finding`'s brand-consistent, glyph-prefixed human text:
     one summary line, followed by one indented location line per
     evidence entry carrying a `path`, rendered through
     `controlloop.redaction.source_reference` -- the only sanctioned
     textual description of a source location, so this function
-    structurally cannot print raw source content even by mistake."""
+    structurally cannot print raw source content even by mistake.
 
-    glyph = _SEVERITY_GLYPH[finding.severity]
+    `suppressed_until` is the expiry date of an active suppression that
+    covers this finding. The finding is still shown at its own severity,
+    but with the neutral `•` glyph and a closing line saying it is
+    suppressed, so it never reads as one that blocks."""
+
+    glyph = "•" if suppressed_until is not None else _SEVERITY_GLYPH[finding.severity]
     label = finding.severity.value.upper()
     lines = [f"{glyph} {label:<{_LABEL_WIDTH}}{finding.rule_id}: {finding.message}"]
     for evidence in _located_evidence(finding.evidence):
@@ -91,6 +98,10 @@ def render_finding_text(finding: Finding) -> str:
             line_end=evidence.line_end,
         )
         lines.append(f"    at {location}")
+    if suppressed_until is not None:
+        lines.append(
+            f"    suppressed until {suppressed_until}; does not affect the verdict"
+        )
     return "\n".join(lines)
 
 

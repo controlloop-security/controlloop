@@ -12,6 +12,6 @@ suppressions:
   # scanner still reports it, at medium confidence, by design: a
   # placeholder lowers confidence but never hides a finding.
   - rule_id: policy.hardcoded-secrets
-    target: clp:finding:sha256:5208ba00d814da1eb6d25c66a1b4a953870567473a71878c39f4eec70f432b69
+    target: clp:finding:sha256:d237dd82530d66d1e0dfd2a4bce427c66bc38adffe054ef214064d956290dbb8
     reason: "AWS's documented example key, listed in secret_scan.py as a known placeholder; not a credential."
     expires_at: "2027-10-19"

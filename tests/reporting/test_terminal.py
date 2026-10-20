@@ -18,6 +18,7 @@ from controlloop.findings.models import (
     FindingChangeState,
     FindingSeverity,
 )
+from controlloop.policy.suppressions import SuppressionRecord, SuppressionStatus
 from controlloop.reporting.terminal import (
     Verdict,
     render_terminal_report,
@@ -379,3 +380,56 @@ class TestReductionOnlyChangeSet:
         )
 
         assert "no material capability change" in rendered
+
+
+def _suppression(
+    *, status: SuppressionStatus, rule_id: str = "policy.undeclared-tools"
+) -> SuppressionRecord:
+    return SuppressionRecord(
+        rule_id=rule_id,
+        target=_FINDING_ID,
+        reason="reviewed",
+        expires_at="2026-12-31",
+        status=status,
+    )
+
+
+class TestSuppressedFindings:
+    """A finding an active suppression covers reads as suppressed, never
+    as one that blocks; nothing else changes."""
+
+    def _report(self, *suppressions: SuppressionRecord) -> str:
+        return render_terminal_report(
+            blast_radius=None,
+            verdict=Verdict.PASSED,
+            findings=(_finding(),),
+            suppressions=suppressions,
+        )
+
+    def test_an_actively_suppressed_finding_is_marked(self) -> None:
+        report = self._report(_suppression(status=SuppressionStatus.ACTIVE))
+
+        assert "• HIGH" in report
+        assert "✕ HIGH" not in report
+        assert "suppressed until 2026-12-31; does not affect the verdict" in report
+
+    def test_an_expired_suppression_leaves_the_finding_blocking(self) -> None:
+        report = self._report(_suppression(status=SuppressionStatus.EXPIRED))
+
+        assert "✕ HIGH" in report
+        assert "suppressed until" not in report
+
+    def test_a_suppression_for_another_rule_does_not_mark_the_finding(self) -> None:
+        report = self._report(
+            _suppression(
+                status=SuppressionStatus.ACTIVE, rule_id="policy.broad-permission"
+            )
+        )
+
+        assert "✕ HIGH" in report
+        assert "suppressed until" not in report
+
+    def test_no_suppressions_renders_exactly_as_before(self) -> None:
+        assert self._report() == render_terminal_report(
+            blast_radius=None, verdict=Verdict.PASSED, findings=(_finding(),)
+        )

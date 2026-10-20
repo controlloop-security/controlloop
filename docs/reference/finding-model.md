@@ -222,13 +222,20 @@ repository-relative evidence paths (sorted, deduplicated), the closest
 allowlisted, non-mutable anchor left -- the same *category* of identity
 material (`source_path`) `controlloop.acbom.identity.SemanticIdentity`
 already treats as approved for a node, reused here for the one case
-that has nothing else. **Disclosed limitation:** line numbers still
-never participate, so two distinct secrets of the *same* detected
-pattern in the *same* file collapse to one finding identity -- a real,
-disclosed accuracy limitation, not a fabricated per-occurrence
-precision this codebase's own identity constraints (no line numbers, no
-source content) cannot honestly provide. The agent-scoped payload shape
-is completely unchanged by this addition.
+that has nothing else. Line numbers still never participate, so a
+line added elsewhere in the file never mints a new identity. A rule
+that can report several findings in one file also supplies an
+`occurrence`, a short nonsecret label that tells them apart:
+`policy.hardcoded-secrets` uses the detected credential kind and its
+ordinal among detections of that kind in the file, for example
+`aws-access-key-id#1` or `stripe-secret-key#1`. Every detection
+therefore has its own identity, and a suppression of one never silences
+another. The ordinal changes only when a detection of the same kind is
+added or removed above it in the same file; the suppression then
+reports `stale` instead of silently moving to a different secret. The
+`occurrence` never contains any part of the matched value. The
+agent-scoped payload shape is completely unchanged by this addition,
+and a rule that supplies no `occurrence` keeps its original IDs.
 
 ## Serialization across human, JSON, and SARIF
 
@@ -299,9 +306,10 @@ author.
   decided `RuleMetadata.mandatory` flag per rule.
 - `controlloop scan` and `controlloop gate` both consume this via
   `ALL_RULES` (see [CLI reference](cli.md#scan)).
-- Repository-scoped finding identity collapses two
-  distinct secrets of the same detected pattern in the same file into
-  one finding identity -- see "Finding identity" above.
+- A repository-scoped finding's `occurrence` ordinal follows file
+  order, so adding a secret of the same kind above an existing one in
+  the same file gives the existing one a new identity -- see "Finding
+  identity" above.
 - `finding_to_sarif_result` returns one SARIF `result` object, not a
   complete SARIF log document.
 - A finding's documentation URL is validated for shape only and is

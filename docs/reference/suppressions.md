@@ -113,7 +113,10 @@ to make.
 
 - **Never hides a finding from evidence.** `findings` in every scan and
   gate result stays the full, unfiltered set, including
-  `active`-suppressed ones -- only the *gate decision* changes.
+  `active`-suppressed ones -- only the *gate decision* changes. In text
+  output an `active`-suppressed finding keeps its severity but takes the
+  neutral `•` glyph and a closing line, `suppressed until YYYY-MM-DD;
+  does not affect the verdict`, so it never reads as one that blocks.
 - **Never widens.** No suppression can ever affect more than the one
   finding it names by exact ID (see "How matching works" above).
 - **Never persists across a materially different finding.** A code

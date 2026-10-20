@@ -55,6 +55,7 @@ from controlloop.findings.models import (
 )
 from controlloop.policy.models import Rule, RuleContext, RuleObservation
 from controlloop.policy.rules._shared import documentation_url
+from controlloop.secret_scan import detection_kind
 
 RULE_ID = "policy.hardcoded-secrets"
 _RULE_VERSION = "1.0.0"
@@ -119,6 +120,26 @@ def _secret_scan_bound_exceeded(context: RuleContext) -> tuple[Diagnostic, ...]:
     )
 
 
+def _with_occurrences(
+    diagnostics: tuple[Diagnostic, ...],
+) -> tuple[tuple[Diagnostic, str], ...]:
+    """Pair each detection with its identity occurrence: the credential
+    kind plus its ordinal among detections of that kind in the same file,
+    for example `aws-access-key-id#2`. `diagnostics` is already in
+    location order, so the ordinal is stable while the file is unchanged
+    above the detection, and two detections in one file never share a
+    finding ID."""
+
+    seen: dict[tuple[str, str], int] = {}
+    paired: list[tuple[Diagnostic, str]] = []
+    for diagnostic in diagnostics:
+        kind = detection_kind(diagnostic) or diagnostic.code
+        key = (diagnostic.evidence[0].path or "", kind)
+        seen[key] = seen.get(key, 0) + 1
+        paired.append((diagnostic, f"{kind}#{seen[key]}"))
+    return tuple(paired)
+
+
 def evaluate(context: RuleContext) -> tuple[RuleObservation, ...]:
     """Engine-compatible entry point: one `RuleObservation` per
     secret-shaped-content detection diagnostic already present in
@@ -177,8 +198,9 @@ def findings(
             change_state=FindingChangeState.NOT_COMPARED,
             remediation=_REMEDIATION,
             documentation_url=documentation_url_value,
+            identity_occurrence=occurrence,
         )
-        for diagnostic in _detection_diagnostics(context)
+        for diagnostic, occurrence in _with_occurrences(_detection_diagnostics(context))
     ]
 
     return tuple(sorted(results, key=lambda finding: finding.id))

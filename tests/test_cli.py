@@ -723,6 +723,72 @@ class TestBom:
         assert "INVALID ACBOM" in result.stderr
         assert result.stdout == ""
 
+    def _generated_acbom_with_an_agent(
+        self, monkeypatch: MonkeyPatch, tmp_path: Path
+    ) -> dict[str, object]:
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / "agent-card.json").write_text(
+            '{"protocolVersion": "0.2", "name": "invoice-agent",'
+            ' "skills": [{"id": "read-invoice", "name": "read-invoice"}]}'
+        )
+        monkeypatch.chdir(repo)
+        generated = runner.invoke(app, ["bom"])
+        assert generated.exit_code == ExitCode.PASS
+        data: dict[str, object] = json.loads(generated.stdout)
+        return data
+
+    def test_validate_rejects_an_acbom_edited_after_generation(
+        self, monkeypatch: MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """The declared digest no longer matches the content: exit 2,
+        never `VALID`."""
+        data = self._generated_acbom_with_an_agent(monkeypatch, tmp_path)
+        nodes = data["nodes"]
+        assert isinstance(nodes, list)
+        nodes[0]["name"] = "renamed"
+        edited = tmp_path / "edited.json"
+        edited.write_text(json.dumps(data))
+
+        result = runner.invoke(app, ["bom", "--validate", str(edited)])
+
+        assert result.exit_code == ExitCode.INVALID_INPUT
+        assert "INVALID ACBOM" in result.stderr
+        assert "digest does not match" in result.stderr
+        assert "VALID  " not in result.stdout
+
+    def test_validate_reports_a_schema_violation_instead_of_crashing(
+        self, monkeypatch: MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """A value the schema rejects is invalid input (exit 2) reported
+        on one line, never an internal error (exit 5)."""
+        data = self._generated_acbom_with_an_agent(monkeypatch, tmp_path)
+        nodes = data["nodes"]
+        assert isinstance(nodes, list)
+        nodes[0]["type"] = "banana"
+        broken = tmp_path / "broken.json"
+        broken.write_text(json.dumps(data))
+
+        result = runner.invoke(app, ["bom", "--validate", str(broken)])
+
+        assert result.exit_code == ExitCode.INVALID_INPUT
+        assert "INVALID ACBOM" in result.stderr
+        assert "nodes.0.type" in result.stderr
+        assert "INTERNAL ERROR" not in result.stderr
+        assert len(result.stderr.strip().splitlines()) == 1
+
+    def test_validate_reports_invalid_json_instead_of_crashing(
+        self, tmp_path: Path
+    ) -> None:
+        truncated = tmp_path / "truncated.json"
+        truncated.write_text('{"schema_version": "1.2.0", "nodes": [')
+
+        result = runner.invoke(app, ["bom", "--validate", str(truncated)])
+
+        assert result.exit_code == ExitCode.INVALID_INPUT
+        assert "not valid JSON" in result.stderr
+        assert "INTERNAL ERROR" not in result.stderr
+
     def test_validate_without_a_path_exits_invalid_input(self) -> None:
         result = runner.invoke(app, ["bom", "--validate"])
 
@@ -1054,6 +1120,27 @@ class TestDiff:
         assert any(
             change.kind.value == "added" for change in report.result.node_changes
         )
+
+    def test_an_acbom_edited_after_generation_is_rejected(
+        self, monkeypatch: MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """`diff` refuses to compare a document whose digest no longer
+        matches its content, the same check `bom --validate` applies."""
+        monkeypatch.chdir(tmp_path)
+        generated = runner.invoke(app, ["bom"])
+        assert generated.exit_code == 0
+        baseline_file = tmp_path / "baseline.json"
+        baseline_file.write_text(generated.stdout)
+        edited = json.loads(generated.stdout)
+        edited["generator"]["version"] = "9.9.9"
+        current_file = tmp_path / "current.json"
+        current_file.write_text(json.dumps(edited))
+
+        result = runner.invoke(app, ["diff", str(baseline_file), str(current_file)])
+
+        assert result.exit_code == ExitCode.INVALID_INPUT
+        assert "INVALID ACBOM" in result.stderr
+        assert "digest does not match" in result.stderr
 
     def test_two_identical_acbom_files_produce_an_empty_diff(
         self, monkeypatch: MonkeyPatch, tmp_path: Path

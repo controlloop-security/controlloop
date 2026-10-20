@@ -13,7 +13,12 @@ from pathlib import Path
 import pytest
 
 from controlloop import secret_scan
-from controlloop.acbom.models import Confidence, Diagnostic
+from controlloop.acbom.models import (
+    Confidence,
+    Diagnostic,
+    DiagnosticSeverity,
+    Evidence,
+)
 from controlloop.repository import resolve_repository_root, walk_repository
 from controlloop.secret_scan import SecretScanBounds, scan_repository_for_secrets
 
@@ -357,3 +362,52 @@ def test_a_literal_value_in_an_mcp_env_block_is_detected_without_the_value(
     assert [d.code for d in detections] == ["SECRET-HIGH-ENTROPY-VALUE-DETECTED"]
     assert detections[0].confidence.value == "medium"
     assert value not in repr(detections)
+
+
+class TestDetectionKind:
+    def test_names_the_credential_shape(self) -> None:
+        from controlloop.secret_scan import _shape_message, detection_kind
+
+        diagnostic = Diagnostic(
+            code="SECRET-CREDENTIAL-SHAPE-DETECTED",
+            severity=DiagnosticSeverity.ERROR,
+            message=_shape_message("aws-access-key-id"),
+            confidence=Confidence.HIGH,
+            incomplete=False,
+            evidence=(Evidence(adapter="secret-scan", path="config.py"),),
+        )
+
+        assert detection_kind(diagnostic) == "aws-access-key-id"
+
+    def test_names_a_high_entropy_value(self) -> None:
+        from controlloop.secret_scan import detection_kind
+
+        diagnostic = Diagnostic(
+            code="SECRET-HIGH-ENTROPY-VALUE-DETECTED",
+            severity=DiagnosticSeverity.WARNING,
+            message=(
+                "A high-entropy value assigned to a credential-like variable "
+                "was detected."
+            ),
+            confidence=Confidence.MEDIUM,
+            incomplete=False,
+            evidence=(Evidence(adapter="secret-scan", path="config.py"),),
+        )
+
+        assert detection_kind(diagnostic) == "high-entropy-value"
+
+    def test_is_none_for_other_diagnostics(self) -> None:
+        from controlloop.secret_scan import detection_kind
+
+        diagnostic = Diagnostic(
+            code="INCOMPLETE-BOUND-EXCEEDED",
+            severity=DiagnosticSeverity.WARNING,
+            message="stopped",
+            confidence=Confidence.UNKNOWN,
+            incomplete=True,
+            evidence=(
+                Evidence(adapter="secret-scan", path="<secret-scan-evaluation>"),
+            ),
+        )
+
+        assert detection_kind(diagnostic) is None
