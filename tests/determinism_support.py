@@ -53,7 +53,6 @@ from controlloop.acbom import (
     SecurityAttributes,
     SemanticIdentity,
     compute_digest,
-    load_acbom_document,
     node_id,
     serialize_document,
     with_digest,
@@ -110,9 +109,15 @@ def golden_fixture_bytes() -> bytes:
 
 
 def build_golden_document() -> ACBOMDocument:
-    """Parse the golden fixture into a fresh `ACBOMDocument` on every call."""
+    """Parse the golden fixture into a fresh `ACBOMDocument` on every call.
 
-    return load_acbom_document(golden_fixture_bytes())
+    The fixture is canonicalization input with a placeholder `digest`, so
+    it is parsed directly rather than through `load_acbom_document`, which
+    rejects a document whose digest does not match its content. Every
+    caller computes the digest itself.
+    """
+
+    return ACBOMDocument.model_validate_json(golden_fixture_bytes())
 
 
 def assert_stable_digest(build: Callable[[], ACBOMDocument], *, runs: int = 5) -> str:
