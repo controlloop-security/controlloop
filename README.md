@@ -38,9 +38,9 @@ run a script on every session start.
 > prompts, environment values, and file contents never reach the output.
 
 > **Development preview.** `init`, `bom`, `diff`, `scan`, `gate`, `rules`,
-> and `example` work and are covered by tests. There is no published release
-> yet: no PyPI package, Homebrew tap, container image, or tagged version.
-> Install from source as below.
+> and `example` work and are covered by tests. Releases are published to
+> [PyPI](https://pypi.org/project/controlloop/); there is no Homebrew tap or
+> container image yet.
 
 ## Features
 
@@ -76,7 +76,14 @@ run a script on every session start.
 
 ### Installation
 
-There is no package yet. Clone the repository and run from source:
+Install the CLI from PyPI with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv tool install controlloop
+controlloop --version
+```
+
+`pipx install controlloop` works too. To run from source instead:
 
 ```bash
 git clone https://github.com/controlloop-security/controlloop
@@ -86,7 +93,7 @@ uv run controlloop --version
 ```
 
 ```text
-ControlLoop 0.1.0
+ControlLoop 0.1.1
 Supported OASF versions: none yet
 Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17
 Rule pack: controlloop-community 0.5.0 (18 rules)
