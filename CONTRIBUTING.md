@@ -40,6 +40,13 @@ the area you are changing before you start.
 Discuss new adapters, new standards, network behavior, or changes to what
 blocks a build in an issue before implementing them.
 
+## Writing a rule
+
+A new or changed policy rule touches the rule module, its registration,
+the rule pack version, its tests, and its documentation section. [Writing a
+rule](docs/guides/writing-a-rule.md) walks through each step and ends with
+a checklist to copy into the pull request.
+
 ## Fixtures
 
 Fixtures are product assets, not disposable test data.

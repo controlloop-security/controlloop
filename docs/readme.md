@@ -75,6 +75,7 @@ specific workflow.
 | Look up current commands | [CLI reference](reference/cli.md) |
 | Understand offline and data-handling boundaries | [Privacy, security, and limitations](reference/privacy-security.md) |
 | Recover from setup or command errors | [Troubleshooting](troubleshooting.md) |
+| Add or change a policy rule | [Writing a rule](guides/writing-a-rule.md) |
 
 ## Product boundaries
 
