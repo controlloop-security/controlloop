@@ -10,6 +10,26 @@ The first public release of the ControlLoop CLI.
 
 ### Fixed
 
+- **One suppression could silence several secrets.** Two hardcoded
+  secrets in the same file shared one finding ID, even an AWS key and a
+  Stripe key, so a suppression of one also suppressed the other. Each
+  `policy.hardcoded-secrets` finding's identity now includes its
+  credential kind and its ordinal among detections of that kind in the
+  file, never a line number or any part of the value. **Existing
+  suppressions of `policy.hardcoded-secrets` findings report `stale`:**
+  copy the new ID from `scan --format json`. No other rule's finding IDs
+  change.
+- **`bom --validate` accepted an edited ACBOM.** It now recomputes the
+  document's `digest` and exits `2` when it does not match the content.
+  `diff` applies the same check to each ACBOM file it compares.
+- **`bom --validate` crashed on a schema violation.** A document the
+  schema rejects (for example an unknown node `type`) ended with
+  `INTERNAL ERROR` and exit `5`. It now exits `2` with one line naming
+  the first error's location, such as `nodes.0.type`.
+- **Suppressed findings looked like blocking ones.** In `scan` and
+  `gate` text output, a finding an active suppression covers keeps its
+  severity but takes the neutral `•` glyph and a closing line,
+  `suppressed until YYYY-MM-DD; does not affect the verdict`.
 - **`gate --default-branch` on a pull request.** A bare branch name such
   as `main` that does not exist locally is now also tried as
   `origin/main`. A pull-request checkout in GitHub Actions has the target

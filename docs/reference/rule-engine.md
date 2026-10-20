@@ -10,8 +10,8 @@ created: 2026-08-20
 # Deterministic rule engine
 
 **Status: Implemented foundation.** The model and evaluation logic
-described below are implemented and tested library code. **Ten rules
-are registered** (see [Policy rules](policy-rules.md)). Expiring
+described below are implemented and tested library code. **Eighteen
+rules are registered** (see [Policy rules](policy-rules.md)). Expiring
 suppressions are a suppression mechanism, not a rule, and are not
 included in that count. `controlloop scan` and `controlloop gate` both
 consume `ALL_RULES` for every non-disabled rule -- see the [CLI
@@ -211,13 +211,14 @@ exactly as it was before the host was recorded.
 
 ## Known limitations
 
-- Ten rules are registered (`controlloop.policy.rules.ALL_RULES` --
-  undeclared tools, newly introduced destructive or financial action,
-  broad or wildcard permission, sensitive write without declared
-  approval, missing action logging on a privileged tool, unauthorized
-  delegation, unresolved dynamic tool registration, capability ceiling
-  evaluation, exfiltration triangle detection, hardcoded secret
-  material). See [Concrete policy rules](policy-rules.md). Expiring
+- Eighteen rules are registered (`controlloop.policy.rules.ALL_RULES`):
+  the original ten (undeclared tools, newly introduced destructive or
+  financial action, broad or wildcard permission, sensitive write
+  without declared approval, missing action logging on a privileged
+  tool, unauthorized delegation, unresolved dynamic tool registration,
+  capability ceiling evaluation, exfiltration triangle detection,
+  hardcoded secret material) and eight coding-agent authority rules.
+  See [Concrete policy rules](policy-rules.md). Expiring
   suppressions are a suppression mechanism, not a rule, and are not
   included in that count.
 - The real finding model exists (see [Finding model](finding-model.md)),
