@@ -55,6 +55,7 @@ from controlloop.acbom.serialization import (
 )
 from controlloop.acbom.versioning import (
     CURRENT_SCHEMA_VERSION,
+    ACBOMIntegrityError,
     IncompatibleSchemaVersionError,
     check_schema_version_compatible,
     load_acbom_document,
@@ -70,6 +71,7 @@ __all__ = [
     "MAX_ATTRIBUTE_VALUE_LENGTH",
     "MAX_NODE_ATTRIBUTES",
     "ACBOMDocument",
+    "ACBOMIntegrityError",
     "AuthoritySubtype",
     "AuthoritySubtypeRule",
     "CanonicalizationError",
