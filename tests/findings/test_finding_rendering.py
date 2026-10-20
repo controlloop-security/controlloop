@@ -287,3 +287,29 @@ class TestCrossFormatConsistency:
             for location in sarif_locations
         }
         assert sarif_uris == {"a.json", "b.json"}
+
+
+class TestSuppressedFindingText:
+    def test_a_suppressed_finding_says_so_and_drops_the_blocking_glyph(self) -> None:
+        finding = _finding(
+            evidence=_LOCATED_EVIDENCE, severity=FindingSeverity.CRITICAL
+        )
+
+        text = render_finding_text(finding, suppressed_until="2026-12-31")
+
+        summary, *rest = text.split("\n")
+        assert summary.startswith("• CRITICAL")
+        assert (
+            rest[-1] == "    suppressed until 2026-12-31; does not affect the verdict"
+        )
+
+    def test_an_unsuppressed_finding_is_unchanged(self) -> None:
+        finding = _finding(
+            evidence=_LOCATED_EVIDENCE, severity=FindingSeverity.CRITICAL
+        )
+
+        assert render_finding_text(finding) == render_finding_text(
+            finding, suppressed_until=None
+        )
+        assert render_finding_text(finding).startswith("✕ CRITICAL")
+        assert "suppressed" not in render_finding_text(finding)

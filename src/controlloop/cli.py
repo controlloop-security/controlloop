@@ -1925,6 +1925,7 @@ def _scan_render_and_exit(
             material_changes=report.material_changes,
             findings=report.findings,
             authority_delta=report.authority_delta,
+            suppressions=report.suppressions,
             color_enabled=False,
         )
         # Appended after render_terminal_report's own fixed section
@@ -2390,6 +2391,7 @@ def _gate_render_and_exit(
             material_changes=material_changes,
             findings=artifact.findings,
             authority_delta=artifact.authority_delta,
+            suppressions=artifact.suppressions,
             color_enabled=False,
         )
         # The active setting is stated in the gate result. Appended by this

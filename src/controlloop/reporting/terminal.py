@@ -189,7 +189,12 @@ def _render_material_changes(
     return _wrap_lines(describe_material_change_summary(summary), width=width)
 
 
-def _render_findings(findings: tuple[Finding, ...] | None, *, width: int) -> str:
+def _render_findings(
+    findings: tuple[Finding, ...] | None,
+    *,
+    width: int,
+    suppressions: tuple[SuppressionRecord, ...] = (),
+) -> str:
     """The report's fourth section. `None` means no policy was evaluated at
     all (true of every repository today, since
     `controlloop.policy.engine` ships with zero registered rules); an
@@ -201,8 +206,20 @@ def _render_findings(findings: tuple[Finding, ...] | None, *, width: int) -> str
         return _wrap_line("• findings: not evaluated", width=width)
     if not findings:
         return _wrap_line("• no findings", width=width)
+    suppressed_until = {
+        (record.rule_id, record.target): record.expires_at
+        for record in suppressions
+        if record.status is SuppressionStatus.ACTIVE
+    }
     return "\n\n".join(
-        _wrap_block(render_finding_text(finding), width=width) for finding in findings
+        _wrap_block(
+            render_finding_text(
+                finding,
+                suppressed_until=suppressed_until.get((finding.rule_id, finding.id)),
+            ),
+            width=width,
+        )
+        for finding in findings
     )
 
 
@@ -259,6 +276,7 @@ def render_terminal_report(
     material_changes: MaterialChangeSummary | None = None,
     findings: tuple[Finding, ...] | None = None,
     authority_delta: AuthorityDelta | None = None,
+    suppressions: tuple[SuppressionRecord, ...] = (),
     color_enabled: bool = False,
     width: int = _DEFAULT_WIDTH,
 ) -> str:
@@ -274,7 +292,11 @@ def render_terminal_report(
     The one exception is the authority statement:
     it is change-only, so a change that hands no agent new power adds
     nothing, and a non-empty one sits between the verdict and the
-    material changes, ahead of the findings."""
+    material changes, ahead of the findings.
+
+    `suppressions` marks each finding an active suppression covers, so
+    it reads as suppressed rather than blocking; the full list of
+    suppressions is still rendered separately by `render_suppressions`."""
 
     sections = [
         _wrap_lines(describe_blast_radius(blast_radius), width=width),
@@ -287,7 +309,7 @@ def render_terminal_report(
     sections.extend(
         [
             _render_material_changes(material_changes, width=width),
-            _render_findings(findings, width=width),
+            _render_findings(findings, width=width, suppressions=suppressions),
         ]
     )
     return "\n\n".join(sections)
