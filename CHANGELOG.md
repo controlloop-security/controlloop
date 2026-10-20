@@ -6,6 +6,16 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Rule pack `0.6.0`: the fingerprint covers rule logic.** It now hashes
+  each rule's whole module and the shared rule helpers, not only the
+  one-line `evaluate` wrapper, so a change to what a rule detects moves the
+  fingerprint and needs a new pack version. The pack has the same rules
+  as `0.5.0`; the only behavior change is the hardcoded-secret finding IDs
+  listed under Fixed. Reports and gate results now show
+  `controlloop-community` `0.6.0` with a new fingerprint.
+
 ### Fixed
 
 - **One suppression could silence several secrets.** Two hardcoded

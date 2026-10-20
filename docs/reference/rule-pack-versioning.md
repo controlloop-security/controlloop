@@ -52,12 +52,12 @@ def rule_pack_fingerprint(
 
 
 CURRENT_RULE_PACK: (
-    RulePack  # name="controlloop-community", version="0.5.0", every registered rule
+    RulePack  # name="controlloop-community", version="0.6.0", every registered rule
 )
 
 KNOWN_RULE_PACK_FINGERPRINTS: dict[
     str, str
-]  # {"0.1.0": "<pinned hex>", "0.2.0": "<pinned hex>", "0.3.0": "<pinned hex>", "0.4.0": "<pinned hex>", "0.5.0": "<pinned hex>"}
+]  # {"0.1.0": "<pinned hex>", "0.2.0": "<pinned hex>", "0.3.0": "<pinned hex>", "0.4.0": "<pinned hex>", "0.5.0": "<pinned hex>", "0.6.0": "<pinned hex>"}
 ```
 
 ## Why `rules`/`metadata` stay two parallel tuples, not one merged type (deliberate, disclosed)
@@ -70,12 +70,18 @@ already-shipped type into something new.
 
 ## The fingerprint: how a silent rule change fails CI
 
-`rule_pack_fingerprint` hashes, for every rule in the pack, its id, a
-SHA-256 digest of its `evaluate` callable's own source text (via
+`rule_pack_fingerprint` hashes, for every rule in the pack, its id,
+SHA-256 digests of its `evaluate` callable's own source text and of the
+full source of the module that defines it, and its `mandatory` flag --
+sorted by rule id so order never matters -- together with the source of
+the shared rule helper modules, `controlloop.policy.rules._authority` and
+`controlloop.policy.rules._shared`. All of it is read with
 `inspect.getsource`, the same introspection primitive
 [`controlloop.policy.engine`](rule-engine.md)'s own structural safety check
-already uses), and its `mandatory` flag -- sorted by rule id so order never
-matters. `KNOWN_RULE_PACK_FINGERPRINTS` pins one hand-computed, hardcoded
+already uses. A rule's `evaluate` is a one-line wrapper over its
+`findings`, so the module source is what makes a change to a rule's real
+logic visible; before `0.6.0`, only `evaluate` was hashed and such a change
+moved no pin. `KNOWN_RULE_PACK_FINGERPRINTS` pins one hand-computed, hardcoded
 fingerprint per declared version, deliberately **not**
 `{CURRENT_RULE_PACK.version: rule_pack_fingerprint(CURRENT_RULE_PACK)}`
 computed at import time -- self-computing the pinned value from the same
@@ -88,11 +94,15 @@ changes the *computed* fingerprint away from the *pinned* one, failing
 removing, or changing a rule's behavior without a version increment
 fails CI.
 
-**Disclosed limitation:** the fingerprint only detects a change to a
-declared rule's own `evaluate` source text or `mandatory` flag, or a rule
-being added or removed -- not every conceivable behavior change reachable
-only through, for example, a shared helper function a rule calls into that
-is itself edited elsewhere. A best-effort, narrow mechanism, not a general
+**Disclosed limitation:** the fingerprint detects a change to a rule's
+module, to a shared rule helper module, or to a rule's `mandatory` flag,
+and a rule being added or removed. It does not cover code outside those
+modules that a rule reaches indirectly, such as the finding model or the
+[material capability taxonomy](material-capability-taxonomy.md), so a
+behavior change made only there still needs a deliberate version bump.
+Any edit to a covered module moves the fingerprint, a comment included,
+so a pin can also move with no behavior change; a needless version bump
+is the safe direction to err in. A best-effort mechanism, not a general
 semantic-diff tool, the same "best-effort, disclosed" framing
 [`controlloop.policy.engine`](rule-engine.md)'s own structural safety check
 already established for this codebase.
@@ -104,7 +114,7 @@ $ uv run controlloop --version
 ControlLoop 0.1.0
 Supported OASF versions: none yet
 Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17
-Rule pack: controlloop-community 0.5.0 (18 rules)
+Rule pack: controlloop-community 0.6.0 (18 rules)
 ```
 
 ## A gate result records both versions
@@ -136,6 +146,7 @@ verdict on unchanged input" is that same guarantee applied to a pack's
 | `0.3.0` | 14 | Adds `policy.unpinned-agent-component`, `policy.mcp-server-identity-change`, `policy.overprivileged-agent-workflow`, and `policy.component-self-grant`, and extends `policy.hardcoded-secrets` to agent configuration. |
 | `0.4.0` | 17 | Adds `policy.agent-hook-command-change`, `policy.widened-permission-rule`, and `policy.permission-bypass-from-project`. Before its first release, a read-only tool allow rule was set to `medium`; the change is outside `evaluate`, so the pinned fingerprint is unchanged. |
 | `0.5.0` | 18 | Adds `policy.unsanctioned-agent-component`, a Team rule: it is loaded only on a Team gate with an effective organization policy, so a Community run is unchanged. |
+| `0.6.0` | 18 | The same rules; `policy.hardcoded-secrets` findings get one ID per occurrence. The fingerprint now covers each rule's whole module and the shared rule helpers, so a change to a rule's logic moves it; earlier pins used `evaluate` source only and can no longer be recomputed. |
 
 ## Known limitations
 

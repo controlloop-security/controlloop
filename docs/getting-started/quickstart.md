@@ -31,7 +31,7 @@ Expected output for the current repository version:
 ControlLoop 0.1.0
 Supported OASF versions: none yet
 Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17
-Rule pack: controlloop-community 0.5.0 (18 rules)
+Rule pack: controlloop-community 0.6.0 (18 rules)
 ```
 
 This proves that `uv` can invoke the package entry point.

@@ -72,8 +72,9 @@ class TestRulesCatalogIsTheRealPack:
 
     def test_summaries_do_not_change_the_pinned_fingerprint(self) -> None:
         """The central safety property of `controlloop rules`:
-        `rule_pack_fingerprint` digests `[id, sha256(evaluate source),
-        mandatory]`. Descriptive metadata is
+        `rule_pack_fingerprint` digests each rule's id, its `evaluate` and
+        module source, and `mandatory`, plus the shared rule helpers.
+        Descriptive metadata is
         deliberately not an input, so adding or editing a summary must never
         invalidate a pinned fingerprint or imply a rule-pack version bump."""
         assert (
