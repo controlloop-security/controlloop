@@ -42,20 +42,23 @@ that has nothing else. This is a real, narrow, disclosed exception to
 scoped finding, the path is the finding's entire semantic identity, not
 incidental provenance about it.
 
-**Disclosed limitation:** line numbers still never participate (per the
-identity rule above and this module's own determinism goal -- a line
-shifting elsewhere in the file must not mint a "new" finding), so two
-distinct secrets of the *same* detected pattern in the *same* file
-collapse to one finding identity. This is a real accuracy limitation,
-not silently unhandled: it is disclosed here and in
-docs/reference/finding-model.md rather than fabricated as full
-per-occurrence precision this codebase's own identity constraints cannot
-honestly provide.
+Line numbers still never participate (per the identity rule above and
+this module's own determinism goal -- a line shifting elsewhere in the
+file must not mint a "new" finding). A rule that can report several
+distinct findings in one file therefore supplies an `occurrence`: a
+short, nonsecret label that tells them apart without a line number.
+`policy.hardcoded-secrets` uses the detected credential kind and its
+ordinal among detections of that kind in the file (for example
+`aws-access-key-id#1`), so an AWS key and a Stripe key in the same file,
+or two AWS keys, each get their own identity -- and a suppression of one
+never silences another. The ordinal changes only when a detection of
+the same kind is added or removed above it in the same file.
 
 The agent-scoped payload shape below is completely unchanged by this
-addition -- `evidence_paths` only participates when `affected_agent is
-None` -- so every one of the nine already-existing rules keeps its
-exact original computed `id` for identical input.
+addition -- `evidence_paths` and `occurrence` only participate when
+`affected_agent is None`, and `occurrence` only when supplied -- so
+every rule that does not supply it keeps its exact original computed
+`id` for identical input.
 """
 
 from __future__ import annotations
@@ -76,6 +79,7 @@ def _canonical_identity_bytes(
     affected_agent: str | None,
     capability_path: CapabilityPath | None,
     evidence_paths: tuple[str, ...],
+    occurrence: str | None,
 ) -> bytes:
     if affected_agent is None:
         payload: dict[str, object] = {
@@ -85,6 +89,8 @@ def _canonical_identity_bytes(
             "affected_agent": None,
             "resource_paths": sorted(set(evidence_paths)),
         }
+        if occurrence is not None:
+            payload["occurrence"] = occurrence
     else:
         assert capability_path is not None
         payload = {
@@ -114,6 +120,7 @@ def finding_id(
     affected_agent: AgentNodeId | None,
     capability_path: CapabilityPath | None,
     evidence_paths: tuple[str, ...] = (),
+    occurrence: str | None = None,
 ) -> FindingId:
     """Return the stable identifier for a finding matching `rule_id` and
     either `affected_agent`/`capability_path` (agent-scoped) or
@@ -130,10 +137,12 @@ def finding_id(
     same issue is recognizable between scans.
 
     `capability_path` must be supplied (non-`None`) whenever
-    `affected_agent` is not `None`; `evidence_paths` is only consulted
-    when `affected_agent is None` and is otherwise ignored, so every
-    existing agent-scoped call site's computed ID is completely
-    unaffected by this parameter's addition.
+    `affected_agent` is not `None`; `evidence_paths` and `occurrence` are
+    only consulted when `affected_agent is None` and are otherwise
+    ignored, so every existing agent-scoped call site's computed ID is
+    completely unaffected by these parameters. `occurrence` tells apart
+    several repository-scoped findings of one rule in the same file (see
+    this module's docstring); omitting it keeps the original ID.
     """
 
     canonical_bytes = _canonical_identity_bytes(
@@ -141,6 +150,7 @@ def finding_id(
         affected_agent=affected_agent,
         capability_path=capability_path,
         evidence_paths=evidence_paths,
+        occurrence=occurrence,
     )
     digest = hashlib.sha256(canonical_bytes).hexdigest()
     return f"clp:finding:sha256:{digest}"

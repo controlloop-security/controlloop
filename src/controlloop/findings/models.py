@@ -275,6 +275,7 @@ def finding_from_observation(
     change_state: FindingChangeState,
     remediation: str,
     documentation_url: str,
+    identity_occurrence: str | None = None,
 ) -> Finding:
     """Build a `Finding` from one `RuleObservation` plus the additional
     context only a caller has: `RuleObservation` itself has no
@@ -299,6 +300,10 @@ def finding_from_observation(
     function's own docstring for why. Every existing caller that always
     supplies both keeps its original behavior and its original computed
     `id` unchanged.
+
+    `identity_occurrence` is passed to `finding_id` as its `occurrence`
+    for a repository-scoped finding, to tell apart several findings of
+    one rule in the same file; it is ignored for an agent-scoped one.
     """
 
     # Imported here, not at module level: `controlloop.findings.identity`
@@ -319,6 +324,7 @@ def finding_from_observation(
         affected_agent=affected_agent,
         capability_path=capability_path,
         evidence_paths=evidence_paths,
+        occurrence=identity_occurrence if affected_agent is None else None,
     )
     return Finding(
         schema_version=CURRENT_FINDING_SCHEMA_VERSION,

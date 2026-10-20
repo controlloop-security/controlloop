@@ -944,8 +944,11 @@ organization intends.
 
 ## Known limitations specific to this rule
 
-- Two distinct secrets of the same detected pattern in the same file
-  collapse to one finding identity -- see [Finding
+- Each detection's finding identity includes its credential kind and
+  its ordinal among detections of that kind in the file, never a line
+  number. Adding a secret of the same kind above an existing one in the
+  same file gives the existing one a new identity, so a suppression
+  naming it reports `stale` -- see [Finding
   model](finding-model.md#finding-identity).
 - The high-entropy heuristic's false-positive/false-negative rate is not
   eliminated by design -- the goal is *documented* confidence, not

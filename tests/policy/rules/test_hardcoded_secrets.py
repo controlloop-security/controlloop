@@ -185,3 +185,84 @@ class TestDeterminism:
         backward = evaluate(context(acbom=acbom(diagnostics=(second, first))))
 
         assert forward == backward
+
+
+def _stripe_detection(*, path: str = "config.py", line_start: int = 4) -> Diagnostic:
+    return _detection_diagnostic(
+        path=path,
+        line_start=line_start,
+        message=(
+            "Content matching the 'stripe-secret-key' credential shape was detected."
+        ),
+    )
+
+
+class TestFindingIdentityPerOccurrence:
+    """Each detection keeps its own finding ID, so a suppression of one
+    secret never silences another in the same file."""
+
+    def test_different_kinds_in_one_file_get_different_ids(self) -> None:
+        aws = _detection_diagnostic(path="config.py", line_start=2)
+        stripe = _stripe_detection(path="config.py", line_start=3)
+
+        result = findings(context(acbom=acbom(diagnostics=(aws, stripe))))
+
+        assert len({finding.id for finding in result}) == 2
+
+    def test_two_of_the_same_kind_in_one_file_get_different_ids(self) -> None:
+        first = _detection_diagnostic(path="config.py", line_start=2)
+        second = _detection_diagnostic(path="config.py", line_start=9)
+
+        result = findings(context(acbom=acbom(diagnostics=(first, second))))
+
+        assert len({finding.id for finding in result}) == 2
+
+    def test_the_same_kind_in_different_files_get_different_ids(self) -> None:
+        first = _detection_diagnostic(path="a.py", line_start=2)
+        second = _detection_diagnostic(path="b.py", line_start=2)
+
+        result = findings(context(acbom=acbom(diagnostics=(first, second))))
+
+        assert len({finding.id for finding in result}) == 2
+
+    def test_ids_survive_a_line_shift(self) -> None:
+        """Lines added above both secrets move them but change no ID."""
+        before = findings(
+            context(
+                acbom=acbom(
+                    diagnostics=(
+                        _detection_diagnostic(line_start=2),
+                        _stripe_detection(line_start=3),
+                    )
+                )
+            )
+        )
+        after = findings(
+            context(
+                acbom=acbom(
+                    diagnostics=(
+                        _detection_diagnostic(line_start=12),
+                        _stripe_detection(line_start=13),
+                    )
+                )
+            )
+        )
+
+        assert [finding.id for finding in before] == [finding.id for finding in after]
+
+    def test_a_new_secret_of_another_kind_keeps_the_existing_id(self) -> None:
+        alone = findings(
+            context(acbom=acbom(diagnostics=(_detection_diagnostic(line_start=5),)))
+        )
+        with_stripe_above = findings(
+            context(
+                acbom=acbom(
+                    diagnostics=(
+                        _stripe_detection(line_start=1),
+                        _detection_diagnostic(line_start=5),
+                    )
+                )
+            )
+        )
+
+        assert alone[0].id in {finding.id for finding in with_stripe_above}

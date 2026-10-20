@@ -3,6 +3,7 @@ across runs, so the same issue is recognizable between scans."""
 
 from __future__ import annotations
 
+import hashlib
 import re
 
 from controlloop.acbom.models import Confidence, EdgeType, Evidence, NodeType
@@ -212,6 +213,61 @@ class TestRepositoryScopedIdentity:
             evidence_paths=("ignored.yaml",),
         )
         assert without == with_unused_evidence_paths
+
+    def test_occurrence_distinguishes_findings_in_one_file(self) -> None:
+        def identity(occurrence: str) -> str:
+            return finding_id(
+                rule_id="policy.hardcoded-secrets",
+                affected_agent=None,
+                capability_path=None,
+                evidence_paths=("config/secrets.yaml",),
+                occurrence=occurrence,
+            )
+
+        assert identity("aws-access-key-id#1") != identity("stripe-secret-key#1")
+        assert identity("aws-access-key-id#1") != identity("aws-access-key-id#2")
+        assert identity("aws-access-key-id#1") == identity("aws-access-key-id#1")
+
+    def test_omitting_occurrence_keeps_the_original_identity(self) -> None:
+        """Rules that never supply an occurrence keep the IDs they had."""
+
+        omitted = finding_id(
+            rule_id="policy.broad-permission",
+            affected_agent=None,
+            capability_path=None,
+            evidence_paths=("iam/policy.json",),
+        )
+        explicit_none = finding_id(
+            rule_id="policy.broad-permission",
+            affected_agent=None,
+            capability_path=None,
+            evidence_paths=("iam/policy.json",),
+            occurrence=None,
+        )
+        assert omitted == explicit_none
+        assert omitted == (
+            "clp:finding:sha256:"
+            + hashlib.sha256(
+                b'{"affected_agent":null,"identity_version":1,'
+                b'"namespace":"controlloop.finding",'
+                b'"resource_paths":["iam/policy.json"],'
+                b'"rule_id":"policy.broad-permission"}'
+            ).hexdigest()
+        )
+
+    def test_occurrence_never_affects_an_agent_scoped_identity(self) -> None:
+        without = finding_id(
+            rule_id="policy.undeclared-tools",
+            affected_agent=_AGENT_ID,
+            capability_path=_path(),
+        )
+        with_occurrence = finding_id(
+            rule_id="policy.undeclared-tools",
+            affected_agent=_AGENT_ID,
+            capability_path=_path(),
+            occurrence="ignored#1",
+        )
+        assert without == with_occurrence
 
 
 class TestIdentityExcludesNonSemanticFields:

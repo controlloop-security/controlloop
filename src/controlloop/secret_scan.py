@@ -335,6 +335,34 @@ def _detection_diagnostic(
     )
 
 
+def _shape_message(shape_name: str) -> str:
+    return f"Content matching the {shape_name!r} credential shape was detected."
+
+
+_SHAPE_MESSAGE_PATTERN = re.compile(
+    r"^Content matching the '([^']+)' credential shape was detected\.$"
+)
+_ENTROPY_KIND = "high-entropy-value"
+
+
+def detection_kind(diagnostic: Diagnostic) -> str | None:
+    """The kind of credential a detection diagnostic reports -- the
+    credential shape's name (for example `aws-access-key-id`), or
+    `high-entropy-value` -- or `None` for any other diagnostic.
+
+    Read back from the diagnostic itself because an ACBOM's diagnostics
+    carry only a code, a message, and evidence. The kind names a pattern,
+    never any part of the matched value.
+    """
+
+    if diagnostic.code == _ENTROPY_DETECTED_CODE:
+        return _ENTROPY_KIND
+    if diagnostic.code != _SHAPE_DETECTED_CODE:
+        return None
+    match = _SHAPE_MESSAGE_PATTERN.match(diagnostic.message)
+    return match.group(1) if match else None
+
+
 def _scan_text(
     text: str, *, relative_path: str, fixture_path: bool
 ) -> tuple[Diagnostic, ...]:
@@ -352,10 +380,7 @@ def _scan_text(
         detections.append(
             _detection_diagnostic(
                 code=_SHAPE_DETECTED_CODE,
-                message=(
-                    f"Content matching the {shape_match.name!r} credential "
-                    "shape was detected."
-                ),
+                message=_shape_message(shape_match.name),
                 confidence=confidence,
                 relative_path=relative_path,
                 start=shape_match.start,
