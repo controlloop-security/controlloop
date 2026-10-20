@@ -126,6 +126,15 @@ def build_binary(
     propagates uncaught -- never invent a passing result.
     """
 
+    # PyInstaller resolves a relative `--add-data` source against the
+    # `--specpath` directory, not the working directory, so a relative
+    # `cli_root` (the release workflow passes `--repo-root .`) points the
+    # rules glob inside `build-binary/spec/`. Absolute paths everywhere.
+    cli_root = cli_root.resolve()
+    dist_dir = dist_dir.resolve()
+    work_dir = work_dir.resolve()
+    spec_dir = spec_dir.resolve()
+
     name = binary_name(platform, arch)
     entry = cli_root / "src" / "controlloop" / "__main__.py"
     if not entry.is_file():

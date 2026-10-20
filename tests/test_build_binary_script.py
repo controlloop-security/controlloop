@@ -194,6 +194,56 @@ class TestBuildBinaryNonzeroExit:
             )
 
 
+class TestRelativeRepoRoot:
+    """The release workflow runs `build_binary.py --repo-root .`.
+    PyInstaller resolves a relative `--add-data` source against the
+    `--specpath` directory, so every path it is given must be absolute,
+    or the rules glob lands inside `build-binary/spec/` and the build
+    fails."""
+
+    def test_a_relative_repo_root_reaches_pyinstaller_as_absolute_paths(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        entry = tmp_path / "src" / "controlloop" / "__main__.py"
+        entry.parent.mkdir(parents=True)
+        entry.write_text("# synthetic entry point\n")
+        (tmp_path / "src" / "controlloop" / "policy" / "rules").mkdir(parents=True)
+        captured: list[list[str]] = []
+
+        def _fake_run(
+            args: list[str], **kwargs: object
+        ) -> subprocess.CompletedProcess[str]:
+            captured.append(args)
+            return subprocess.CompletedProcess(
+                args=args, returncode=1, stdout="", stderr="stop here"
+            )
+
+        monkeypatch.setattr(_MODULE.subprocess, "run", _fake_run)
+        monkeypatch.chdir(tmp_path)
+
+        with pytest.raises(_MODULE.BinaryBuildError):
+            _MODULE.build_binary(
+                cli_root=Path("."),
+                platform="linux",
+                arch="x86_64",
+                dist_dir=Path("dist-binary"),
+                work_dir=Path("build-binary"),
+                spec_dir=Path("build-binary") / "spec",
+            )
+
+        (args,) = captured
+        add_data = args[args.index("--add-data") + 1]
+        source = add_data.rsplit(":", 1)[0]
+        assert Path(source).is_absolute()
+        assert (
+            Path(source).parent
+            == (tmp_path / "src" / "controlloop" / "policy" / "rules").resolve()
+        )
+        for flag in ("--distpath", "--workpath", "--specpath"):
+            assert Path(args[args.index(flag) + 1]).is_absolute(), flag
+        assert Path(args[-1]).is_absolute()
+
+
 def _host_platform_and_arch() -> tuple[str, str] | None:
     """Map the real host this test is running on to this script's own
     `--platform`/`--arch` vocabulary, or `None` when the host is neither
