@@ -96,7 +96,7 @@ uv run controlloop --version
 ControlLoop 0.1.1
 Supported OASF versions: none yet
 Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17
-Rule pack: controlloop-community 0.5.0 (18 rules)
+Rule pack: controlloop-community 0.6.0 (18 rules)
 ```
 
 ### Requirements
@@ -417,8 +417,8 @@ uv run controlloop rules
 ```
 
 ```text
-• RULE PACK  controlloop-community 0.5.0 (18 rules)
-• FINGERPRINT  fcc904c2a47d9a3353a8ddfd3607e7b26140b8476012f0e80c7629babee1edc0
+• RULE PACK  controlloop-community 0.6.0 (18 rules)
+• FINGERPRINT  169a7ceb80ffac4ccdb2ab95bc7491cb296f8736ded076f666a3020d3f1a342e
 
 ✓ policy.undeclared-tools  [active, optional]
     A tool an agent can reach, directly or transitively, that the repository's

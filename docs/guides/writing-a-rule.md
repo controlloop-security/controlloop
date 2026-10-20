@@ -171,7 +171,14 @@ and environment values must never reach the output.
      paste the value; never compute the pinned value at import time.
 
 `tests/policy/test_rule_pack.py` fails until the pinned fingerprint
-matches. See [Rule pack versioning](../reference/rule-pack-versioning.md).
+matches. Two tests state the expected pack version and rule count, so
+update both: `test_current_rule_pack_ships_all_registered_rules` in the
+same file and `test_version_reports_the_real_populated_rule_pack` in
+`tests/test_cli.py`. The version
+examples in the README, `docs/getting-started/quickstart.md`, and the
+[rule pack versioning](../reference/rule-pack-versioning.md) reference show
+the pack version and fingerprint; update them and add a row to that
+reference's version table.
 
 ## Test it
 
@@ -265,12 +272,15 @@ uv run pytest
 ## Changing a rule later
 
 - **Bump the rule's own `_RULE_VERSION`** when what it reports changes.
-- **Bump the rule pack version, and pin its new fingerprint, for any
-  behavior change.** The fingerprint hashes each rule's `evaluate()`
-  source, and `evaluate()` is a one-line wrapper, so an edit inside
-  `findings()` or a helper does not change the fingerprint and no test
-  will remind you. Bump it anyway, so a report's rule pack version keeps
-  meaning the same behavior.
+- **Bump the rule pack version, and pin its new fingerprint, whenever the
+  fingerprint moves.** It covers each rule's whole module and the shared
+  helpers in `_authority.py` and `_shared.py`, so any edit there, even to a
+  comment, fails `test_current_rule_pack_fingerprint_matches_pinned_registry`
+  until you do.
+- **Bump it by hand for a change outside those modules.** A rule's
+  behavior can also change through code it reaches indirectly, such as the
+  finding model or the material capability taxonomy. The fingerprint does
+  not cover those, so no test will remind you.
 - **Never rename a rule ID or its anchor.** Findings, suppressions, and
   links from older reports depend on both.
 - **Changing severity changes what blocks.** Say so in the changelog.

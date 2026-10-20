@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -20,6 +21,7 @@ from controlloop.acbom.models import (
     SecurityAttributes,
 )
 from controlloop.policy import evaluate as policy_evaluate
+from controlloop.policy import rulepack
 from controlloop.policy.models import Rule, RuleContext
 from controlloop.policy.rulepack import (
     CURRENT_RULE_PACK,
@@ -276,8 +278,9 @@ class TestCurrentRulePack:
 
         assert CURRENT_RULE_PACK.name == "controlloop-community"
         # Includes the seven agent-authority rules and the Team
-        # sanctioned-list rule.
-        assert CURRENT_RULE_PACK.version == "0.5.0"
+        # sanctioned-list rule. 0.6.0 fingerprints rule modules and shared
+        # helpers; its rules are 0.5.0's, with per-occurrence secret IDs.
+        assert CURRENT_RULE_PACK.version == "0.6.0"
         assert len(ALL_RULES) == 18
         assert set(CURRENT_RULE_PACK.rules) == set(ALL_RULES)
         assert {rule.id for rule in CURRENT_RULE_PACK.rules} == {
@@ -328,3 +331,62 @@ class TestOffline:
 
         with pytest.raises(RuntimeError, match="offline harness"):
             socket.socket()
+
+
+_RULE_MODULE_TEMPLATE = """\
+from controlloop.policy.models import RuleContext, RuleObservation
+
+
+def findings(context: RuleContext) -> tuple[RuleObservation, ...]:
+    return {findings_body}
+
+
+def evaluate(context: RuleContext) -> tuple[RuleObservation, ...]:
+    return findings(context)
+"""
+
+
+def _write_rule_module(tmp_path: Path, name: str, findings_body: str) -> ModuleType:
+    path = tmp_path / f"{name}.py"
+    path.write_text(
+        _RULE_MODULE_TEMPLATE.format(findings_body=findings_body), encoding="utf-8"
+    )
+    module_name = f"controlloop_policy_test_fixture_{name}"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+class TestRulePackFingerprintCoversRuleLogic:
+    """Every rule's `evaluate` is a thin wrapper over `findings`, so the
+    fingerprint must cover the module that holds the logic, and the shared
+    helpers rules call into, or a logic change ships under an old pin."""
+
+    def test_a_change_inside_findings_changes_the_fingerprint(
+        self, tmp_path: Path
+    ) -> None:
+        before = _write_rule_module(tmp_path, "logic_before", "()")
+        after = _write_rule_module(tmp_path, "logic_after", "tuple([])")
+
+        assert inspect.getsource(before.evaluate) == inspect.getsource(after.evaluate)
+        assert rule_pack_fingerprint(
+            _pack(rules=(Rule(id="policy.rule-a", evaluate=before.evaluate),))
+        ) != rule_pack_fingerprint(
+            _pack(rules=(Rule(id="policy.rule-a", evaluate=after.evaluate),))
+        )
+
+    def test_the_shared_rule_helpers_are_part_of_the_fingerprint(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        with_helpers = rule_pack_fingerprint(_pack())
+        monkeypatch.setattr(rulepack, "_SHARED_RULE_MODULES", ())
+
+        assert rule_pack_fingerprint(_pack()) != with_helpers
+
+    def test_every_shared_rule_helper_module_exists(self) -> None:
+        for name in rulepack._SHARED_RULE_MODULES:
+            assert importlib.util.find_spec(name) is not None, name

@@ -13,22 +13,30 @@ rather than merged into a new combined type.
 
 `rule_pack_fingerprint` is the actual enforcement mechanism: a
 deterministic SHA-256 digest over every declared rule's own `evaluate`
-source text (via `inspect.getsource`, the same introspection primitive
-`controlloop.policy.engine`'s own safety check already uses) and its
-`mandatory` flag. `KNOWN_RULE_PACK_FINGERPRINTS` pins one
+source text, the full source of the module that defines it, and its
+`mandatory` flag, plus the source of the helper modules every rule calls
+into (`_SHARED_RULE_MODULES`), all read with `inspect.getsource`, the same
+introspection primitive `controlloop.policy.engine`'s own safety check
+already uses. A rule's `evaluate` is a thin wrapper over its `findings`,
+so hashing `evaluate` alone missed every change to a rule's real logic;
+the module source catches it. `KNOWN_RULE_PACK_FINGERPRINTS` pins one
 hand-computed, hardcoded fingerprint per declared version; a rule pack
 version whose *computed* fingerprint no longer matches its *pinned*
 one is exactly "a rule's behavior changed without a version
 increment", enforced by `tests/policy/test_rule_pack.py`'s
 `test_current_rule_pack_fingerprint_matches_pinned_registry`.
 
-**Disclosed limitation:** the fingerprint only detects a change to a
-declared rule's *own* `evaluate` source text or `mandatory` flag, or a rule
-being added or removed -- not every conceivable behavior change reachable
-only through, for example, a shared helper function a rule calls into that
-is itself edited elsewhere. Disclosed as a best-effort, narrow mechanism,
-not a general semantic-diff tool -- the same "best-effort, disclosed"
-framing `controlloop.policy.engine`'s own structural safety check already
+**Disclosed limitation:** the fingerprint detects a change to a rule's
+module, to the rule helper modules in `_SHARED_RULE_MODULES`, or to a
+rule's `mandatory` flag, and a rule being added or removed. It does not
+cover code outside those modules that a rule reaches indirectly, such as
+the finding model or the material capability taxonomy, so a behavior
+change made only there still needs a deliberate version bump. Any edit to
+a covered module changes the fingerprint, including a comment, so a pin
+can also move without a behavior change; a needless version bump is the
+safe direction to err in. Disclosed as a best-effort mechanism, not a
+general semantic-diff tool -- the same "best-effort, disclosed" framing
+`controlloop.policy.engine`'s own structural safety check already
 established for this codebase.
 
 **Disclosed scope boundary: `scan`/`gate` still execute rules from
@@ -50,6 +58,7 @@ populated.
 from __future__ import annotations
 
 import hashlib
+import importlib
 import inspect
 import json
 from dataclasses import dataclass
@@ -115,31 +124,66 @@ class RulePack:
             )
 
 
+#: Helper modules the registered rules call into for their detection
+#: logic. Their source is part of every fingerprint, so editing a helper
+#: moves the pin even though no rule module changed.
+_SHARED_RULE_MODULES: tuple[str, ...] = (
+    "controlloop.policy.rules._authority",
+    "controlloop.policy.rules._shared",
+)
+
+
+def _source_digest(source: str) -> str:
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+
 def _rule_fingerprint_entry(
     rule: Rule, metadata_by_id: dict[str, RuleMetadata]
 ) -> object:
-    source = inspect.getsource(rule.evaluate)
-    source_digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
-    return [rule.id, source_digest, metadata_by_id[rule.id].mandatory]
+    module = inspect.getmodule(rule.evaluate)
+    if module is None:
+        raise RulePackError(
+            f"rule {rule.id!r}: its evaluate callable has no defining module "
+            "to fingerprint"
+        )
+    return [
+        rule.id,
+        _source_digest(inspect.getsource(rule.evaluate)),
+        _source_digest(inspect.getsource(module)),
+        metadata_by_id[rule.id].mandatory,
+    ]
+
+
+def _shared_module_entries() -> list[list[str]]:
+    return [
+        [name, _source_digest(inspect.getsource(importlib.import_module(name)))]
+        for name in _SHARED_RULE_MODULES
+    ]
 
 
 def rule_pack_fingerprint(pack: RulePack) -> str:
     """Return a deterministic SHA-256 hex digest over `pack`'s own
-    content: every rule's id, a SHA-256 digest of its `evaluate`
-    callable's source text, and its `mandatory` flag, sorted by rule id
-    so fingerprint order never depends on `pack.rules`' own input order
-    (mirroring `controlloop.policy.engine.evaluate`'s own
-    canonicalization convention). Two `RulePack`s with identical rules
-    (in any order) and identical metadata always produce an identical
-    fingerprint; changing, adding, or removing a rule, or changing a
-    rule's `mandatory` flag, always changes it."""
+    content: every rule's id, SHA-256 digests of its `evaluate`
+    callable's source text and of its defining module's full source, and
+    its `mandatory` flag, sorted by rule id so fingerprint order never
+    depends on `pack.rules`' own input order (mirroring
+    `controlloop.policy.engine.evaluate`'s own canonicalization
+    convention), together with a digest of each `_SHARED_RULE_MODULES`
+    source. Two `RulePack`s with identical rules (in any order) and
+    identical metadata always produce an identical fingerprint;
+    changing, adding, or removing a rule, editing its module or a shared
+    rule helper, or changing a rule's `mandatory` flag, always changes
+    it."""
 
     metadata_by_id = {entry.id: entry for entry in pack.metadata}
     entries = sorted(
         (_rule_fingerprint_entry(rule, metadata_by_id) for rule in pack.rules),
         key=lambda entry: entry[0],  # type: ignore[index]
     )
-    canonical = json.dumps(entries, separators=(",", ":"))
+    canonical = json.dumps(
+        {"rules": entries, "shared": _shared_module_entries()},
+        separators=(",", ":"),
+    )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
@@ -264,7 +308,7 @@ _SUMMARY_BY_RULE_ID: dict[str, str] = {
 #: `KNOWN_RULE_PACK_FINGERPRINTS` below).
 CURRENT_RULE_PACK = RulePack(
     name="controlloop-community",
-    version="0.5.0",
+    version="0.6.0",
     rules=ALL_RULES,
     metadata=tuple(
         RuleMetadata(
@@ -305,4 +349,9 @@ KNOWN_RULE_PACK_FINGERPRINTS: dict[str, str] = {
     "0.4.0": "c91150a1d8a80626bd6e3bbda6527576f62be4a00227bbfc5aba3ebed0ce06fe",
     # policy.unsanctioned-agent-component, a Team rule, 18 in total.
     "0.5.0": "fcc904c2a47d9a3353a8ddfd3607e7b26140b8476012f0e80c7629babee1edc0",
+    # The same rules, with policy.hardcoded-secrets' per-occurrence
+    # finding IDs, fingerprinted with each rule's whole module and the
+    # shared rule helpers. Every pin above used the older evaluate-only
+    # digest and can no longer be recomputed; they stay as a record.
+    "0.6.0": "169a7ceb80ffac4ccdb2ab95bc7491cb296f8736ded076f666a3020d3f1a342e",
 }
