@@ -18,6 +18,7 @@
 - [Example walkthrough](guides/example-walkthrough.md)
 - [Writing a capability ceiling](guides/capability-ceiling-guide.md)
 - [Your first Team gate](guides/first-team-gate.md)
+- [Writing a rule](guides/writing-a-rule.md)
 
 ## Adapters
 
