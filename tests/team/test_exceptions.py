@@ -178,6 +178,24 @@ class TestExpiry:
         assert len(outcome.expired()) == 1
         assert outcome.expired()[0].finding_fingerprint == first.id
 
+    def test_applied_reports_only_exceptions_that_covered_a_finding(self) -> None:
+        first = make_finding(rule_id="a.rule")
+        second = make_finding(rule_id="b.rule", tool_id=TOOL_B_ID, edge_id=EDGE_B_ID)
+
+        outcome = apply_exceptions(
+            (first,),
+            (
+                ActiveException(finding_fingerprint=first.id, expires_at=_FUTURE),
+                ActiveException(finding_fingerprint=second.id, expires_at=_FUTURE),
+            ),
+            evaluated_at=_NOW,
+        )
+
+        assert [record.finding_fingerprint for record in outcome.applied()] == [
+            first.id
+        ]
+        assert outcome.applied()[0].expires_at == _FUTURE
+
     def test_the_same_inputs_at_a_later_instant_can_change_the_outcome(
         self,
     ) -> None:

@@ -136,6 +136,7 @@ class TestRegistry:
             "CLI-TEAM-ENTITLEMENT",
             "CLI-TEAM-POLICY-REJECTED",
             "CLI-TEAM-EXCEPTION-EXPIRED",
+            "CLI-TEAM-EXCEPTION-APPLIED",
             "CLI-TEAM-UPLOAD",
             "CLI-TEAM-UPLOAD-SKIPPED",
         }
