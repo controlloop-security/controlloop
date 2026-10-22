@@ -117,6 +117,14 @@ class ExceptionOutcome:
             record for record in self.records if record.state is ExceptionState.EXPIRED
         )
 
+    def applied(self) -> tuple[ExceptionRecord, ...]:
+        """Records of exceptions that narrowed this run's findings, so a
+        gate that passed because of one can say so."""
+
+        return tuple(
+            record for record in self.records if record.state is ExceptionState.APPLIED
+        )
+
 
 def apply_exceptions(
     findings: tuple[Finding, ...],

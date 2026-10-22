@@ -6,6 +6,14 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **The Team gate names each organization exception it applies.** A gate
+  that passes only because an exception covers a finding now prints
+  `• organization exception applied to <rule> (<fingerprint>) until
+  <date>; that finding does not block` (diagnostic
+  `CLI-TEAM-EXCEPTION-APPLIED`). The evidence file already recorded it.
+
 ### Changed
 
 - **Rule pack `0.6.0`: the fingerprint covers rule logic.** It now hashes

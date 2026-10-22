@@ -446,6 +446,12 @@ class TestExceptionsAtTheCommandLevel:
         result = _run(tmp_path, monkeypatch, excepted)
 
         assert result.exit_code == ExitCode.PASS
+        # A pass that only an approval allowed says so, finding by finding.
+        for fingerprint in fingerprints:
+            assert f"({fingerprint}) until 2099-01-01" in result.output
+        assert result.output.count("organization exception applied to") == len(
+            fingerprints
+        )
 
     def test_an_expired_exception_re_blocks_and_names_the_date(
         self, tmp_path: Path, monkeypatch: MonkeyPatch

@@ -2589,10 +2589,27 @@ def gate(
     exception_outcome: ExceptionOutcome | None = None
     effective_findings = suppression_outcome.effective_findings
     if team is not None:
+        covered = {finding.id: finding for finding in effective_findings}
         exception_outcome = team_pipeline.apply_team_exceptions(
             effective_findings, team.preparation, now=evaluated_at
         )
         effective_findings = exception_outcome.effective_findings
+        for applied in exception_outcome.applied():
+            # Named, because a gate that passes only thanks to an approval
+            # should not read the same as one with nothing to approve. The
+            # evidence records it too; this is the line a reviewer reads.
+            finding = covered.get(applied.finding_fingerprint)
+            subject = (
+                f"{finding.rule_id} ({applied.finding_fingerprint})"
+                if finding
+                else applied.finding_fingerprint
+            )
+            _report(
+                "CLI-TEAM-EXCEPTION-APPLIED",
+                f"organization exception applied to {subject} until "
+                f"{applied.expires_at.date().isoformat()}; that finding does not block",
+                severity=DiagnosticSeverity.INFO,
+            )
         for expired in exception_outcome.expired():
             # Reported unconditionally, not at a verbosity level: a build
             # that broke because an approval lapsed must say so on the

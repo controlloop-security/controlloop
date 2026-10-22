@@ -38,6 +38,7 @@ _TEAM_STATUS_CODE = "CLI-TEAM-STATUS"
 _TEAM_ENTITLEMENT_CODE = "CLI-TEAM-ENTITLEMENT"
 _TEAM_POLICY_REJECTED_CODE = "CLI-TEAM-POLICY-REJECTED"
 _TEAM_EXCEPTION_EXPIRED_CODE = "CLI-TEAM-EXCEPTION-EXPIRED"
+_TEAM_EXCEPTION_APPLIED_CODE = "CLI-TEAM-EXCEPTION-APPLIED"
 _TEAM_UPLOAD_CODE = "CLI-TEAM-UPLOAD"
 _TEAM_UPLOAD_SKIPPED_CODE = "CLI-TEAM-UPLOAD-SKIPPED"
 
@@ -77,6 +78,10 @@ CLI_DIAGNOSTIC_REGISTRY: Mapping[str, str] = {
     _TEAM_EXCEPTION_EXPIRED_CODE: (
         "An organization exception expired, so the finding it covered is "
         "blocking again."
+    ),
+    _TEAM_EXCEPTION_APPLIED_CODE: (
+        "An organization exception covered a finding, so it did not block. "
+        "Named on every run so a passing gate says why."
     ),
     _TEAM_UPLOAD_CODE: (
         "A Team gate reported the outcome of submitting its scan "
