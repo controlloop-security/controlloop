@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Homebrew formula passes `brew audit --strict`.** It no longer
+  repeats the version Homebrew already reads from the release URL.
+
 ## [0.2.0] - 2026-10-23
 
 A container image on GHCR and a Homebrew formula are published from this

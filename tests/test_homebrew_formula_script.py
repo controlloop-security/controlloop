@@ -74,7 +74,10 @@ class TestRenderFormula:
         for asset in module.ASSETS.values():
             assert f'url "{base}/{asset}"' in formula
             assert f'sha256 "{_SHAS[asset]}"' in formula
-        assert 'version "0.2.0"' in formula
+        assert "/releases/download/v0.2.0/" in formula
+        # Homebrew scans the version from the URL; `brew audit --strict`
+        # rejects a redundant `version` line.
+        assert '\n  version "' not in formula
         assert 'license "Apache-2.0"' in formula
         assert 'homepage "https://controlloop.ai"' in formula
         assert "class Controlloop < Formula" in formula
