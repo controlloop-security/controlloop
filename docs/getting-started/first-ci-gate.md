@@ -159,10 +159,13 @@ instead of an install (available from the first release after this page
 was written; see [Container image](../reference/container-image.md)):
 
 ```bash
-docker run --rm --network none -v "$PWD:/work" \
+docker run --rm --network none --user "$(id -u):$(id -g)" -v "$PWD:/work" \
   ghcr.io/controlloop-security/controlloop:<version> \
   gate /work --default-branch main --evidence-path /work/evidence.json
 ```
+
+`--user` runs the container as the job's own user so it can write
+`evidence.json` into the checkout.
 
 A GitLab CI job, as one example:
 

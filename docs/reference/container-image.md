@@ -28,15 +28,20 @@ docker run --rm --network none \
   ghcr.io/controlloop-security/controlloop:<version> scan /work
 ```
 
-`gate` writes an evidence artifact, so mount the repository writable, or
-point `--evidence-path` at a separate writable mount:
+`gate` writes an evidence artifact, so mount the repository writable and
+run the container as your own user, so that the file it writes is yours
+and the mount is writable to it (the image's own user, uid 10001, owns
+nothing on your machine):
 
 ```bash
-docker run --rm --network none \
+docker run --rm --network none --user "$(id -u):$(id -g)" \
   -v "$PWD:/work" \
   ghcr.io/controlloop-security/controlloop:<version> \
   gate /work --default-branch main --evidence-path /work/evidence.json
 ```
+
+On Docker Desktop for Mac file sharing already maps ownership, so the
+`--user` flag is harmless there and required on Linux.
 
 Every option is the same as the installed command's; see the
 [CLI reference](cli.md). The image's entrypoint is `controlloop`, so the
@@ -67,7 +72,9 @@ Built from the repository's `Dockerfile` in two stages:
   and no source tree; `git` is added, because `diff`, `scan` and `gate`
   resolve the merge-base baseline through local git.
 - It runs as user `10001`, never root, with `/work` as the working
-  directory.
+  directory. `--user` may override that with any uid; nothing in the
+  image depends on the user existing in `/etc/passwd` (`HOME` is `/tmp`,
+  and git is told to accept a mounted repository whoever owns it).
 - The Python base image is pinned by digest and `uv` by exact version, so
   two builds of the same commit start from the same bytes. The published
   stage applies Debian's security updates on top, so a fix shipped since

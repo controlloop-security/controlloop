@@ -206,6 +206,22 @@ class TestSmokeTest:
         for line in scan_lines:
             assert "--network none" in line
 
+    def test_gate_runs_as_the_host_user_on_a_writable_mount(self) -> None:
+        """The image's uid owns nothing on the host, so the documented
+        way to let `gate` write its evidence is `--user`; the smoke test
+        exercises exactly that, which is what caught the permission
+        failure on a Linux runner."""
+        text = _SMOKE.read_text(encoding="utf-8")
+
+        gate_lines = [
+            line
+            for line in text.splitlines()
+            if "docker run" in line and '"$WORK/repo:/work"' in line
+        ]
+        assert gate_lines, "the smoke test runs no gate on a writable mount"
+        for line in gate_lines:
+            assert '--user "$(id -u):$(id -g)"' in line
+
     def test_checks_non_root_and_no_toolchain(self) -> None:
         text = _SMOKE.read_text(encoding="utf-8")
 

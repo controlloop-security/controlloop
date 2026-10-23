@@ -14,7 +14,11 @@
 #      container's network disabled (`--network none`), so no network
 #      request is part of scanning;
 #   5. a `gate` against a mounted git repository resolves its baseline
-#      (git is present and the mount's ownership is accepted).
+#      (git is present and the mount's ownership is accepted) and writes
+#      its evidence into the mount, run as the host user (`--user`), the
+#      way the documentation tells a Linux user to run it: the image's
+#      own uid (10001) owns nothing on the host, so a writable mount
+#      needs the caller's uid.
 #
 # Every check is a hard failure. Nothing here needs a published release.
 set -euo pipefail
@@ -63,8 +67,9 @@ cp "$WORK/fixture/agent-card.json" "$WORK/repo/"
 git -C "$WORK/repo" init -q -b main
 git -C "$WORK/repo" -c user.name=smoke -c user.email=smoke@example.invalid add -A
 git -C "$WORK/repo" -c user.name=smoke -c user.email=smoke@example.invalid commit -q -m "fixture"
-# The mount is writable so `gate` can write its evidence artifact.
-docker run --rm --network none -v "$WORK/repo:/work" "$IMAGE" \
+# The mount is writable so `gate` can write its evidence artifact, and
+# the container runs as the host user so it may write there.
+docker run --rm --network none --user "$(id -u):$(id -g)" -v "$WORK/repo:/work" "$IMAGE" \
   gate /work --default-branch main --evidence-path /work/evidence.json --format json \
   > "$WORK/gate.json" || status=$?
 status="${status:-0}"
