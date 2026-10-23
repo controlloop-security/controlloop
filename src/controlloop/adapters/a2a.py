@@ -366,6 +366,68 @@ def _delegation_nodes_and_edges(
     return nodes, edges, diagnostics
 
 
+_URL_HOST = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://([^/?#]+)")
+
+
+def _endpoint_trigger(
+    card: dict[str, Any],
+    relative_path: str,
+    agent_node: Node,
+    evidence: tuple[Evidence, ...],
+) -> tuple[tuple[Node, ...], tuple[Edge, ...]]:
+    """An inferred, deliberately unconfirmed untrusted-input leg.
+
+    A card's `url` is where the agent accepts requests. Whether those
+    requests come from the open internet or from an authenticated
+    gateway the card cannot say, so this is recorded as a `trigger`
+    node whose `untrusted_input` is the literal `"unknown"`, with a
+    `receives-from` edge at `Confidence.LOW`. The exfiltration-triangle
+    rule reports that as an unproven leg at reduced severity, never as a
+    confirmed one; a repository confirms or rules it out by declaring the
+    agent's inputs in `controlloop.yaml` (`external_inputs`), which is
+    authoritative. Only the host is kept: the full URL is not needed for
+    identity and may carry a path nobody wants in a report.
+    """
+
+    url = card.get("url")
+    if not isinstance(url, str) or not url:
+        return (), ()
+    match = _URL_HOST.match(url.strip())
+    if match is None:
+        return (), ()
+    host = match.group(1)
+    try:
+        trigger = _build_node(
+            relative_path,
+            "url",
+            NodeType.TRIGGER,
+            "a2a-endpoint",
+            f"inbound requests to {host}",
+            evidence,
+            confidence=Confidence.LOW,
+            security_attributes=SecurityAttributes(untrusted_input="unknown"),
+        )
+    except ValueError:
+        return (), ()
+    edge_material = EdgeIdentityMaterial(
+        relationship_type=EdgeType.RECEIVES_FROM,
+        source_id=agent_node.id,
+        target_id=trigger.id,
+        relationship_discriminator="a2a-endpoint",
+    )
+    edge = Edge(
+        id=edge_id(edge_material),
+        source=agent_node.id,
+        target=trigger.id,
+        type=EdgeType.RECEIVES_FROM,
+        status=EdgeStatus.DIRECT,
+        security_attributes=SecurityAttributes(untrusted_input="unknown"),
+        confidence=Confidence.LOW,
+        evidence=evidence,
+    )
+    return (trigger,), (edge,)
+
+
 def _discover_file(
     context: ScanContext, relative_path: str
 ) -> tuple[tuple[Node, ...], tuple[Edge, ...], tuple[Diagnostic, ...]]:
@@ -441,10 +503,19 @@ def _discover_file(
     delegation_nodes, delegation_edges, delegation_diagnostics = (
         _delegation_nodes_and_edges(context, card, agent_node, evidence)
     )
+    endpoint_nodes, endpoint_edges = _endpoint_trigger(
+        card, relative_path, agent_node, evidence
+    )
 
     return (
-        (agent_node, *identity_nodes, *skill_nodes, *delegation_nodes),
-        (*skill_edges, *delegation_edges),
+        (
+            agent_node,
+            *identity_nodes,
+            *skill_nodes,
+            *delegation_nodes,
+            *endpoint_nodes,
+        ),
+        (*skill_edges, *delegation_edges, *endpoint_edges),
         (*diagnostics, *delegation_diagnostics),
     )
 

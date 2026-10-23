@@ -1,0 +1,14 @@
+# Only what the Dockerfile copies is sent to the build: the package
+# metadata, the lockfile, the files the package's own README metadata
+# reads, and `src/`. Everything else stays out so a stray local file
+# (a virtual environment, a scan's evidence, a test fixture) can never
+# land in the image.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!CHANGELOG.md
+!LICENSE
+!NOTICE
+!src/
+src/**/__pycache__/

@@ -10,10 +10,8 @@ created: 2026-08-21
 
 # Release pipeline
 
-**No release has ever been published.** This page describes what
-`.github/workflows/release.yml` does when a maintainer pushes a real tag
-matching `v*.*.*` -- it has never actually run, and nothing on this page is
-a claim that a version of ControlLoop is available to install.
+The first release built and published by this pipeline is [v0.1.1](https://github.com/controlloop-security/controlloop/releases/tag/v0.1.1), 2026-10-20: wheel, sdist, release manifest, the three standalone binaries, their checksums, `SHA256SUMS`, and build-provenance attestations for all of them, with the same wheel and sdist on PyPI. This page describes what `.github/workflows/release.yml`
+does on each tag.
 
 The goal: one tagged release builds, verifies, and publishes every
 artifact from a single reproducible pipeline.
@@ -97,6 +95,25 @@ publishing a release is always a deliberate, human act.
    cannot be replaced, only yanked. The job runs in the `pypi`
    environment.
 
+10. **Publish the container image** -- only after stage 7, builds the
+    image from the repository's `Dockerfile`, runs
+    `scripts/container-smoke.sh` against it (non-root, no build toolchain,
+    a real scan with networking disabled), scans it with Trivy -- a
+    critical vulnerability fails the job and nothing is pushed -- then
+    builds the `linux/amd64` and `linux/arm64` image, pushes it to
+    `ghcr.io/controlloop-security/controlloop` tagged with the exact
+    version, and attests the pushed digest with the same keyless
+    build-provenance attestation as stage 6. It signs in to GHCR with the
+    workflow's own `GITHUB_TOKEN` (`packages: write`); no registry
+    password is stored. See [Container image](container-image.md).
+11. **Publish the Homebrew formula** -- only after stage 7, renders
+    `Formula/controlloop.rb` from the release's own `SHA256SUMS`
+    (`release-scripts/homebrew_formula.py`) and writes it to the tap
+    repository through the GitHub API. This is the one step that uses a
+    stored credential, `HOMEBREW_TAP_TOKEN`, scoped to that single
+    repository; the job is skipped until the `HOMEBREW_TAP_REPOSITORY`
+    variable is set. See [Homebrew](homebrew.md).
+
 ## Setting up PyPI publishing
 
 Done once, by a maintainer who owns the `controlloop` project on PyPI:
@@ -119,13 +136,13 @@ the cause and re-run only that job; nothing earlier needs to run again.
 
 ## What this pipeline does not do
 
-- **No GHCR or Homebrew publication.** Each is separate, later work, and
-  each uses the same name, `controlloop`, as the PyPI project. The
-  Homebrew tap repository now exists
-  (`controlloop-security/homebrew-controlloop`, reserved, no formula yet),
-  but the GHCR namespace has not been created. A later change adding
-  either adds a new job that depends on this pipeline's existing `verify`
-  and `changelog-gate` stages; it does not need to change them.
+- **No publication from a developer machine, and no moving container
+  tag.** The container image and the Homebrew formula are published by
+  stages 10 and 11 above, from the pipeline only. The GHCR namespace
+  `ghcr.io/controlloop-security/controlloop` is created by the first push
+  from stage 10, and the tap carries no formula until stage 11 writes one;
+  until the first release tagged after these stages were added, neither
+  channel has anything to install.
 - **No macOS code signing or notarization, and no macOS x86_64 (Intel)
   binary.** Standalone binaries themselves are now built, smoke-tested,
   checksummed, and every published artifact now also
@@ -153,8 +170,10 @@ hand-typed a second time.
 
 ## Next steps
 
-- Review [Release notes](release-notes.md) for what is actually published
-  today (nothing yet).
+- Review [Release notes](release-notes.md) for what each release
+  published.
+- Review [Container image](container-image.md) and [Homebrew](homebrew.md)
+  for the two channels stages 10 and 11 publish.
 - Review [Release verification](release-verification.md) for how a
   downloader checks an artifact's checksum and signature.
 - Review [Shell installer](shell-installer.md) for the one-command

@@ -308,7 +308,7 @@ _SUMMARY_BY_RULE_ID: dict[str, str] = {
 #: `KNOWN_RULE_PACK_FINGERPRINTS` below).
 CURRENT_RULE_PACK = RulePack(
     name="controlloop-community",
-    version="0.6.0",
+    version="0.7.0",
     rules=ALL_RULES,
     metadata=tuple(
         RuleMetadata(
@@ -354,4 +354,8 @@ KNOWN_RULE_PACK_FINGERPRINTS: dict[str, str] = {
     # shared rule helpers. Every pin above used the older evaluate-only
     # digest and can no longer be recomputed; they stay as a record.
     "0.6.0": "169a7ceb80ffac4ccdb2ab95bc7491cb296f8736ded076f666a3020d3f1a342e",
+    # 0.7.0: the exfiltration-triangle rule (1.1.0) reads a declared or
+    # inferred untrusted-input leg; an inferred one is reported at
+    # medium severity instead of silence or a confident claim.
+    "0.7.0": "06beef30e8745a1fd18898c800555aa29dab80ef4e80a446c069e4b532197cde",
 }

@@ -35,6 +35,7 @@ from controlloop import __version__
 from controlloop.acbom import (
     ACBOMDocument,
     Diagnostic,
+    Edge,
     Evidence,
     Generator,
     Node,
@@ -48,6 +49,7 @@ from controlloop.adapters import ALL_ADAPTERS, ScanContext, run_adapters
 from controlloop.adapters.sandbox import adapter_sandbox
 from controlloop.manifest import ManifestValidationError, load_manifest
 from controlloop.manifest.annotation import annotate_tool_capabilities
+from controlloop.manifest.inputs import declare_external_inputs
 from controlloop.manifest.reconciliation import (
     manifest_evidence,
     unverified_diagnostic,
@@ -126,11 +128,12 @@ def _run_secret_scan(root: RepositoryRoot, files: list[Path]) -> tuple[Diagnosti
         )
 
 
-def _annotate_from_manifest(
-    root: RepositoryRoot, nodes: tuple[Node, ...]
-) -> tuple[tuple[Node, ...], tuple[Diagnostic, ...]]:
+def _apply_manifest(
+    root: RepositoryRoot, nodes: tuple[Node, ...], edges: tuple[Edge, ...]
+) -> tuple[tuple[Node, ...], tuple[Edge, ...], tuple[Diagnostic, ...]]:
     """Supplement discovered tool nodes with the repository's own
-    `tool_capabilities` declarations.
+    `tool_capabilities` declarations, and add the trigger nodes and
+    `receives-from` edges its `external_inputs` declare.
 
     Deliberately lenient about the manifest itself. `bom` has never
     required a `controlloop.yaml`, and a repository with a broken one
@@ -144,27 +147,41 @@ def _annotate_from_manifest(
 
     manifest_path = root.path / _MANIFEST_FILENAME
     if not manifest_path.exists():
-        return nodes, ()
+        return nodes, edges, ()
 
     evidence = manifest_evidence(_MANIFEST_FILENAME)
     try:
         raw = manifest_path.read_text(encoding="utf-8")
     except OSError:
-        return nodes, (
-            unverified_diagnostic(
-                evidence, "the manifest could not be read, so no tool was annotated"
+        return (
+            nodes,
+            edges,
+            (
+                unverified_diagnostic(
+                    evidence, "the manifest could not be read, so no tool was annotated"
+                ),
             ),
         )
     try:
         manifest = load_manifest(raw, path=_MANIFEST_FILENAME)
     except ManifestValidationError:
-        return nodes, (
-            unverified_diagnostic(
-                evidence,
-                "the manifest could not be parsed, so no tool was annotated",
+        return (
+            nodes,
+            edges,
+            (
+                unverified_diagnostic(
+                    evidence,
+                    "the manifest could not be parsed, so no tool was annotated",
+                ),
             ),
         )
-    return annotate_tool_capabilities(nodes, manifest, evidence)
+    nodes, annotation_diagnostics = annotate_tool_capabilities(
+        nodes, manifest, evidence
+    )
+    nodes, edges, input_diagnostics = declare_external_inputs(
+        nodes, edges, manifest, _MANIFEST_FILENAME, evidence
+    )
+    return nodes, edges, annotation_diagnostics + input_diagnostics
 
 
 def build_acbom_document(
@@ -205,7 +222,9 @@ def build_acbom_document(
     )
     discovery = run_adapters([adapter_cls() for adapter_cls in ALL_ADAPTERS], context)
     secret_scan_diagnostics = _run_secret_scan(root, files)
-    nodes, annotation_diagnostics = _annotate_from_manifest(root, discovery.nodes)
+    nodes, edges, manifest_diagnostics = _apply_manifest(
+        root, discovery.nodes, discovery.edges
+    )
 
     document = ACBOMDocument(
         schema_version=CURRENT_SCHEMA_VERSION,
@@ -218,12 +237,12 @@ def build_acbom_document(
             root_digest=_compute_root_digest(root.path, files),
         ),
         nodes=nodes,
-        edges=discovery.edges,
+        edges=edges,
         diagnostics=(
             walk_diagnostics
             + discovery.diagnostics
             + secret_scan_diagnostics
-            + annotation_diagnostics
+            + manifest_diagnostics
         ),
         digest=_PLACEHOLDER_DIGEST,
     )

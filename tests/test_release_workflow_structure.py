@@ -7,8 +7,10 @@ These tests never execute the workflow -- they parse the real YAML file with
 structure matches the release pipeline's design: a tag-only trigger, a
 `needs` graph that makes every publish step depend on verification and the
 changelog gate, PyPI publication through trusted publishing rather than a
-stored token, no reference to a GHCR/Homebrew credential this repository
-does not have, and every third-party action pinned to an exact version.
+stored token, GHCR publication with the workflow's own token rather than a
+stored registry password, exactly one stored credential (the Homebrew tap
+token, scoped to that one repository), and every third-party action pinned
+to an exact version.
 This mirrors the existing drift-guard pattern in
 `test_fixture_corpus_doc.py`: real repository content, asserted against, not
 merely described in a docstring.
@@ -16,6 +18,7 @@ merely described in a docstring.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -26,14 +29,22 @@ _RELEASE_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "release.yml"
 _CI_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 _VERIFY_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "verify.yml"
 
-#: Every schema/version constant `derive_release_metadata.py` reads (and
-#: every credential this repository is known NOT to have) informs the
-#: negative assertions below.
+#: Credentials this pipeline must never store: a Docker Hub login, a
+#: long-lived registry token, a personal token for GHCR. GHCR is reached
+#: with the workflow's own `github.token`; the Homebrew tap with the one
+#: documented secret, `HOMEBREW_TAP_TOKEN`.
 _FORBIDDEN_SECRET_SUBSTRINGS = (
-    "GHCR",
-    "HOMEBREW",
-    "DOCKER",
+    "DOCKERHUB",
+    "DOCKER_PASSWORD",
+    "DOCKER_TOKEN",
+    "GHCR_TOKEN",
+    "GHCR_PAT",
+    "CR_PAT",
 )
+
+#: The only `secrets.*` reference the pipeline may make. Everything else
+#: is GitHub's own short-lived `github.token` / OIDC.
+_ALLOWED_SECRETS = frozenset({"HOMEBREW_TAP_TOKEN"})
 
 
 def _load(path: Path) -> dict[Any, Any]:
@@ -88,6 +99,8 @@ class TestReleaseWorkflowJobGraph:
             "publish-github-release",
             "publish-schemas",
             "publish-pypi",
+            "publish-container",
+            "publish-homebrew",
         }
 
     def test_verify_and_changelog_gate_depend_on_derive_version(self) -> None:
@@ -157,22 +170,26 @@ class TestReleaseWorkflowJobGraph:
 
 
 class TestReleaseWorkflowScopeBoundary:
-    def test_no_channel_this_story_defers_is_referenced(self) -> None:
-        """A container registry and Homebrew are separate,
-        not-yet-implemented distribution channels blocked on an open
-        namespace decision -- this workflow's real,
-        executable content (jobs: steps, env, secrets -- never a comment,
-        which YAML parsing already strips) must not reference credentials
-        for any of them."""
+    def test_no_stored_registry_credential_is_referenced(self) -> None:
+        """The container image is pushed with the workflow's own token and
+        the Homebrew formula with one documented, single-repository
+        secret. This workflow's real, executable content (jobs: steps,
+        env, secrets -- never a comment, which YAML parsing already
+        strips) must reference no other stored credential."""
         jobs = _load(_RELEASE_WORKFLOW)["jobs"]
-        jobs_upper = str(jobs).upper()
+        jobs_text = str(jobs)
+        jobs_upper = jobs_text.upper()
 
         for forbidden in _FORBIDDEN_SECRET_SUBSTRINGS:
             assert forbidden not in jobs_upper, (
                 f"release.yml's real job content references {forbidden!r}, "
-                "which belongs to a separate, not-yet-implemented "
-                "distribution channel"
+                "a stored registry credential this pipeline must not hold"
             )
+        referenced = set(re.findall(r"secrets\.([A-Za-z0-9_]+)", jobs_text))
+        assert referenced <= _ALLOWED_SECRETS, (
+            f"release.yml references secrets {sorted(referenced - _ALLOWED_SECRETS)}; "
+            f"only {sorted(_ALLOWED_SECRETS)} may be stored"
+        )
 
     def test_never_pushes_a_tag_or_calls_uv_publish(self) -> None:
         raw = _RELEASE_WORKFLOW.read_text(encoding="utf-8")
@@ -546,3 +563,122 @@ class TestReleaseWorkflowPyPIPublish:
             if step.get("uses", "").startswith("pypa/gh-action-pypi-publish@")
         )
         assert publish["with"]["packages-dir"] == "release-dist/dist/"
+
+
+class TestPublishContainerJob:
+    def test_runs_only_after_the_github_release_and_every_gate(self) -> None:
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+
+        assert set(jobs["publish-container"]["needs"]) == {
+            "derive-version",
+            "verify",
+            "changelog-gate",
+            "publish-github-release",
+        }
+
+    def test_holds_packages_write_and_attestation_permissions_only(self) -> None:
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+
+        assert jobs["publish-container"]["permissions"] == {
+            "contents": "read",
+            "packages": "write",
+            "id-token": "write",
+            "attestations": "write",
+        }
+
+    def test_signs_in_to_ghcr_with_the_workflow_token(self) -> None:
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+        login = next(
+            step
+            for step in jobs["publish-container"]["steps"]
+            if str(step.get("uses", "")).startswith("docker/login-action@")
+        )
+
+        assert login["with"]["registry"] == "ghcr.io"
+        assert login["with"]["password"] == "${{ github.token }}"
+
+    def test_smoke_tests_and_scans_before_pushing(self) -> None:
+        """Order matters: the push step must come after both the smoke
+        test and the vulnerability scan, and the scan must fail the job
+        on a critical finding."""
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+        steps = jobs["publish-container"]["steps"]
+        names = [str(step.get("uses", step.get("run", ""))) for step in steps]
+
+        smoke = next(i for i, name in enumerate(names) if "container-smoke.sh" in name)
+        scan = next(
+            i
+            for i, name in enumerate(names)
+            if name.startswith("aquasecurity/trivy-action@")
+        )
+        push = next(
+            i
+            for i, step in enumerate(steps)
+            if str(step.get("uses", "")).startswith("docker/build-push-action@")
+            and step["with"].get("push") is True
+        )
+        assert smoke < push and scan < push
+
+        trivy = steps[scan]["with"]
+        assert trivy["exit-code"] == "1"
+        assert trivy["severity"] == "CRITICAL"
+
+    def test_pushes_only_an_exact_version_tag_for_both_architectures(self) -> None:
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+        push = next(
+            step
+            for step in jobs["publish-container"]["steps"]
+            if str(step.get("uses", "")).startswith("docker/build-push-action@")
+            and step["with"].get("push") is True
+        )
+
+        assert push["with"]["tags"] == "${{ env.IMAGE }}:${{ env.VERSION }}"
+        assert push["with"]["platforms"] == "linux/amd64,linux/arm64"
+        raw = _RELEASE_WORKFLOW.read_text(encoding="utf-8")
+        assert ":latest" not in raw
+
+    def test_attests_the_pushed_digest(self) -> None:
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+        attest = next(
+            step
+            for step in jobs["publish-container"]["steps"]
+            if str(step.get("uses", "")).startswith("actions/attest-build-provenance@")
+        )
+
+        assert attest["with"]["push-to-registry"] is True
+        assert "digest" in attest["with"]["subject-digest"]
+
+
+class TestPublishHomebrewJob:
+    def test_runs_only_after_the_github_release(self) -> None:
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+
+        assert set(jobs["publish-homebrew"]["needs"]) == {
+            "derive-version",
+            "publish-github-release",
+        }
+
+    def test_is_skipped_until_the_tap_repository_is_configured(self) -> None:
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+
+        assert "vars.HOMEBREW_TAP_REPOSITORY" in jobs["publish-homebrew"]["if"]
+
+    def test_renders_the_formula_from_the_release_checksums(self) -> None:
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+        runs = " ".join(
+            str(step.get("run", "")) for step in jobs["publish-homebrew"]["steps"]
+        )
+
+        assert "release-scripts/homebrew_formula.py" in runs
+        assert "release-checksums/SHA256SUMS" in runs
+
+    def test_writes_through_the_api_with_the_tap_token_only(self) -> None:
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+        write = next(
+            step
+            for step in jobs["publish-homebrew"]["steps"]
+            if "gh api --method PUT" in str(step.get("run", ""))
+        )
+
+        assert write["env"]["GH_TOKEN"] == "${{ secrets.HOMEBREW_TAP_TOKEN }}"
+        assert jobs["publish-homebrew"]["permissions"] == {"contents": "read"}

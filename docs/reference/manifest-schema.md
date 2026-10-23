@@ -40,10 +40,11 @@ trusted.
 | `logged_tools` | Per-tool declarations of where a privileged tool's invocations are logged or audited -- see [Concrete policy rules](policy-rules.md#missing-action-logging-on-a-privileged-tool). |
 | `suppressions` | Repo-local, expiring suppressions of specific findings, each with a rule identifier, a scoped target, a written reason, and an expiry date -- see [Expiring repo-local suppressions](suppressions.md). |
 | `tool_capabilities` | What a named tool actually does -- the declaration that makes an agent's capability surface classifiable at all (see below). |
+| `external_inputs` | Where a named agent's input comes from: each entry names an agent and an external source it accepts input from (see below). |
 
 The packaged JSON Schema for the current version lives at
-`src/controlloop/schemas/manifest/1.2.0/manifest.schema.json`.
-`1.0.0` and `1.1.0` remain packaged, frozen, and never edited; an
+`src/controlloop/schemas/manifest/1.3.0/manifest.schema.json`.
+`1.0.0`, `1.1.0` and `1.2.0` remain packaged, frozen, and never edited; an
 existing manifest at either version still reads fine under the
 one-directional compatibility rule in
 [Schema versioning](schema-versioning.md).
@@ -155,6 +156,42 @@ name contained a space.
 - A repository that declares no `tool_capabilities` produces a
   byte-identical ACBOM to one built before this feature existed.
 
+## Declaring where an agent's input comes from (`external_inputs`)
+
+The [exfiltration-triangle rule](policy-rules.md#exfiltration-triangle)
+needs to know whether an agent takes input from outside: a public
+support inbox, a webhook, a chat channel, a form. Discovery can tell
+that an agent-running workflow starts on an issue comment, and it can
+infer from an A2A card's `url` that the agent accepts requests from
+somewhere. It cannot read "this agent is wired to the customer inbox"
+out of any file, so the repository declares it:
+
+```yaml
+schema_version: "1.3.0"
+owner: support-eng
+
+external_inputs:
+  - agent: widgetworks-order-support-agent   # matches the DISCOVERED agent's name
+    source: customer support inbox
+    description: Tickets anyone on the internet can open.
+```
+
+| Field | Meaning |
+| --- | --- |
+| `agent` | The discovered agent's display name, matched the same way `tool_capabilities` matches a tool. |
+| `source` | A human name for the input. It becomes the trigger node's name and part of its identity. |
+| `description` | Free text for reviewers; no part in identity or policy. |
+
+Each entry adds one `trigger` node and one `receives-from` edge from
+the agent to it, carrying `untrusted_input: true`. A declared external
+input is untrusted by definition; an input you would call trusted is
+not external, and is simply not declared. The declaration is
+authoritative: with it, the rule treats the leg as confirmed and the
+full triangle as `critical`. An inferred input (an A2A endpoint) stays
+`unknown`, reported at `medium` until a declaration confirms or rules
+it out. A declaration naming an agent discovery did not find produces an
+`unverified` diagnostic rather than silently doing nothing.
+
 ## How declarations are checked against discovery
 
 `reconcile_manifest` compares a parsed manifest against already-discovered
@@ -215,6 +252,9 @@ before policy evaluation.
   privileged may newly trigger
   [`policy.missing-action-logging`](policy-rules.md#missing-action-logging-on-a-privileged-tool),
   which then requires a matching `logged_tools` entry.
+- `external_inputs` is likewise applied during ACBOM construction
+  (`controlloop.manifest.inputs`), so every command sees the same
+  trigger nodes and `receives-from` edges and the same digest.
 - `suppressions` is applied by both `scan` and
   `gate`, before policy classification -- see [Expiring repo-local
   suppressions](suppressions.md) for the full mechanism, including its

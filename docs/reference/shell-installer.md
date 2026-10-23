@@ -10,11 +10,9 @@ created: 2026-08-23
 
 # Shell installer
 
-**No release has ever been published.** This page describes what
-`install.sh` does -- it has never actually downloaded a real ControlLoop
-release, because no `vX.Y.Z` tag has ever been pushed to this repository
-(see [Release pipeline](release-pipeline.md)). Nothing on this page is a
-claim that a ControlLoop release is available to install today.
+The first release built and published by this pipeline is [v0.1.1](https://github.com/controlloop-security/controlloop/releases/tag/v0.1.1), 2026-10-20: wheel, sdist, release manifest, the three standalone binaries, their checksums, `SHA256SUMS`, and build-provenance attestations for all of them, with the same wheel and sdist on PyPI. `install.sh` downloads and verifies those assets; a real run
+against that release is recorded in
+[Installation](../getting-started/installation.md#the-shell-installer).
 
 The goal: one command downloads, verifies, and installs the correct
 binary for the user's platform.
@@ -101,8 +99,8 @@ built-in tooling.
 
 ## Tested without a live release
 
-Because no release has ever been tagged, `install.sh` cannot be
-exercised end-to-end against a real `github.com` release yet. Every
+`install.sh` is tested in CI without touching a real release, so a test
+run can never depend on, or be broken by, what is published. Every
 network endpoint it uses is overridable via environment variable
 (`CONTROLLOOP_INSTALL_RELEASE_API_URL`, `CONTROLLOOP_INSTALL_BASE_URL`),
 defaulting to the real GitHub endpoints.

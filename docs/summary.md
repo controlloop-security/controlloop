@@ -7,7 +7,8 @@
 ## Getting started
 
 - [Installation](getting-started/installation.md)
-- [Current quickstart](getting-started/quickstart.md)
+- [Quickstart: your first scan](getting-started/quickstart.md)
+- [Quickstart: your first CI gate](getting-started/first-ci-gate.md)
 
 ## Core concepts
 
@@ -70,6 +71,8 @@
 - [Release notes](reference/release-notes.md)
 - [Release pipeline](reference/release-pipeline.md)
 - [Standalone binaries](reference/standalone-binaries.md)
+- [Container image](reference/container-image.md)
+- [Homebrew](reference/homebrew.md)
 - [Supported platforms](reference/supported-platforms.md)
 
 ## Documentation contributors

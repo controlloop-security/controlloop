@@ -290,12 +290,59 @@ from `financial-action` on `Issue a refund` to `destructive-action` on
 `change_state: added`, so it objects to authority the pull request
 *introduces* rather than to refunds existing.
 
-## Scenarios still blocked
+## Scenario: exfiltration triangle
 
-The exfiltration-triangle scenario is **still blocked**. Its
-sensitive-data-access leg is now expressible via `tool_capabilities`,
-but its untrusted-input leg needs a `receives-from` edge, and no adapter
-emits one. That needs a separate decision.
+Branch
+[`scenario/exfiltration-triangle`](https://github.com/controlloop-security/controlloop-reference-agent/tree/scenario/exfiltration-triangle).
+**It is never merged** -- the branch is the artifact.
+
+On `main` the agent already has two of the three legs, from the
+`tool_capabilities` block: `Issue a refund` and `Look up an order` read
+`confidential` data, and `Reply to customer` communicates externally.
+The gate passes there, because two legs are not a triangle. The pull
+request adds the third: a module that reads unread tickets from the
+public support inbox and hands their text to the agent unchanged, and
+the declaration that makes that fact visible to the gate:
+
+```yaml
+external_inputs:
+  - agent: widgetworks-order-support-agent
+    source: customer support inbox
+```
+
+Real recorded output, 2026-10-23:
+
+```
+$ controlloop gate scenarios/order-support-agent
+! WORST REACHABLE  financial-action: widgetworks-order-support-agent can invoke
+  Issue a refund
+
+✕ DEPLOYMENT BLOCKED
+
+✕ CRITICAL policy.exfiltration-triangle: Agent forms an exfiltration triangle,
+  combining all three legs: sensitive-data-access to 'Issue a refund' (direct),
+  untrusted-input from 'customer support inbox' (direct, receives-from), and
+  external-communication to 'Reply to customer' (direct).
+    at agent-card.json
+    at controlloop.yaml
+```
+
+Exit code `1` (the three `MEDIUM` undeclared-tool findings are omitted
+above). One finding names all three legs and the path to each; remove
+any one leg and the rule does not fire, which its own tests in this
+repository assert. The declaration is what the gate sees: discovery
+cannot read "wired to the public inbox" out of `inbox.py`, so the
+repository states it, and the declaration is authoritative. Had the
+agent card published a `url` instead, the gate would have *inferred*
+an input and reported the same triangle at `medium`, below the blocking
+threshold, asking for exactly this declaration (see
+[the rule](policy-rules.md#exfiltration-triangle) and
+[`external_inputs`](manifest-schema.md#declaring-where-an-agents-input-comes-from-external_inputs)).
+
+`scenarios/order-support-agent/expected/exfiltration-triangle.json`
+holds the committed expectations, produced by that real run.
+
+## Scenarios still blocked
 
 The [capability-reduction scenario](#scenario-capability-reduction) was
 blocked until [subdirectory

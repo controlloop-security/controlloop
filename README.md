@@ -39,8 +39,10 @@ run a script on every session start.
 
 > **Development preview.** `init`, `bom`, `diff`, `scan`, `gate`, `rules`,
 > and `example` work and are covered by tests. Releases are published to
-> [PyPI](https://pypi.org/project/controlloop/); there is no Homebrew tap or
-> container image yet.
+> [PyPI](https://pypi.org/project/controlloop/). A container image on GHCR
+> and a Homebrew formula are published by the release pipeline from the
+> next tagged release; see [Container image](docs/reference/container-image.md)
+> and [Homebrew](docs/reference/homebrew.md).
 
 ## Features
 
@@ -83,7 +85,15 @@ uv tool install controlloop
 controlloop --version
 ```
 
-`pipx install controlloop` works too. To run from source instead:
+`pipx install controlloop` works too. Without Python, the shell installer
+downloads and verifies the standalone binary for your machine:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/controlloop-security/controlloop/main/install.sh | bash
+```
+
+Every install path, with its verification step, is in
+[Installation](docs/getting-started/installation.md). To run from source instead:
 
 ```bash
 git clone https://github.com/controlloop-security/controlloop
@@ -96,7 +106,7 @@ uv run controlloop --version
 ControlLoop 0.1.1
 Supported OASF versions: none yet
 Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17
-Rule pack: controlloop-community 0.6.0 (18 rules)
+Rule pack: controlloop-community 0.7.0 (18 rules)
 ```
 
 ### Requirements
@@ -417,7 +427,7 @@ uv run controlloop rules
 ```
 
 ```text
-• RULE PACK  controlloop-community 0.6.0 (18 rules)
+• RULE PACK  controlloop-community 0.7.0 (18 rules)
 • FINGERPRINT  169a7ceb80ffac4ccdb2ab95bc7491cb296f8736ded076f666a3020d3f1a342e
 
 ✓ policy.undeclared-tools  [active, optional]

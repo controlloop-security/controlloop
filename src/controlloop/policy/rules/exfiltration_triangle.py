@@ -25,6 +25,22 @@ adapter, node type, or edge type is introduced -- `RECEIVES_FROM` is
 already declared, already schema-published, and already exercised by
 `tests/concepts/reference_fixture.py`.
 
+## Declared and inferred input
+
+Two sources produce that edge for a real repository today. A
+declaration in `controlloop.yaml` (`external_inputs`, applied by
+`controlloop.manifest.inputs`) is authoritative: the repository states
+that the agent takes input from a named external source, the edge
+carries `untrusted_input=True`, and the leg is PRESENT. An A2A card's
+`url` is an inference by `controlloop.adapters.a2a`: the agent accepts
+requests, from whom the card cannot say, so the edge carries the
+literal `untrusted_input="unknown"` and the leg is UNKNOWN -- with the
+other two legs present that is a qualified finding at `medium`, below
+the default gate threshold, naming what was inferred and how to
+confirm or rule it out. A confirmed edge always outranks an inferred
+one on the same agent. Agent-running workflows produce a confirmed
+edge from the event that starts them (`controlloop.adapters.workflows`).
+
 ## Untrusted-input transitivity is deliberately direct-only
 
 `compute_transitive_capability_paths`'s own `_TRANSITIVE_EDGE_TYPES`
@@ -111,7 +127,7 @@ from controlloop.policy.models import Rule, RuleContext, RuleObservation
 from controlloop.policy.rules._shared import documentation_url
 
 RULE_ID = "policy.exfiltration-triangle"
-RULE_VERSION = "1.0.0"
+RULE_VERSION = "1.1.0"
 
 _DOCUMENTATION_URL = documentation_url(RULE_ID)
 
@@ -121,6 +137,12 @@ _FULL_SEVERITY = FindingSeverity.CRITICAL
 #: Serious, but deliberately below the confident top tier --
 #: this claim is, by definition, unproven.
 _QUALIFIED_SEVERITY = FindingSeverity.HIGH
+#: Lower again when the unproven leg is the untrusted-input one and it
+#: was *inferred* (an A2A card's endpoint, `untrusted_input="unknown"`)
+#: rather than declared: below the default gate threshold, so an
+#: inference alone never blocks; the repository confirms or rules it out
+#: by declaring the agent's inputs in `controlloop.yaml`.
+_INFERRED_INPUT_SEVERITY = FindingSeverity.MEDIUM
 
 _FULL_REMEDIATION = (
     "This agent structurally combines sensitive-data access, untrusted "
@@ -134,6 +156,15 @@ _QUALIFIED_REMEDIATION = (
     "third could not be classified from available evidence. Resolve the "
     "unproven leg's security attributes so this can be confidently "
     "confirmed or ruled out, rather than left unknown."
+)
+_INFERRED_INPUT_REMEDIATION = (
+    "This agent confirms sensitive-data access and external "
+    "communication, and discovery inferred that it accepts inbound "
+    "requests, without being able to tell whether they come from an "
+    "untrusted source. Declare the agent's inputs in controlloop.yaml "
+    "(`external_inputs`): a declared external input confirms the "
+    "triangle at full severity; an agent with no external input needs "
+    "no declaration, and this finding then records what was inferred."
 )
 
 #: Mirrors `controlloop.capability.compute`'s own private
@@ -329,13 +360,21 @@ def _untrusted_input_leg(
     smallest edge ID is chosen, so the result never depends on input
     order (the shuffled-order determinism case)."""
 
+    def _inferred(edge: Edge) -> bool:
+        # An inferred input (an A2A endpoint) carries the literal
+        # `"unknown"` on the edge; a declared or discovered one does not.
+        return edge.security_attributes.untrusted_input == "unknown"
+
+    # A confirmed edge always outranks an inferred one; among equals the
+    # lexicographically smallest edge ID wins, so the result never
+    # depends on input order (the shuffled-order determinism case).
     candidates = sorted(
         (
             edge
             for edge in edges
             if edge.type is EdgeType.RECEIVES_FROM and edge.source == agent_id
         ),
-        key=lambda edge: edge.id,
+        key=lambda edge: (_inferred(edge), edge.id),
     )
     if not candidates:
         return _ABSENT_LEG
@@ -343,6 +382,14 @@ def _untrusted_input_leg(
     edge = candidates[0]
     target = node_by_id.get(edge.target)
     target_name = target.name if target is not None else edge.target
+    if _inferred(edge):
+        return _LegFinding(
+            status=_LegStatus.UNKNOWN,
+            description=f"'{target_name}' (inferred, receives-from)",
+            evidence=tuple(edge.evidence),
+            path=None,
+            confidence=edge.confidence,
+        )
     return _LegFinding(
         status=_LegStatus.PRESENT,
         description=f"'{target_name}' (direct, receives-from)",
@@ -425,13 +472,26 @@ def _qualified_detection(
     present_description = "; ".join(
         f"{leg.value}: {legs[leg].description}" for leg in present
     )
-    message = (
-        "Agent confirms two of three exfiltration-triangle legs "
-        f"({present_description}), but the {unknown_leg.value} leg could "
-        "not be classified from available evidence (marked 'unknown'); "
-        "reported as a qualified finding rather than silence or a "
-        "confident claim."
-    )
+    if unknown_leg is _Leg.UNTRUSTED_INPUT:
+        message = (
+            "Agent confirms two of three exfiltration-triangle legs "
+            f"({present_description}), and its untrusted-input leg is "
+            f"inferred, not declared: {unknown_lf.description}; reported "
+            "at reduced severity until controlloop.yaml declares the "
+            "agent's external inputs or their absence."
+        )
+        severity = _INFERRED_INPUT_SEVERITY
+        remediation = _INFERRED_INPUT_REMEDIATION
+    else:
+        message = (
+            "Agent confirms two of three exfiltration-triangle legs "
+            f"({present_description}), but the {unknown_leg.value} leg could "
+            "not be classified from available evidence (marked 'unknown'); "
+            "reported as a qualified finding rather than silence or a "
+            "confident claim."
+        )
+        severity = _QUALIFIED_SEVERITY
+        remediation = _QUALIFIED_REMEDIATION
     evidence = _combined_evidence(
         *(legs[leg].evidence for leg in present), unknown_lf.evidence
     )
@@ -440,9 +500,9 @@ def _qualified_detection(
         evidence=evidence,
         affected_agent=agent_id,
         capability_path=canonical,
-        severity=_QUALIFIED_SEVERITY,
+        severity=severity,
         confidence=Confidence.UNKNOWN,
-        remediation=_QUALIFIED_REMEDIATION,
+        remediation=remediation,
     )
 
 

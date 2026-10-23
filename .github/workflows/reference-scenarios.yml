@@ -101,6 +101,16 @@ jobs:
             run: blocking_run
             expect-blocked: true
 
+          - name: Exfiltration triangle
+            id: exfiltration-triangle
+            guard-file: scenarios/order-support-agent/controlloop.yaml
+            guard-text: customer support inbox
+            branch: scenario/exfiltration-triangle
+            expected: scenarios/order-support-agent/expected/exfiltration-triangle.json
+            path: scenarios/order-support-agent
+            run: blocking_run
+            expect-blocked: true
+
           - name: CrewAI unresolved capability
             # The only non-blocking scenario in the matrix, and
             # deliberately so. Its manifest approves everything and no
