@@ -114,7 +114,7 @@ $ uv run controlloop --version
 ControlLoop 0.1.0
 Supported OASF versions: none yet
 Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17
-Rule pack: controlloop-community 0.6.0 (18 rules)
+Rule pack: controlloop-community 0.7.0 (18 rules)
 ```
 
 ## A gate result records both versions
@@ -147,6 +147,7 @@ verdict on unchanged input" is that same guarantee applied to a pack's
 | `0.4.0` | 17 | Adds `policy.agent-hook-command-change`, `policy.widened-permission-rule`, and `policy.permission-bypass-from-project`. Before its first release, a read-only tool allow rule was set to `medium`; the change is outside `evaluate`, so the pinned fingerprint is unchanged. |
 | `0.5.0` | 18 | Adds `policy.unsanctioned-agent-component`, a Team rule: it is loaded only on a Team gate with an effective organization policy, so a Community run is unchanged. |
 | `0.6.0` | 18 | The same rules; `policy.hardcoded-secrets` findings get one ID per occurrence. The fingerprint now covers each rule's whole module and the shared rule helpers, so a change to a rule's logic moves it; earlier pins used `evaluate` source only and can no longer be recomputed. |
+| `0.7.0` | 18 | The same rules; `policy.exfiltration-triangle` (1.1.0) reads a declared untrusted-input leg (`external_inputs` in `controlloop.yaml`) as confirmed and an inferred one (an A2A card's endpoint) as unknown, reported at `medium` with the other two legs present instead of silence. |
 
 ## Known limitations
 

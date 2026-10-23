@@ -1,5 +1,5 @@
 """Immutable canonical models for the `controlloop.yaml` security
-manifest, schema version 1.2.0.
+manifest, schema version 1.3.0.
 
 ## Naming a discovered node
 
@@ -47,7 +47,7 @@ from controlloop.acbom.models import (
     SemanticVersion,
 )
 
-CURRENT_MANIFEST_SCHEMA_VERSION = "1.2.0"
+CURRENT_MANIFEST_SCHEMA_VERSION = "1.3.0"
 
 #: A suppression's declared target: the exact
 #: shape `controlloop.findings.models.FindingId` already uses
@@ -256,6 +256,49 @@ class ToolCapabilityDeclaration(_ManifestModel):
         return self
 
 
+class ExternalInputDeclaration(_ManifestModel):
+    """Where a named agent's input comes from, declared by the repository.
+
+    ## Why this field has to exist
+
+    `controlloop.policy.rules.exfiltration_triangle` reads an agent's
+    untrusted-input leg from a `receives-from` edge. Discovery produces
+    that edge for an agent-running workflow (the event that starts it)
+    and, as an inference only, for an A2A card that publishes an
+    endpoint. Nothing in a repository states that a support agent is
+    wired to a public inbox, a webhook or a chat channel; like what a
+    tool does (`ToolCapabilityDeclaration`), it is a fact only the
+    repository's authors know. So they declare it here, and the
+    declaration is authoritative: `controlloop.manifest.inputs` adds one
+    trigger node and one `receives-from` edge per declaration, carrying
+    `untrusted_input=True`.
+
+    ## What it means
+
+    A declared external input is untrusted by definition. There is no
+    `trusted` switch: an input a repository would call trusted is not an
+    *external* input, and is simply not declared. An inferred input (an
+    A2A endpoint) is never confused with a declared one: it is reported
+    as unknown, at lower severity, until a declaration confirms or
+    rules it out.
+
+    ## Matching
+
+    `agent` is matched against a discovered `AGENT` node's `name`, the
+    same human display name every other node-naming field here matches
+    on, so it is `SafeText`, not `SafeIdentifier`. A declaration naming
+    an agent discovery did not find produces an `unverified` diagnostic
+    rather than silently doing nothing. `source` is the human name of
+    the input (`customer support inbox`, `public webhook`), used as the
+    trigger node's name and as part of its identity; `description` is
+    free text for reviewers and takes no part in identity.
+    """
+
+    agent: SafeText
+    source: SafeText
+    description: SafeText | None = None
+
+
 class CapabilityCeiling(_ManifestModel):
     """The maximum authority an agent (or, with `agent` unset, every
     agent in the repository) may ever hold.
@@ -357,6 +400,7 @@ class ManifestDocument(_ManifestModel):
     logged_tools: tuple[ToolLoggingDeclaration, ...] = ()
     tool_capabilities: tuple[ToolCapabilityDeclaration, ...] = ()
     suppressions: tuple[Suppression, ...] = ()
+    external_inputs: tuple[ExternalInputDeclaration, ...] = ()
 
     @model_validator(mode="after")
     def validate_at_most_one_ceiling_per_scope(self) -> Self:

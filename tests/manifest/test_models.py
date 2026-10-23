@@ -593,3 +593,102 @@ class TestPackagedSchema120:
             Draft202012Validator(schema).validate(payload)
         with pytest.raises(PydanticValidationError):
             ManifestDocument.model_validate_json(json.dumps(payload))
+
+
+_SCHEMA_PATH_1_3_0 = (
+    _CLI_ROOT / "src/controlloop/schemas/manifest/1.3.0/manifest.schema.json"
+)
+
+# Regenerate by hashing the schema file after a deliberate, version-bumped
+# change: `hashlib.sha256(_SCHEMA_PATH_1_3_0.read_bytes()).hexdigest()`.
+# Introduced by the change that added `external_inputs`. Additive, so
+# `1.2.0` stays frozen and unedited.
+_GOLDEN_SCHEMA_DIGEST_FOR_1_3_0 = (
+    "62a9094f9ae0b145713ef93cd3af0629ca1e7118fe7626b63def38f9c8be071c"
+)
+
+
+class TestPackagedSchema130:
+    """The 1.3.0 packaged manifest schema, mirroring the assertions for
+    every earlier version above."""
+
+    def test_published_schema_is_valid_draft_2020_12(self) -> None:
+        Draft202012Validator.check_schema(
+            json.loads(_SCHEMA_PATH_1_3_0.read_text(encoding="utf-8"))
+        )
+
+    def test_packaged_schema_matches_its_golden_digest(self) -> None:
+        actual_digest = hashlib.sha256(_SCHEMA_PATH_1_3_0.read_bytes()).hexdigest()
+
+        assert actual_digest == _GOLDEN_SCHEMA_DIGEST_FOR_1_3_0, (
+            "the packaged manifest 1.3.0 schema file changed without "
+            "updating the golden digest -- see "
+            "docs/reference/schema-versioning.md before updating this "
+            "constant"
+        )
+
+    def test_packaged_schema_is_what_the_model_generates(self) -> None:
+        """The file is `ManifestDocument.model_json_schema()` under the
+        hand-chosen wrapper, byte for byte, so the model and the
+        published schema cannot drift apart."""
+        packaged = json.loads(_SCHEMA_PATH_1_3_0.read_text(encoding="utf-8"))
+        generated = ManifestDocument.model_json_schema()
+        expected = {
+            "$schema": packaged["$schema"],
+            "$id": packaged["$id"],
+            "title": "ControlLoop Security Manifest",
+            "description": (
+                "Canonical controlloop.yaml security manifest for ControlLoop "
+                "schema version 1.3.0."
+            ),
+        }
+        for key, value in generated.items():
+            if key not in ("title", "description"):
+                expected[key] = value
+
+        assert packaged == expected
+        assert packaged["$id"].endswith("/manifest/1.3.0/manifest.schema.json")
+
+    def test_frozen_1_2_0_schema_has_no_external_inputs(self) -> None:
+        old = json.loads(
+            (
+                _CLI_ROOT
+                / "src/controlloop/schemas/manifest/1.2.0/manifest.schema.json"
+            ).read_text(encoding="utf-8")
+        )
+
+        assert "external_inputs" not in old["properties"]
+        assert old["description"].endswith("schema version 1.2.0.")
+
+    def test_schema_and_model_agree_on_an_external_input_document(self) -> None:
+        document = {
+            "schema_version": "1.3.0",
+            "owner": "support-eng",
+            "external_inputs": [
+                {
+                    "agent": "widgetworks-order-support-agent",
+                    "source": "customer support inbox",
+                    "description": "Tickets anyone on the internet can open.",
+                }
+            ],
+        }
+        schema = json.loads(_SCHEMA_PATH_1_3_0.read_text(encoding="utf-8"))
+
+        Draft202012Validator(schema).validate(document)
+        model = ManifestDocument.model_validate_json(json.dumps(document))
+
+        assert model.external_inputs[0].agent == "widgetworks-order-support-agent"
+        assert model.external_inputs[0].source == "customer support inbox"
+
+    def test_an_external_input_needs_an_agent_and_a_source(self) -> None:
+        document = {
+            "schema_version": "1.3.0",
+            "owner": "support-eng",
+            "external_inputs": [{"agent": "support-agent"}],
+        }
+        schema = json.loads(_SCHEMA_PATH_1_3_0.read_text(encoding="utf-8"))
+
+        with pytest.raises(JsonSchemaValidationError):
+            Draft202012Validator(schema).validate(document)
+        with pytest.raises(ValueError):
+            ManifestDocument.model_validate_json(json.dumps(document))

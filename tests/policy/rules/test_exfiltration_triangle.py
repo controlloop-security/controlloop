@@ -400,3 +400,95 @@ class TestOffline:
 class TestPrivacy:
     def test_no_raw_content_path_exists(self) -> None:
         assert engine_module.module_forbidden_imports(rule_module) == frozenset()
+
+
+def _inferred_triangle_context() -> RuleContext:
+    """Sensitive data and external communication confirmed; the input
+    leg inferred (an A2A endpoint: `untrusted_input="unknown"` on the
+    edge), the shape `controlloop.adapters.a2a` produces from a card's
+    `url`."""
+
+    inferred = receives_from_edge(
+        _RECEIVES_EDGE_ID, source=_AGENT_ID, target=_TRIGGER_ID
+    ).model_copy(
+        update={"security_attributes": SecurityAttributes(untrusted_input="unknown")}
+    )
+    return context(
+        acbom=acbom(
+            nodes=(_agent(), _sensitive_resource(), _trigger(), _comm_tool()),
+            edges=(
+                invokes_edge(_RESOURCE_EDGE_ID, source=_AGENT_ID, target=_RESOURCE_ID),
+                inferred,
+                invokes_edge(_TOOL_EDGE_ID, source=_AGENT_ID, target=_TOOL_ID),
+            ),
+        )
+    )
+
+
+class TestInferredInput:
+    """An inferred input is reported, never confirmed, and never blocks
+    on its own."""
+
+    def test_inferred_input_with_the_other_two_legs_is_a_medium_qualified_finding(
+        self,
+    ) -> None:
+        result = findings(_inferred_triangle_context())
+
+        assert len(result) == 1
+        finding = result[0]
+        assert finding.severity is FindingSeverity.MEDIUM
+        assert finding.confidence is Confidence.UNKNOWN
+        assert "inferred, not declared" in finding.message
+        assert "support-ticket-created" in finding.message
+        assert "external_inputs" in finding.remediation
+
+    def test_inferred_input_alone_with_one_other_leg_produces_nothing(self) -> None:
+        inferred = receives_from_edge(
+            _RECEIVES_EDGE_ID, source=_AGENT_ID, target=_TRIGGER_ID
+        ).model_copy(
+            update={
+                "security_attributes": SecurityAttributes(untrusted_input="unknown")
+            }
+        )
+        ctx = context(
+            acbom=acbom(
+                nodes=(_agent(), _trigger(), _comm_tool()),
+                edges=(
+                    inferred,
+                    invokes_edge(_TOOL_EDGE_ID, source=_AGENT_ID, target=_TOOL_ID),
+                ),
+            )
+        )
+
+        assert findings(ctx) == ()
+
+    def test_a_declared_input_outranks_an_inferred_one(self) -> None:
+        """Both edges on the same agent: the confirmed one decides, so
+        the finding is the full critical triangle, whatever the edge
+        order."""
+        inferred = receives_from_edge(
+            hex_id("edge", "f"), source=_AGENT_ID, target=_TRIGGER_ID
+        ).model_copy(
+            update={
+                "security_attributes": SecurityAttributes(untrusted_input="unknown")
+            }
+        )
+        declared = receives_from_edge(
+            _RECEIVES_EDGE_ID, source=_AGENT_ID, target=_TRIGGER_ID
+        )
+        base = (
+            invokes_edge(_RESOURCE_EDGE_ID, source=_AGENT_ID, target=_RESOURCE_ID),
+            invokes_edge(_TOOL_EDGE_ID, source=_AGENT_ID, target=_TOOL_ID),
+        )
+        nodes = (_agent(), _sensitive_resource(), _trigger(), _comm_tool())
+
+        forward = findings(
+            context(acbom=acbom(nodes=nodes, edges=(*base, inferred, declared)))
+        )
+        backward = findings(
+            context(acbom=acbom(nodes=nodes, edges=(*base, declared, inferred)))
+        )
+
+        assert forward == backward
+        assert len(forward) == 1
+        assert forward[0].severity is FindingSeverity.CRITICAL
