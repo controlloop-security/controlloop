@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from controlloop.acbom import EdgeType, NodeType
+from controlloop.acbom import Confidence, EdgeType, NodeType
 from controlloop.adapters import A2aAgentCardAdapter, ScanContext, run_adapters
 from controlloop.repository import resolve_repository_root
 
@@ -280,3 +280,69 @@ def test_card_with_no_delegation_field_is_unaffected(tmp_path: Path) -> None:
 
     assert [e for e in result.edges if e.type is EdgeType.DELEGATES_TO] == []
     assert result.diagnostics == ()
+
+
+class TestEndpointInference:
+    """A card's `url` is where the agent accepts requests: recorded as an
+    inferred, unconfirmed untrusted-input leg, never a confirmed one."""
+
+    def test_a_url_becomes_an_unknown_trigger_the_agent_receives_from(
+        self, tmp_path: Path
+    ) -> None:
+        _write(
+            tmp_path,
+            "agent-card.json",
+            {"name": "Refund Agent", "url": "https://agents.example.com/refunds/v1"},
+        )
+        result = run_adapters([A2aAgentCardAdapter()], _context(tmp_path))
+
+        triggers = [n for n in result.nodes if n.type is NodeType.TRIGGER]
+        assert [t.name for t in triggers] == ["inbound requests to agents.example.com"]
+        assert triggers[0].subtype == "a2a-endpoint"
+        assert triggers[0].security_attributes.untrusted_input == "unknown"
+        assert triggers[0].confidence is Confidence.LOW
+        receives = [e for e in result.edges if e.type is EdgeType.RECEIVES_FROM]
+        assert len(receives) == 1
+        agent = next(n for n in result.nodes if n.type is NodeType.AGENT)
+        assert receives[0].source == agent.id
+        assert receives[0].target == triggers[0].id
+        assert receives[0].security_attributes.untrusted_input == "unknown"
+        assert receives[0].confidence is Confidence.LOW
+
+    def test_the_path_and_query_are_not_kept(self, tmp_path: Path) -> None:
+        _write(
+            tmp_path,
+            "agent-card.json",
+            {
+                "name": "Refund Agent",
+                "url": "https://agents.example.com/a/b?token=secret",
+            },
+        )
+        result = run_adapters([A2aAgentCardAdapter()], _context(tmp_path))
+
+        trigger = next(n for n in result.nodes if n.type is NodeType.TRIGGER)
+        assert trigger.name == "inbound requests to agents.example.com"
+        assert "secret" not in trigger.name
+
+    @pytest.mark.parametrize("url", ["", "not a url", 42, None, "/relative/path"])
+    def test_no_usable_url_means_no_trigger(self, tmp_path: Path, url: object) -> None:
+        card: dict[str, object] = {"name": "Refund Agent"}
+        if url is not None:
+            card["url"] = url
+        _write(tmp_path, "agent-card.json", card)
+        result = run_adapters([A2aAgentCardAdapter()], _context(tmp_path))
+
+        assert not any(n.type is NodeType.TRIGGER for n in result.nodes)
+        assert not any(e.type is EdgeType.RECEIVES_FROM for e in result.edges)
+
+    def test_the_same_card_twice_gives_the_same_ids(self, tmp_path: Path) -> None:
+        _write(
+            tmp_path,
+            "agent-card.json",
+            {"name": "Refund Agent", "url": "https://agents.example.com/"},
+        )
+        first = run_adapters([A2aAgentCardAdapter()], _context(tmp_path))
+        second = run_adapters([A2aAgentCardAdapter()], _context(tmp_path))
+
+        assert [n.id for n in first.nodes] == [n.id for n in second.nodes]
+        assert [e.id for e in first.edges] == [e.id for e in second.edges]

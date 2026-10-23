@@ -57,7 +57,7 @@ controlloop --version
 ControlLoop 0.1.1
 Supported OASF versions: none yet
 Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17
-Rule pack: controlloop-community 0.6.0 (18 rules)
+Rule pack: controlloop-community 0.7.0 (18 rules)
 ```
 
 The version and rule-pack lines change with each release (the published

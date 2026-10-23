@@ -663,6 +663,15 @@ ones:
   separately asserted fact today). No new adapter, node type, or edge
   type is introduced -- `EdgeType.RECEIVES_FROM` already existed,
   already schema-published, unused by any rule until now.
+- **Where that edge comes from.** A declaration in `controlloop.yaml`
+  ([`external_inputs`](manifest-schema.md#declaring-where-an-agents-input-comes-from-external_inputs))
+  is authoritative: the repository states that the agent takes input
+  from a named external source, and the leg is *present*. An
+  agent-running workflow's start event is likewise present. An A2A
+  card's `url` is an *inference*: the agent accepts requests, from whom
+  the card cannot say, so the edge carries `untrusted_input: "unknown"`
+  and the leg is *unknown*. A confirmed edge always outranks an inferred
+  one on the same agent.
 - **This leg's transitivity is deliberately direct-only, disclosed as a
   scope boundary, not an oversight.** `compute_transitive_capability_paths`'s
   own edge-type set does not include `receives-from`, and
@@ -678,8 +687,11 @@ ones:
   one's own path; exactly two present plus the third `unknown`
   produces one `high`-severity, `Confidence.UNKNOWN` qualified finding
   stating which leg is unproven rather than silence or a
-  confident claim; two present with the third confirmed absent, or
-  fewer than two present regardless of unknowns, produces nothing.
+  confident claim -- except when the unproven leg is an *inferred*
+  input, which produces the same qualified finding at `medium`, below
+  the default gate threshold, so an inference alone never blocks; two
+  present with the third confirmed absent, or fewer than two present
+  regardless of unknowns, produces nothing.
 - `Finding.capability_path` is singular and closed to five node types
   that exclude the untrusted-input leg's natural target, so it cannot
   literally hold three paths. It is deterministically set to the

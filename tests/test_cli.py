@@ -70,13 +70,13 @@ def test_version_reports_the_real_populated_rule_pack() -> None:
     """A direct, hardcoded assertion -- not merely one derived from
     `CURRENT_RULE_PACK` itself, which would pass trivially even if
     `CURRENT_RULE_PACK` regressed back to zero rules, a bug this once had.
-    Pins the actual reported line to the real eighteen-rule, `0.6.0`
+    Pins the actual reported line to the real eighteen-rule, `0.7.0`
     state."""
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "Rule pack: controlloop-community 0.6.0 (18 rules)\n" in result.stdout
-    assert CURRENT_RULE_PACK.version == "0.6.0"
+    assert "Rule pack: controlloop-community 0.7.0 (18 rules)\n" in result.stdout
+    assert CURRENT_RULE_PACK.version == "0.7.0"
     assert len(CURRENT_RULE_PACK.rules) == 18
     assert len(CURRENT_RULE_PACK.metadata) == 18
 

@@ -280,7 +280,7 @@ class TestCurrentRulePack:
         # Includes the seven agent-authority rules and the Team
         # sanctioned-list rule. 0.6.0 fingerprints rule modules and shared
         # helpers; its rules are 0.5.0's, with per-occurrence secret IDs.
-        assert CURRENT_RULE_PACK.version == "0.6.0"
+        assert CURRENT_RULE_PACK.version == "0.7.0"
         assert len(ALL_RULES) == 18
         assert set(CURRENT_RULE_PACK.rules) == set(ALL_RULES)
         assert {rule.id for rule in CURRENT_RULE_PACK.rules} == {
