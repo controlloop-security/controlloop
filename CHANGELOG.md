@@ -8,6 +8,28 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **A container image.** The release pipeline publishes
+  `ghcr.io/controlloop-security/controlloop:<version>` for linux/amd64 and
+  linux/arm64, built from the repository's `Dockerfile`: non-root, no
+  build toolchain, pinned base image, no network request when it runs.
+  Before pushing, the image is smoke-tested with networking disabled and
+  scanned for known vulnerabilities; a critical finding blocks
+  publication. Images are tagged by exact version only and attested with
+  GitHub build provenance. See `docs/reference/container-image.md`.
+- **A Homebrew formula.** The release pipeline writes
+  `Formula/controlloop.rb` to the `controlloop-security/controlloop` tap
+  from the release's own checksums (`release-scripts/homebrew_formula.py`),
+  installing the published standalone binary on macOS (Apple Silicon) and
+  Linux. See `docs/reference/homebrew.md`.
+- **Getting-started documentation for a released CLI.** `Installation`
+  now covers every install path (PyPI with uv or pipx, the shell
+  installer, a standalone binary by hand, Homebrew, the container image,
+  from source) with the command that installs it and the command that
+  verifies it. `Quickstart: your first scan` scans the public reference
+  agent and reads the result line by line, and a new `Quickstart: your
+  first CI gate` adds the gate to a repository and shows it blocking a
+  real change. The release pages no longer say that no release has been
+  published: v0.1.1 was, on 2026-10-20.
 - **The Team gate names each organization exception it applies.** A gate
   that passes only because an exception covers a finding now prints
   `• organization exception applied to <rule> (<fingerprint>) until

@@ -10,13 +10,8 @@ created: 2026-08-21
 
 # Standalone binaries
 
-**No standalone binary has ever been published.** This page describes what
-`.github/workflows/release.yml`'s `build-binaries` job does when a
-maintainer pushes a real tag matching `v*.*.*` -- that job has never
-actually run as part of a real release, because no release has ever been
-published (see [Release pipeline](release-pipeline.md)). Nothing on this
-page is a claim that a downloadable ControlLoop executable is available
-today.
+The first release built and published by this pipeline is [v0.1.1](https://github.com/controlloop-security/controlloop/releases/tag/v0.1.1), 2026-10-20: wheel, sdist, release manifest, the three standalone binaries, their checksums, `SHA256SUMS`, and build-provenance attestations for all of them, with the same wheel and sdist on PyPI. This page describes what the `build-binaries` job does on
+each tag.
 
 The goal: a single downloadable executable for macOS and Linux, on
 x86_64 and arm64, requiring no Python.

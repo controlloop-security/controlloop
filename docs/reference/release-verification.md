@@ -11,14 +11,9 @@ created: 2026-08-23
 
 # Release verification
 
-**No release has ever been published.** This page describes what
-`.github/workflows/release.yml`'s `attest-artifacts` job does when a
-maintainer pushes a real tag matching `v*.*.*`, and the commands a
-downloader would run to verify a published artifact -- that job has
-never actually run as part of a real release, because no release has
-ever been published (see [Release pipeline](release-pipeline.md)).
-Nothing on this page is a claim that a verifiable ControlLoop release is
-available today.
+The first release built and published by this pipeline is [v0.1.1](https://github.com/controlloop-security/controlloop/releases/tag/v0.1.1), 2026-10-20: wheel, sdist, release manifest, the three standalone binaries, their checksums, `SHA256SUMS`, and build-provenance attestations for all of them, with the same wheel and sdist on PyPI. This page describes what the `attest-artifacts` job does on
+each tag, and the commands a downloader runs to verify a published
+artifact.
 
 The goal: every release publishes verifiable artifacts to GitHub
 Releases with checksums and signatures.
@@ -87,9 +82,8 @@ pipeline, not tampered with after the fact.
 
 ## Verified in CI
 
-Because no release has ever been tagged, these commands cannot yet be
-demonstrated against a real published release. Instead, the
-`attest-artifacts` job runs the identical documented commands above
+Independently of any published release, the `attest-artifacts` job
+runs the identical documented commands above
 against the artifacts it just built and attested, in the same workflow
 run, with real recorded output -- proving the procedure itself works,
 not merely describing it. See the "Verify checksums against the

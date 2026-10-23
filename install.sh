@@ -6,11 +6,10 @@
 #   curl -fsSL https://raw.githubusercontent.com/controlloop-security/controlloop/main/install.sh | bash
 #   curl -fsSL https://raw.githubusercontent.com/controlloop-security/controlloop/main/install.sh | bash -s -- --version v0.2.0
 #
-# **No release has ever been published.** This script has never
-# downloaded a real ControlLoop release, because no `vX.Y.Z` tag has
-# ever been pushed to this repository -- see
-# docs/reference/release-pipeline.md. Nothing here is a claim that a
-# ControlLoop release is available to install today.
+# Releases are published by .github/workflows/release.yml on each
+# `vX.Y.Z` tag; the first, v0.1.1 (2026-10-20), carries the binaries,
+# checksums and attestations this script downloads and verifies. See
+# docs/reference/release-pipeline.md.
 #
 # Checksum verification is mandatory and always aborts the
 # install on a mismatch: `sha256sum`/`shasum` are effectively universal

@@ -60,16 +60,19 @@ specific workflow.
 
 ## Start here
 
-1. [Install the development preview](getting-started/installation.md).
-2. [Verify the current CLI](getting-started/quickstart.md).
-3. [Learn how the ACBOM makes agent authority reviewable](concepts/acbom.md).
-4. [Review privacy, security, and current limitations](reference/privacy-security.md).
+1. [Install the CLI](getting-started/installation.md).
+2. [Run your first scan](getting-started/quickstart.md) and read the result.
+3. [Add your first CI gate](getting-started/first-ci-gate.md) and watch it block a change.
+4. [Learn how the ACBOM makes agent authority reviewable](concepts/acbom.md).
+5. [Review privacy, security, and current limitations](reference/privacy-security.md).
 
 ## Find what you need
 
 | Goal | Guide |
 | --- | --- |
-| Verify that the current package works | [Current quickstart](getting-started/quickstart.md) |
+| Install the CLI on any supported machine | [Installation](getting-started/installation.md) |
+| Scan an agent and understand the result | [Quickstart: your first scan](getting-started/quickstart.md) |
+| Block a pull request that widens an agent | [Quickstart: your first CI gate](getting-started/first-ci-gate.md) |
 | Understand agents, capabilities, evidence, and ACBOMs | [ACBOM concepts](concepts/acbom.md) |
 | Check supported discovery formats | [Adapter status](adapters/readme.md) |
 | Look up current commands | [CLI reference](reference/cli.md) |

@@ -39,8 +39,10 @@ run a script on every session start.
 
 > **Development preview.** `init`, `bom`, `diff`, `scan`, `gate`, `rules`,
 > and `example` work and are covered by tests. Releases are published to
-> [PyPI](https://pypi.org/project/controlloop/); there is no Homebrew tap or
-> container image yet.
+> [PyPI](https://pypi.org/project/controlloop/). A container image on GHCR
+> and a Homebrew formula are published by the release pipeline from the
+> next tagged release; see [Container image](docs/reference/container-image.md)
+> and [Homebrew](docs/reference/homebrew.md).
 
 ## Features
 
@@ -83,7 +85,15 @@ uv tool install controlloop
 controlloop --version
 ```
 
-`pipx install controlloop` works too. To run from source instead:
+`pipx install controlloop` works too. Without Python, the shell installer
+downloads and verifies the standalone binary for your machine:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/controlloop-security/controlloop/main/install.sh | bash
+```
+
+Every install path, with its verification step, is in
+[Installation](docs/getting-started/installation.md). To run from source instead:
 
 ```bash
 git clone https://github.com/controlloop-security/controlloop

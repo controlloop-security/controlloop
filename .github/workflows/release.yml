@@ -4,14 +4,32 @@ name: Release
 # a single reproducible pipeline.
 #
 # SCOPE: this workflow publishes a GitHub Release carrying the CLI's own
-# `uv build` wheel/sdist output and a release manifest, using only this
-# repository's own GITHUB_TOKEN, and then `publish-pypi` uploads the same
-# wheel and sdist to PyPI. It deliberately does NOT publish to GHCR or a
-# Homebrew tap -- each of those waits on its namespace being set up first.
-# Adding one means a new job that
-# `needs: [derive-version, verify, changelog-gate]` alongside
-# `publish-github-release`; it does not need to change anything above
-# that line.
+# `uv build` wheel/sdist output, a release manifest and the standalone
+# binaries, using only this repository's own GITHUB_TOKEN; then
+# `publish-pypi` uploads the same wheel and sdist to PyPI,
+# `publish-container` pushes the container image to GHCR, and
+# `publish-homebrew` writes the Homebrew formula to the tap. Every
+# publication runs only after the GitHub Release exists, so nothing is
+# ever published for a version whose release did not go out.
+#
+# `publish-container` builds the image from this repository's own
+# `Dockerfile`, smoke-tests it (`scripts/container-smoke.sh`: non-root,
+# no toolchain, a real scan with networking disabled), scans it with Trivy
+# -- a critical vulnerability fails the job and nothing is pushed -- then
+# builds the linux/amd64 and linux/arm64 image, pushes it to
+# `ghcr.io/<repository>` tagged with the exact version (no moving tag),
+# and attests the pushed digest with the same keyless build-provenance
+# attestation every other artifact carries. It signs in to GHCR with the
+# workflow's own GITHUB_TOKEN (`packages: write`); no registry password
+# is stored. Full disclosure in `docs/reference/container-image.md`.
+#
+# `publish-homebrew` renders `Formula/controlloop.rb` from the release's
+# own `SHA256SUMS` (`release-scripts/homebrew_formula.py`) and writes it
+# to the tap repository named by the `HOMEBREW_TAP_REPOSITORY` variable
+# through the GitHub API, with the `HOMEBREW_TAP_TOKEN` secret -- the one
+# stored credential in this pipeline, scoped to that single repository.
+# When the variable is unset the job is skipped and the release is
+# otherwise unaffected. Full disclosure in `docs/reference/homebrew.md`.
 #
 # `publish-pypi` uses PyPI trusted publishing: PyPI accepts a short-lived
 # OIDC token GitHub issues to this workflow's run, so no PyPI API token is
@@ -483,3 +501,146 @@ jobs:
         uses: pypa/gh-action-pypi-publish@v1.14.2
         with:
           packages-dir: release-dist/dist/
+
+  publish-container:
+    name: Publish container image to GHCR
+    needs: [derive-version, verify, changelog-gate, publish-github-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+      VERSION: ${{ needs.derive-version.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up QEMU for the arm64 build
+        uses: docker/setup-qemu-action@v4.4.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.4.1
+
+      - name: Build the linux/amd64 image for testing
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: controlloop:candidate
+          build-args: |
+            VERSION=${{ needs.derive-version.outputs.version }}
+            REVISION=${{ github.sha }}
+
+      - name: Smoke-test the candidate image
+        run: scripts/container-smoke.sh controlloop:candidate
+
+      - name: Scan the candidate image for known vulnerabilities
+        # A critical vulnerability with an available fix fails this step,
+        # and the push below never runs: the fix is to bump the base
+        # image digest in the Dockerfile. A critical vulnerability the
+        # distribution has no fix for is printed here but does not block,
+        # because nothing this pipeline can do removes it; the full table
+        # is in the job log for every release.
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: controlloop:candidate
+          format: table
+          exit-code: "1"
+          severity: CRITICAL
+          ignore-unfixed: true
+
+      - name: Sign in to GHCR with the workflow's own token
+        uses: docker/login-action@v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push the multi-architecture image
+        id: push
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.IMAGE }}:${{ env.VERSION }}
+          build-args: |
+            VERSION=${{ needs.derive-version.outputs.version }}
+            REVISION=${{ github.sha }}
+
+      - name: Attest the pushed image
+        uses: actions/attest-build-provenance@v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Record the digest
+        run: |
+          set -euo pipefail
+          {
+            echo "## Container image"
+            echo
+            echo '`'"${IMAGE}:${VERSION}"'`'
+            echo
+            echo "Digest: "'`'"${{ steps.push.outputs.digest }}"'`'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish-homebrew:
+    name: Publish Homebrew formula
+    needs: [derive-version, publish-github-release]
+    # Skipped, not failed, until a maintainer sets the tap repository
+    # variable (and the matching token secret) once.
+    if: ${{ vars.HOMEBREW_TAP_REPOSITORY != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      TAP_REPOSITORY: ${{ vars.HOMEBREW_TAP_REPOSITORY }}
+      VERSION: ${{ needs.derive-version.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Download combined checksums file
+        uses: actions/download-artifact@v4.1.8
+        with:
+          name: release-checksums
+          path: release-checksums
+
+      - name: Render the formula from the release's own checksums
+        run: |
+          set -euo pipefail
+          python3 release-scripts/homebrew_formula.py \
+            --version "$VERSION" \
+            --checksums-file release-checksums/SHA256SUMS \
+            --repository "${{ github.repository }}" \
+            --output Formula/controlloop.rb
+          cat Formula/controlloop.rb
+
+      - name: Write the formula to the tap through the GitHub API
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          path="Formula/controlloop.rb"
+          existing="$(gh api "repos/${TAP_REPOSITORY}/contents/${path}" --jq .sha 2>/dev/null || true)"
+          python3 - "$path" "$existing" "$VERSION" > payload.json <<'EOF'
+          import base64, json, sys
+          path, existing, version = sys.argv[1:4]
+          payload = {
+              "message": f"controlloop {version}",
+              "content": base64.b64encode(open(path, "rb").read()).decode("ascii"),
+          }
+          if existing:
+              payload["sha"] = existing
+          json.dump(payload, sys.stdout)
+          EOF
+          gh api --method PUT "repos/${TAP_REPOSITORY}/contents/${path}" --input payload.json --jq .commit.html_url

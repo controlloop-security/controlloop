@@ -18,3 +18,28 @@ jobs:
   cli:
     name: CLI checks
     uses: ./.github/workflows/verify.yml
+
+  # Builds the container image from the working tree and proves, against
+  # the real image, that it runs as a non-root user, carries no build
+  # toolchain, and performs a real scan with networking disabled
+  # (`scripts/container-smoke.sh`). The release pipeline runs the same
+  # script before an image is pushed, so what CI checks here is what
+  # gets published.
+  container:
+    name: Container image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Build the image
+        run: |
+          set -euo pipefail
+          docker build \
+            --build-arg VERSION=ci \
+            --build-arg REVISION="${GITHUB_SHA}" \
+            --tag controlloop:ci .
+
+      - name: Smoke-test the image
+        run: scripts/container-smoke.sh controlloop:ci
