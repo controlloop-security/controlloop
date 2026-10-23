@@ -57,9 +57,10 @@ _GOLDEN_VERDICT = "passed"
 # and URL are part of the canonical bytes.
 # Updated for the 0.1.0 -> 0.1.1 release: the scanner version is part of
 # the canonical bytes too, so every version bump changes this digest.
+# Updated again for 0.1.1 -> 0.2.0, for the same reason.
 # Stable across 3 repeated local runs before being recorded.
 _GOLDEN_DIGEST = (
-    "sha256:17e6390584f903ba63f16996b1e63534c3a8b844f8f715601e24729a09d8075d"
+    "sha256:b2fba92bbddc32b1ef487975d81a90d2726ca2b4727b8ecaa019b5df19bee3ec"
 )
 
 

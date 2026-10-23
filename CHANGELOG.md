@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-23
+
+A container image on GHCR and a Homebrew formula are published from this
+release on, alongside PyPI and the standalone binaries.
+
 ### Added
 
 - **Declare where an agent's input comes from.** `controlloop.yaml`
