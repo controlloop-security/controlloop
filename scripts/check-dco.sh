@@ -8,7 +8,14 @@
 # must carry a `Signed-off-by:` trailer whose email is the commit author's
 # email. `git commit -s` adds exactly that. Exits 1, naming each commit
 # that fails, otherwise 0. Used by .github/workflows/dco.yml.
+#
+# Dependabot is the one exception: it authors commits as its noreply
+# address but signs them off as `dependabot[bot] <support@github.com>`, so
+# that sign-off also counts on a commit Dependabot authored.
 set -euo pipefail
+
+dependabot_author="49699333+dependabot[bot]@users.noreply.github.com"
+dependabot_signoff="support@github.com"
 
 if [ "$#" -ne 2 ]; then
   echo "usage: $0 <base-sha> <head-sha>" >&2
@@ -24,8 +31,12 @@ while IFS= read -r sha; do
   [ -n "$sha" ] || continue
   checked=$((checked + 1))
   author_email="$(git log -1 --format='%ae' "$sha")"
+  signoff_email="$author_email"
+  if [ "$author_email" = "$dependabot_author" ]; then
+    signoff_email="$dependabot_signoff"
+  fi
   if git log -1 --format='%(trailers:key=Signed-off-by,valueonly)' "$sha" \
-    | grep -qiF -- "<${author_email}>"; then
+    | grep -qiF -- "<${signoff_email}>"; then
     continue
   fi
   # The subject is left out on purpose: it is free text from the pull
