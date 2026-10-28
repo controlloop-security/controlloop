@@ -22,11 +22,21 @@ def _git(repo: Path, *args: str) -> str:
     ).stdout.strip()
 
 
-def _commit(repo: Path, name: str, *, signoff: bool, trailer: str = "") -> None:
+def _commit(
+    repo: Path, name: str, *, signoff: bool, trailer: str = "", author: str = ""
+) -> None:
     (repo / name).write_text(name)
     _git(repo, "add", name)
     message = f"add {name}" + (f"\n\n{trailer}" if trailer else "")
-    _git(repo, "commit", "-q", *(["-s"] if signoff else []), "-m", message)
+    _git(
+        repo,
+        "commit",
+        "-q",
+        *(["-s"] if signoff else []),
+        *([f"--author={author}"] if author else []),
+        "-m",
+        message,
+    )
 
 
 def _check(repo: Path, base: str) -> subprocess.CompletedProcess[str]:
@@ -93,6 +103,44 @@ def test_the_email_match_ignores_case(repo: tuple[Path, str]) -> None:
     )
 
     assert _check(path, base).returncode == 0
+
+
+_DEPENDABOT = "dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>"
+_DEPENDABOT_SIGNOFF = "Signed-off-by: dependabot[bot] <support@github.com>"
+
+
+def test_a_dependabot_commit_with_its_own_sign_off_passes(
+    repo: tuple[Path, str],
+) -> None:
+    """Dependabot authors as its noreply address but signs off as
+    support@github.com, exactly as on its pull requests."""
+
+    path, base = repo
+    _commit(
+        path, "a.txt", signoff=False, trailer=_DEPENDABOT_SIGNOFF, author=_DEPENDABOT
+    )
+
+    result = _check(path, base)
+
+    assert result.returncode == 0, result.stdout
+
+
+def test_a_dependabot_commit_without_a_sign_off_fails(
+    repo: tuple[Path, str],
+) -> None:
+    path, base = repo
+    _commit(path, "a.txt", signoff=False, author=_DEPENDABOT)
+
+    assert _check(path, base).returncode == 1
+
+
+def test_the_dependabot_sign_off_does_not_count_for_anyone_else(
+    repo: tuple[Path, str],
+) -> None:
+    path, base = repo
+    _commit(path, "a.txt", signoff=False, trailer=_DEPENDABOT_SIGNOFF)
+
+    assert _check(path, base).returncode == 1
 
 
 def test_commits_before_the_base_are_not_checked(repo: tuple[Path, str]) -> None:
