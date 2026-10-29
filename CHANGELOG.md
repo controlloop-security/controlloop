@@ -6,6 +6,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-29
+
+A Team gate now does what each rule's organization action says.
+
 ### Added
 
 - **The Team gate honors each rule's organization `action`.** On a Team
