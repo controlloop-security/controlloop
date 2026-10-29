@@ -59,9 +59,10 @@ _GOLDEN_VERDICT = "passed"
 # the canonical bytes too, so every version bump changes this digest.
 # Updated again for 0.1.1 -> 0.2.0, for the same reason.
 # And for 0.2.0 -> 0.3.0.
+# And for 0.3.0 -> 0.4.0.
 # Stable across 3 repeated local runs before being recorded.
 _GOLDEN_DIGEST = (
-    "sha256:28f356a86858b95862f70c9ff9a199c2a5e14f2f07a5a6e1428d732a3fe2ae93"
+    "sha256:f80b5c7743c1078af267a615ee10ac481f5214e0d3bba60dfc2e97d10cf50849"
 )
 
 

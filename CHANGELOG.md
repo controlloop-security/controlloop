@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-29
+
+Rule pack `0.8.0`: five rules for coding-agent configuration the
+adapters already record.
+
 ### Added
 
 - **Rule pack `0.8.0`: five coding-agent rules, 23 in total.** Each
