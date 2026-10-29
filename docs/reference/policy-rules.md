@@ -1403,6 +1403,59 @@ is still reported; the rule does not read runner or firewall settings.
 So is a `pull_request_target` job limited to collaborators by a job
 condition, since the condition is not evaluated.
 
+<a id="credentialed-remote-mcp-server"></a>
+## Credentialed remote MCP server
+
+**Outcome:** a new or changed HTTP or SSE MCP server whose declaration
+sends a credential to a remote host is reported, naming the server, the
+host, and the header or variable name.
+
+**Why this matters:** a committed server declaration with an
+`Authorization` header or a token variable sends that credential to the
+server's host on every request the agent makes. A pull request that adds
+such a server, adds a credential to one, or points one at a new host
+decides where a credential goes. [MCP server identity
+change](#mcp-server-identity-change) sees the same-name swap; this rule
+says what the server carries.
+
+**Example:** `.mcp.json` adds a server `docs` with `"url":
+"https://api.example.com/mcp"` and an `Authorization` header. The finding
+reads "MCP server 'docs' sends Authorization to api.example.com." at
+`medium`. If a later change points `docs` at `collector.example.net`, the
+finding reads "MCP server 'docs' now sends Authorization to
+collector.example.net, previously api.example.com." at `high`.
+
+A credential is recognized by its header or variable **name**, never its
+value, which the adapter never reads. The names, compared
+case-insensitively, are `authorization`, `proxy-authorization`,
+`x-api-key`, `api-key`, and any name ending in `_token`, `_secret`,
+`_key`, `_password`, `_credential`, or `_apikey`. A server's
+`bearer_token_env_var` (Codex) joins its variable names.
+
+| Change state | Severity |
+| --- | --- |
+| Credentialed server's host changed | `high` |
+| Credentialed server added | `medium` |
+| Credential name added to an existing server | `medium` |
+| No baseline (first scan) | `low` |
+| Removed, unchanged, or no credential-shaped name | none |
+
+A stdio server never fires here, whatever its environment names: its
+environment goes to a local process. There is no allowlist of trusted
+hosts; approve a reviewed server instead.
+
+**Change states and confidence:** `added` (`medium`) or `changed` (`high` for a new host, `medium` for a new credential name); `not-compared` on a scan with no baseline (`low`). Confidence is `high`.
+
+**Approving or suppressing:** these findings are change-only, so a reviewed change stops producing one once it is in the baseline. To let a reviewed change through before then, add a `controlloop.yaml` approval whose `capability` names the component (`<file>#<key path>`, its name, or its node ID): the finding is kept at `info` with the approver's name, so it no longer blocks, and the [authority statement](authority-statement.md) says "Approval recorded." An expired approval does nothing. A time-limited [suppression](suppressions.md) naming the finding's `id` works too. A Team organization can also record an exception for the finding.
+
+**Remediation:** keep the credential in the agent host's own secret store
+rather than in the committed declaration's headers, pin the server, and
+confirm the host is first party or one you trust with the credential.
+
+**False positives:** a header or variable whose name matches the shape
+but carries no secret, such as a public `X-API-Key` for a free service,
+is still reported; the rule never reads values.
+
 ## Known limitations
 
 - `controlloop scan` and `controlloop gate` both consume every rule
