@@ -25,7 +25,7 @@ attached to the same Cursor host.
 | `hooks.<event>[]` in `hooks.json` | One hook per entry, as code execution with its command. |
 | `install`, `start`, `terminals[].command` in `environment.json` | Helper commands: code execution, run when a cloud agent's environment is built and started. |
 | `build.dockerfile`, `build.dockerfileContents` | A build helper; an inline Dockerfile is recorded only as present. |
-| `egressMode` | Host attribute. Order, strictest first: `network_settings_only`, `default_with_network_settings`, `parent_plus_network_settings`, `allow_all` (read from the schema's descriptions; the documentation does not state an order). |
+| `egressMode` | Host attribute. Order, strictest first: `network_settings_only`, `default_with_network_settings`, `parent_plus_network_settings`, `allow_all` (read from the schema's descriptions; the documentation does not state an order). A move toward `allow_all` is reported by [agent sandbox weakened](../reference/policy-rules.md#agent-sandbox-weakened). |
 | `agentCanUpdateSnapshot: true` | Host attribute. |
 | `permissions.allow`, `permissions.deny` in `cli.json` | Rules. `Shell(curl:*)` is a wildcard; `Read(src/**)` is not. |
 

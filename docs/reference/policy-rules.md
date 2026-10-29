@@ -1094,8 +1094,8 @@ to `"never"`. The finding reads "Codex: 'approval_policy' moved from
 | Gemini CLI `general.defaultApprovalMode` | `plan`, `default`, `auto_edit`, `yolo` |
 | A subagent's `permissionMode` | the Claude Code order, short of `bypassPermissions` (reported by [component self-grant](#component-self-grant)) |
 
-Also reported: Claude Code `disableAllHooks`, `disableSkillShellExecution`,
-or `sandbox.enabled` going from `true` to anything else, and
+Also reported: Claude Code `disableAllHooks` or `disableSkillShellExecution`
+going from `true` to anything else, and
 `disableBypassPermissionsMode` being removed; and a tool added to a Kiro
 `autoApprove`, Roo `alwaysAllow`, or Cline `autoApprove` list, or a
 Gemini CLI server given `trust: true`.
@@ -1105,6 +1105,10 @@ Gemini CLI server given `trust: true`.
 | Loosened | `high` |
 | No baseline (first scan): a host at the loose end of a scale, or an auto-approval | `low` |
 | Tightened or unchanged | none |
+
+Sandbox and network egress settings, including Claude Code's
+`sandbox.enabled` (read by this rule before version 1.1.0), are reported
+by [agent sandbox weakened](#agent-sandbox-weakened).
 
 **Change states and confidence:** `changed`, or `added` when a host first appears with a loose setting (`high`); `not-compared` on a scan with no baseline for a host in a bypass mode and for each auto-approval (`low`). Confidence is `high`.
 
@@ -1287,6 +1291,65 @@ committed secret is exposed whether or not the current change added it,
 so it is reported on every scan, at the severity and confidence above.
 Rotate the credential first; a suppression for it should name the
 finding's `id` and expire soon.
+
+<a id="agent-sandbox-weakened"></a>
+## Agent sandbox weakened
+
+**Outcome:** a change that turns off a coding agent's sandbox, lets its
+commands run outside the sandbox, approves every command because a
+sandbox exists, or opens its network egress is reported, the way a move
+to `bypassPermissions` already is.
+
+**Why this matters:** the sandbox is what keeps an agent's shell commands
+away from the rest of the machine and the network, and the [limits
+page](agent-authority-limits.md) recommends pairing a passing gate with
+sandboxed or network-restricted runs. A project file that loosens it
+does so for everyone who opens the repository.
+
+**Example:** `.claude/settings.json` changes `"sandbox": {"enabled":
+true}` to `false`. The finding reads "Claude Code: 'sandbox.enabled'
+moved from 'true' to 'false'." at `high`.
+
+| Setting | Order, tightest first |
+| --- | --- |
+| Claude Code `sandbox.enabled` | `true`, `false` |
+| Claude Code `sandbox.allowUnsandboxedCommands` | `false`, `true` |
+| Claude Code `sandbox.autoAllowBashIfSandboxed` | `false`, `true` |
+| Codex `sandbox_workspace_write.network_access` | `false`, `true` |
+| Gemini CLI `tools.sandbox` | on (`true` or a sandbox command such as `docker`), `false` |
+| Gemini CLI `tools.sandboxNetworkAccess` | `false`, `true` |
+| Cursor `egressMode` (`.cursor/environment.json`) | `network_settings_only`, `default_with_network_settings`, `parent_plus_network_settings`, `allow_all` |
+
+A move toward the loose end is a loosening. So is removing a setting
+that was tighter than the loose end, since the protection is gone, and
+setting one to the loose end where the project file had not set it. A
+value this rule does not know is not reported. Every loosened setting on
+one host is one finding.
+
+| Change state | Severity |
+| --- | --- |
+| Loosened | `high` |
+| No baseline (first scan): a setting already at the loose end | `low` |
+| Tightened or unchanged | none |
+
+Approval modes and Codex `sandbox_mode` stay with [permission bypass from
+project files](#permission-bypass-from-project); this rule takes the
+remaining sandbox and egress settings, including Claude Code's
+`sandbox.enabled`.
+
+**Change states and confidence:** `changed`, or `added` when a host first appears with a loose setting (`high`); `not-compared` on a scan with no baseline (`low`). Confidence is `high`.
+
+**Approving or suppressing:** these findings are change-only, so a reviewed change stops producing one once it is in the baseline. To let a reviewed change through before then, add a `controlloop.yaml` approval whose `capability` names the component (`<file>#<key path>`, its name, or its node ID): the finding is kept at `info` with the approver's name, so it no longer blocks, and the [authority statement](authority-statement.md) says "Approval recorded." An expired approval does nothing. A time-limited [suppression](suppressions.md) naming the finding's `id` works too.
+
+**Remediation:** keep the tight value in the project file, and set looser
+values in personal settings outside the repository when one person needs
+them. The finding's remediation names the tight value for each setting
+the host has.
+
+**False positives:** a host version that ignores a setting from a project
+file is still reported, because other versions honor it. Cursor's
+`egressMode` order comes from its environment schema's descriptions;
+the documentation states none.
 
 ## Known limitations
 
