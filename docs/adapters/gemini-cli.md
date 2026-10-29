@@ -25,7 +25,7 @@ with `trust: true` gets a wildcard approval of all its tools.
 | `general.defaultApprovalMode` | Host attribute. Order, strictest first: `plan`, `default`, `auto_edit`. `yolo` is a command-line option only; a file that sets it is recorded and sets the bypass flag. |
 | `security.disableYoloMode`, `disableAlwaysAllow`, `enablePermanentToolApproval`, `autoAddToPolicyByDefault`, `folderTrust.enabled` | Host attributes. |
 | `tools.allowed`, `tools.exclude` | Allow and deny rules. `run_shell_command(git)` allows every `git` command, so it is marked as a wildcard. |
-| `tools.sandbox`, `tools.sandboxNetworkAccess` | Host attributes. |
+| `tools.sandbox`, `tools.sandboxNetworkAccess` | Host attributes. Turning the sandbox off or its network on is reported by [agent sandbox weakened](../reference/policy-rules.md#agent-sandbox-weakened). |
 | `tools.discoveryCommand`, `tools.callCommand`, `mcp.serverCommand` | Helper commands: code execution. |
 | `hooks` | One hook per handler. Events: `SessionStart`, `SessionEnd`, `BeforeAgent`, `AfterAgent`, `BeforeModel`, `AfterModel`, `BeforeToolSelection`, `BeforeTool`, `AfterTool`, `PreCompress`, `Notification`. |
 | `.gemini/.env` | Variable names, as one host attribute. Values are never read into anything. |

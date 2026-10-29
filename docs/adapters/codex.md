@@ -25,7 +25,7 @@ Codex host.
 | `approval_policy` | Host attribute. `never` sets the bypass flag; a `granular` table is recorded as `granular`. Order, strictest first: `untrusted`, `on-request`, `on-failure`, `never` (the first and third are retired or deprecated in current Codex, and kept for older files). |
 | `sandbox_mode` | Host attribute: `read-only`, `workspace-write`, `danger-full-access`. The last sets the bypass flag. |
 | `default_permissions` | Host attribute: `:read-only`, `:workspace`, `:danger-full-access`. The last sets the bypass flag. |
-| `sandbox_workspace_write.network_access` | Host attribute. |
+| `sandbox_workspace_write.network_access` | Host attribute. Turning it on is reported by [agent sandbox weakened](../reference/policy-rules.md#agent-sandbox-weakened). |
 | `projects.*.trust_level` | The set of trust levels, as one host attribute. |
 | `hooks` (inline or in `hooks.json`) | One hook per handler, as for Claude Code. Events: `PreToolUse`, `PermissionRequest`, `PostToolUse`, `PreCompact`, `PostCompact`, `SessionStart`, `SessionEnd`, `SubagentStart`, `SubagentStop`, `UserPromptSubmit`, `Stop`, `Interrupt`. |
 | `mcp_servers.*.http_headers_helper`, `model_providers.*.auth.command` | Helper commands: code execution. |
@@ -42,4 +42,7 @@ not valid TOML or JSON is `INCOMPLETE-UNPARSED-REGION`.
 ## What is not read
 
 `AGENTS.md` and other instruction files; `~/.codex/`; profile files
-outside the repository.
+outside the repository. `sandbox_workspace_write.writable_roots` is not
+recorded yet, so [workspace scope
+expansion](../reference/policy-rules.md#workspace-scope-expansion) does
+not cover a Codex writable root outside the repository.

@@ -52,7 +52,6 @@ def _claude(root: Path, settings: dict[str, object]) -> None:
         ({"disableAllHooks": True}, {"disableAllHooks": False}),
         ({"permissions": {"disableBypassPermissionsMode": "disable"}}, {}),
         ({"disableSkillShellExecution": True}, {}),
-        ({"sandbox": {"enabled": True}}, {"sandbox": {"enabled": False}}),
     ],
     ids=[
         "mode-right",
@@ -60,7 +59,6 @@ def _claude(root: Path, settings: dict[str, object]) -> None:
         "hooks-enabled",
         "bypass-guard-removed",
         "skill-shell",
-        "sandbox-off",
     ],
 )
 def test_claude_code_loosening_is_high(
@@ -87,8 +85,10 @@ def test_claude_code_loosening_is_high(
             {"permissions": {"defaultMode": "default"}},
             {"permissions": {"defaultMode": "manual"}},
         ),
+        # Sandbox settings are policy.agent-sandbox-weakened's.
+        ({"sandbox": {"enabled": True}}, {"sandbox": {"enabled": False}}),
     ],
-    ids=["mode-left", "hooks-disabled", "alias"],
+    ids=["mode-left", "hooks-disabled", "alias", "sandbox-off"],
 )
 def test_tightening_or_an_alias_is_silent(
     tmp_path: Path, before: dict[str, object], after: dict[str, object]

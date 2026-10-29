@@ -215,6 +215,12 @@ _MANDATORY_BY_RULE_ID: dict[str, bool] = {
     # A Team rule; the organization's bundle, not this flag, decides how
     # strictly it applies.
     "policy.unsanctioned-agent-component": False,
+    # Coding-agent rules read from adapter attributes: not mandatory.
+    "policy.agent-sandbox-weakened": False,
+    "policy.secret-exposed-to-untrusted-agent-run": False,
+    "policy.credentialed-remote-mcp-server": False,
+    "policy.workspace-scope-expansion": False,
+    "policy.component-shell-execution": False,
 }
 
 #: One line per rule naming what it actually detects, surfaced by
@@ -296,6 +302,26 @@ _SUMMARY_BY_RULE_ID: dict[str, str] = {
         "On a Team gate, an agent-authority grant the organization's "
         "approved-components list does not cover."
     ),
+    "policy.agent-sandbox-weakened": (
+        "A change that turns off a coding agent's sandbox, lets commands "
+        "run outside it, or opens its network egress."
+    ),
+    "policy.secret-exposed-to-untrusted-agent-run": (
+        "A CI workflow job that runs a coding agent on untrusted input "
+        "and is given a repository secret."
+    ),
+    "policy.credentialed-remote-mcp-server": (
+        "A remote MCP server whose committed declaration sends a "
+        "credential-named header or variable to its host."
+    ),
+    "policy.workspace-scope-expansion": (
+        "An agent host given read and write access to a directory outside "
+        "the repository."
+    ),
+    "policy.component-shell-execution": (
+        "A skill shell line or plugin bin/ directory added or changed, "
+        "with the command it runs."
+    ),
 }
 
 #: The rule pack this Community CLI ships today: every rule currently
@@ -308,7 +334,7 @@ _SUMMARY_BY_RULE_ID: dict[str, str] = {
 #: `KNOWN_RULE_PACK_FINGERPRINTS` below).
 CURRENT_RULE_PACK = RulePack(
     name="controlloop-community",
-    version="0.7.0",
+    version="0.8.0",
     rules=ALL_RULES,
     metadata=tuple(
         RuleMetadata(
@@ -358,4 +384,11 @@ KNOWN_RULE_PACK_FINGERPRINTS: dict[str, str] = {
     # inferred untrusted-input leg; an inferred one is reported at
     # medium severity instead of silence or a confident claim.
     "0.7.0": "06beef30e8745a1fd18898c800555aa29dab80ef4e80a446c069e4b532197cde",
+    # 0.8.0: five coding-agent rules, 23 in total (agent sandbox weakened,
+    # secret exposed to an untrusted agent run, credentialed remote MCP
+    # server, workspace scope expansion, component shell execution).
+    # permission-bypass-from-project 1.1.0 hands sandbox.enabled to the
+    # sandbox rule; agent-hook-command-change 1.1.0 hands skill shell
+    # lines and plugin bin/ to the component rule.
+    "0.8.0": "8f25e70c0cf82a2cb827dae58e554349274cfae73da60be7506e08175c160ef8",
 }

@@ -13,6 +13,10 @@ The scales are copied from the adapters that record them rather than
 imported, so policy does not depend on discovery code;
 `tests/policy/rules/test_permission_bypass_from_project.py` holds the
 two copies equal.
+
+Sandbox and network egress settings, including Claude Code's
+`sandbox.enabled` (read here before 1.1.0), belong to
+`policy.agent-sandbox-weakened`.
 """
 
 from __future__ import annotations
@@ -23,7 +27,7 @@ from controlloop.policy.models import Rule, RuleContext, RuleObservation
 from controlloop.policy.rules import _authority as authority
 
 RULE_ID = "policy.permission-bypass-from-project"
-_RULE_VERSION = "1.0.0"
+_RULE_VERSION = "1.1.0"
 
 CLAUDE_CODE_MODE_SCALE = (
     "plan",
@@ -61,7 +65,6 @@ SCALES: dict[tuple[str, str], tuple[tuple[str, ...], str | None]] = {
 _SWITCHES = (
     ("disable_all_hooks", "true"),
     ("disable_skill_shell_execution", "true"),
-    ("sandbox_enabled", "true"),
 )
 _PRESENCE_SWITCHES = ("disable_bypass_permissions_mode",)
 _AUTO_APPROVAL_SOURCES = frozenset({"autoApprove", "trust"})

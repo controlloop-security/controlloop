@@ -19,6 +19,9 @@ run.
 **Availability:** implemented.
 [`policy.overprivileged-agent-workflow`](../reference/policy-rules.md#overprivileged-agent-workflow)
 reports an agent workflow given a write token with no brakes.
+[`policy.secret-exposed-to-untrusted-agent-run`](../reference/policy-rules.md#secret-exposed-to-untrusted-agent-run)
+reports an agent job on untrusted input that is given a repository
+secret.
 
 ## Files read
 
