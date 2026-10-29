@@ -1456,6 +1456,50 @@ confirm the host is first party or one you trust with the credential.
 but carries no secret, such as a public `X-API-Key` for a free service,
 is still reported; the rule never reads values.
 
+<a id="workspace-scope-expansion"></a>
+## Workspace scope expansion
+
+**Outcome:** a change that adds the home directory, the filesystem root,
+or any other directory outside the repository to a coding agent's
+workspace is reported, naming the host.
+
+**Why this matters:** Claude Code's `permissions.additionalDirectories`
+gives the agent read and write access to each listed directory, as freely
+as the repository itself. A directory outside the repository hands the
+agent files the repository's review never covers: other projects, shell
+profiles, credentials.
+
+**Example:** `.claude/settings.json` adds `"additionalDirectories":
+["~/"]`. The finding reads "Claude Code can now read and write a
+directory outside the repository." at `high`. The path itself is never
+printed; the adapter records it only as `<outside-repository>`.
+
+An absolute or home-relative path is outside the repository, and so is a
+relative path that climbs out with `..`.
+
+| Change state | Severity |
+| --- | --- |
+| Outside directory added, or an entry changed to one | `high` |
+| Directory inside the repository added | `low` |
+| No baseline (first scan): an outside directory | `low` |
+| Removed, narrowed to inside, unchanged, or inside on a first scan | none |
+
+Codex's `sandbox_workspace_write.writable_roots` is not recorded by the
+Codex adapter yet, so this rule does not cover Codex.
+
+**Change states and confidence:** `added` or `changed` (`high` for an outside directory, `low` for an inside one); `not-compared` on a scan with no baseline (`low`). Confidence is `high`.
+
+**Approving or suppressing:** these findings are change-only, so a reviewed change stops producing one once it is in the baseline. To let a reviewed change through before then, add a `controlloop.yaml` approval whose `capability` names the component (`<file>#<key path>`, its name, or its node ID): the finding is kept at `info` with the approver's name, so it no longer blocks, and the [authority statement](authority-statement.md) says "Approval recorded." An expired approval does nothing. A time-limited [suppression](suppressions.md) naming the finding's `id` works too.
+
+**Remediation:** remove the entry, or narrow it to a path inside the
+repository, and prefer the agent host's sandbox for anything it must
+reach outside it.
+
+**False positives:** a shared directory every developer has at the same
+absolute path, such as a mounted read-only dataset, is still reported,
+because the rule cannot see what the path holds. Approve it once
+reviewed.
+
 ## Known limitations
 
 - `controlloop scan` and `controlloop gate` both consume every rule

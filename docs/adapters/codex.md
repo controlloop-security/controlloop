@@ -42,4 +42,7 @@ not valid TOML or JSON is `INCOMPLETE-UNPARSED-REGION`.
 ## What is not read
 
 `AGENTS.md` and other instruction files; `~/.codex/`; profile files
-outside the repository.
+outside the repository. `sandbox_workspace_write.writable_roots` is not
+recorded yet, so [workspace scope
+expansion](../reference/policy-rules.md#workspace-scope-expansion) does
+not cover a Codex writable root outside the repository.
