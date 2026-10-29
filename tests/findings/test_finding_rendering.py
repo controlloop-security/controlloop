@@ -313,3 +313,51 @@ class TestSuppressedFindingText:
         )
         assert render_finding_text(finding).startswith("✕ CRITICAL")
         assert "suppressed" not in render_finding_text(finding)
+
+
+class TestOrganizationDecidedFindingText:
+    def test_an_excepted_finding_says_so_and_drops_the_blocking_glyph(self) -> None:
+        finding = _finding(evidence=_LOCATED_EVIDENCE, severity=FindingSeverity.HIGH)
+
+        text = render_finding_text(finding, excepted_until="2099-01-01")
+
+        summary, *rest = text.split("\n")
+        assert summary.startswith("• HIGH")
+        assert rest[-1] == (
+            "    organization exception until 2099-01-01; does not affect the verdict"
+        )
+
+    @pytest.mark.parametrize(
+        ("action", "glyph", "closing"),
+        [
+            ("fail", "✕", "organization action `fail`: blocks"),
+            (
+                "require_review",
+                "!",
+                "organization action `require_review`: needs review",
+            ),
+            ("warn", "!", "organization action `warn`: reported, does not block"),
+            ("pass", "•", "organization action `pass`: does not affect the verdict"),
+            ("quarantine", "✕", "organization action `fail`: blocks"),
+        ],
+    )
+    def test_an_organization_action_sets_the_glyph_and_says_so(
+        self, action: str, glyph: str, closing: str
+    ) -> None:
+        finding = _finding(evidence=_LOCATED_EVIDENCE, severity=FindingSeverity.LOW)
+
+        text = render_finding_text(finding, organization_action=action)
+
+        summary, *rest = text.split("\n")
+        assert summary.startswith(f"{glyph} LOW")
+        assert rest[-1] == f"    {closing}"
+
+    def test_an_exception_outranks_the_action(self) -> None:
+        finding = _finding(evidence=_LOCATED_EVIDENCE, severity=FindingSeverity.HIGH)
+
+        text = render_finding_text(
+            finding, excepted_until="2099-01-01", organization_action="fail"
+        )
+
+        assert text.startswith("• HIGH")
+        assert "organization action" not in text

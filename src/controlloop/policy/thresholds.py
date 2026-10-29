@@ -22,10 +22,16 @@ execution concerns. `severity_threshold` defaults to `"high"` and
 engineering defaults -- not an approved business threshold, the same
 precedent `controlloop.policy.models.EvaluationBounds` already
 established for this codebase).
+
+On a Team gate an organization rule may also carry an `action`
+(`RuleAction`), and for a finding from such a rule the action, not the
+severity threshold, decides the verdict. A rule without one keeps the
+threshold behaviour, and a Community gate never has any.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
@@ -120,6 +126,46 @@ class CompletenessEnforcement(StrEnum):
     WARN = "warn"
     #: A repository has opted in: incomplete analysis alone blocks.
     ENFORCE = "enforce"
+
+
+class RuleAction(StrEnum):
+    """What an organization rule's finding does to a Team gate verdict.
+
+    Set per rule in the organization's policy and merged strengthen-only
+    (`controlloop.team.policy`). It decides the verdict whatever the
+    finding's severity or confidence: a repository setting such as
+    `low_confidence_action` cannot soften what the organization requires.
+    """
+
+    #: Blocks: `deployment_blocked`, exit `1`.
+    FAIL = "fail"
+    #: `review_required`, exit `3`, unless something else blocks.
+    REQUIRE_REVIEW = "require_review"
+    #: Reported as a warning; never blocks.
+    WARN = "warn"
+    #: Reported; never affects the verdict.
+    PASS = "pass"
+
+    @classmethod
+    def parse(cls, value: str) -> RuleAction:
+        """The action `value` names, or `FAIL` for one this CLI does not
+        know. A newer platform's action must not switch a gate off, and
+        `FAIL` is the one reading that cannot."""
+
+        try:
+            return cls(value)
+        except ValueError:
+            return cls.FAIL
+
+
+class ActionSource(StrEnum):
+    """Where a finding's effective action came from."""
+
+    #: The rule's organization `action`.
+    ORGANIZATION = "organization"
+    #: No organization action: derived from the finding's severity against
+    #: `severity_threshold` and from `low_confidence_action`.
+    SEVERITY_THRESHOLD = "severity_threshold"
 
 
 class GateStatus(StrEnum):
@@ -257,6 +303,10 @@ class GateVerdict:
     `scanner_version`/`rule_pack_name`/`rule_pack_version`/
     `rule_pack_fingerprint` are an additive amendment to this type; every
     threshold guarantee it already made is unchanged.
+
+    `review_findings` holds findings whose organization action is
+    `require_review`. It never changes `status`; the command maps it to
+    `review_required`.
     """
 
     status: GateStatus
@@ -267,6 +317,33 @@ class GateVerdict:
     rule_pack_name: str
     rule_pack_version: str
     rule_pack_fingerprint: str
+    review_findings: tuple[Finding, ...] = ()
+
+
+def finding_action(
+    finding: Finding,
+    policy_config: PolicyConfig,
+    rule_actions: Mapping[str, str] | None = None,
+) -> tuple[RuleAction, ActionSource]:
+    """The action `evaluate_gate` takes on `finding`, and where it came
+    from. Ignores `disabled_rule_ids`; `evaluate_gate` drops those first.
+
+    Without an organization action the threshold behaviour reads as an
+    action too: a finding that blocks is `FAIL`, one that only warns is
+    `WARN`, and one below the threshold is `PASS`.
+    """
+
+    action = (rule_actions or {}).get(finding.rule_id)
+    if action is not None:
+        return RuleAction.parse(action), ActionSource.ORGANIZATION
+    if not severity_at_least(finding.severity, policy_config.severity_threshold):
+        return RuleAction.PASS, ActionSource.SEVERITY_THRESHOLD
+    is_low_confidence = finding.confidence in _LOW_CONFIDENCE_VALUES
+    if is_low_confidence and policy_config.low_confidence_action is (
+        LowConfidenceAction.WARN
+    ):
+        return RuleAction.WARN, ActionSource.SEVERITY_THRESHOLD
+    return RuleAction.FAIL, ActionSource.SEVERITY_THRESHOLD
 
 
 def evaluate_gate(
@@ -277,6 +354,7 @@ def evaluate_gate(
     rule_pack_name: str,
     rule_pack_version: str,
     rule_pack_fingerprint: str,
+    rule_actions: Mapping[str, str] | None = None,
 ) -> GateVerdict:
     """Classify every finding in `findings` against `policy_config` and
     return the resulting `GateVerdict`.
@@ -315,28 +393,33 @@ def evaluate_gate(
     findings report; a full report listing every finding regardless of
     disposition is separate, not-yet-implemented, later scope.
 
+    `rule_actions` maps a rule ID to its organization action (a Team
+    gate's effective policy). A finding from such a rule is classified by
+    `RuleAction` alone, whatever its severity and confidence: `FAIL` into
+    `blocking_findings`, `REQUIRE_REVIEW` into `review_findings`, `WARN`
+    into `warning_findings`, `PASS` into none. See `finding_action`.
+
     `GateStatus.FAIL` exactly when `blocking_findings` is non-empty.
     """
 
     blocking: list[Finding] = []
+    review: list[Finding] = []
     warning: list[Finding] = []
+    by_action = {
+        RuleAction.FAIL: blocking,
+        RuleAction.REQUIRE_REVIEW: review,
+        RuleAction.WARN: warning,
+    }
 
     for finding in findings:
         if finding.rule_id in policy_config.disabled_rule_ids:
             continue
-
-        if not severity_at_least(finding.severity, policy_config.severity_threshold):
-            continue
-
-        is_low_confidence = finding.confidence in _LOW_CONFIDENCE_VALUES
-        if is_low_confidence and policy_config.low_confidence_action is (
-            LowConfidenceAction.WARN
-        ):
-            warning.append(finding)
-        else:
-            blocking.append(finding)
+        action, _ = finding_action(finding, policy_config, rule_actions)
+        if action is not RuleAction.PASS:
+            by_action[action].append(finding)
 
     blocking.sort(key=lambda finding: finding.id)
+    review.sort(key=lambda finding: finding.id)
     warning.sort(key=lambda finding: finding.id)
 
     status = GateStatus.FAIL if blocking else GateStatus.PASS
@@ -349,4 +432,5 @@ def evaluate_gate(
         rule_pack_name=rule_pack_name,
         rule_pack_version=rule_pack_version,
         rule_pack_fingerprint=rule_pack_fingerprint,
+        review_findings=tuple(review),
     )

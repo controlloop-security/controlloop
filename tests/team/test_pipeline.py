@@ -447,7 +447,7 @@ class TestEvidence:
 
         assert evidence is not None
         assert evidence.organization_bundle_version == "7"
-        assert evidence.merge_semantics_version == "1.1.0"
+        assert evidence.merge_semantics_version == "1.2.0"
         assert evidence.policy_source == pipeline.SOURCE_FETCHED
         assert evidence.entitlement_state == "entitled"
         assert [rule.rule_id for rule in evidence.repository_delta] == ["org.optional"]

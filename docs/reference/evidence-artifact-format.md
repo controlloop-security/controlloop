@@ -57,6 +57,14 @@ class TeamEvidence:  # controlloop.team.evidence
     approved_components: tuple[ApprovedComponentRecord, ...] = ()
     rejections: tuple[PolicyRejectionRecord, ...] = ()
     applied_exceptions: tuple[ExceptionRecord, ...] = ()
+    finding_actions: tuple[FindingActionRecord, ...] = ()  # left out when empty
+
+
+class FindingActionRecord:  # controlloop.team.evidence
+    finding_id: str
+    rule_id: str
+    action: str  # fail | require_review | warn | pass
+    source: str  # organization | severity_threshold
 
 
 class EvidenceVersions:  # controlloop.reporting.evidence
@@ -79,6 +87,16 @@ version that make the verdict re-derivable, the repository delta as it
 was sent, the effective policy that resulted, any weakening the merge
 refused, and every exception with its disposition (`applied`, `expired`,
 or `unmatched`).
+
+Each effective-policy rule records its organization `action` when it has
+one, and `finding_actions` records the action the gate took on every
+finding: `fail`, `require_review`, `warn`, or `pass`. Its `source` is
+`organization` when the rule's action decided it, and
+`severity_threshold` when the rule has no action and the finding's
+severity against `severity_threshold` did (a blocking finding reads
+`fail`, a warning `warn`, and one below the threshold `pass`). A finding
+a suppression or exception kept out of the verdict is recorded too; the
+suppression or exception record says why it did not count.
 
 `policy_source` distinguishes a bundle read live (`fetched`) from one
 served fresh from cache (`cache`) from one used past its lifetime because
@@ -166,8 +184,8 @@ The packaged schema is generated directly from
 `EvidenceArtifact.model_json_schema()`, the same disclosed design choice
 [the report schema](report-format.md#published-versioned-schema)
 already makes and for the same reason (every composed model already
-declares `extra="forbid"`). The current version is `1.5.0`
-(`src/controlloop/schemas/evidence/1.5.0/evidence.schema.json`) -- five
+declares `extra="forbid"`). The current version is `1.6.0`
+(`src/controlloop/schemas/evidence/1.6.0/evidence.schema.json`) -- six
 MINOR bumps so far: `1.0.0` -> `1.1.0` (two new, defaulted,
 backward-compatible fields, `completeness_enforcement`/
 `completeness_enforcement_source`), then `1.1.0` -> `1.2.0`
@@ -182,7 +200,9 @@ statement](authority-statement.md), left out when there is no delta),
 then `1.4.0` -> `1.5.0` (the `team` block's approved entries carry their
 matching constraints, and it gains `approved_components_digest`,
 `sanction_judgments`, and `sanction_note`; see [the unsanctioned agent
-component rule](policy-rules.md#unsanctioned-agent-component)). Every
+component rule](policy-rules.md#unsanctioned-agent-component)), then
+`1.5.0` -> `1.6.0` (each `team` rule's `action` and the per-finding
+`finding_actions`, both left out when empty). Every
 prior version's own file is kept unmodified at its own
 `src/controlloop/schemas/evidence/<version>/` directory, the same
 two-version precedent `schemas/baseline/` already established.

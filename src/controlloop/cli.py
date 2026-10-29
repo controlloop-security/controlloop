@@ -81,15 +81,18 @@ from controlloop.manifest.approvals import active_approvals
 from controlloop.manifest.models import Approval
 from controlloop.output import NonInteractiveEnvironmentError, OutputStreams
 from controlloop.policy import (
+    ActionSource,
     CompletenessEnforcement,
     EvaluationResult,
     GateVerdict,
+    PolicyConfig,
     PolicyConfigError,
     RuleContext,
     SanctionContext,
     SuppressionOutcome,
     apply_suppressions,
     evaluate_gate,
+    finding_action,
     resolve_policy_config,
     rule_pack_fingerprint,
     validate_disabled_rules,
@@ -163,7 +166,8 @@ from controlloop.team.client import PlatformClient
 from controlloop.team.components import judge_delta
 from controlloop.team.config import TeamConfig, TeamConfigError, resolve_team_config
 from controlloop.team.envelope import EnvelopeRenderError, render_envelope
-from controlloop.team.exceptions import ExceptionOutcome
+from controlloop.team.evidence import FindingActionRecord
+from controlloop.team.exceptions import ExceptionOutcome, ExceptionState
 from controlloop.team.policy import apply_severity_floors
 from controlloop.team.transport import UrllibTransport
 from controlloop.verbosity import (
@@ -2270,6 +2274,27 @@ def _gate_upload(
     )
 
 
+def _gate_finding_actions(
+    findings: tuple[Finding, ...],
+    policy_config: PolicyConfig,
+    rule_actions: dict[str, str],
+) -> tuple[FindingActionRecord, ...]:
+    """The action the gate took on each finding, for the evidence."""
+
+    records = []
+    for finding in findings:
+        action, source = finding_action(finding, policy_config, rule_actions)
+        records.append(
+            FindingActionRecord(
+                finding_id=finding.id,
+                rule_id=finding.rule_id,
+                action=action.value,
+                source=source.value,
+            )
+        )
+    return tuple(records)
+
+
 def _gate_classify(
     gate_verdict: GateVerdict,
     *,
@@ -2385,6 +2410,7 @@ def _gate_render_and_exit(
         assert sarif_log is not None
         OutputStreams().write_data(json.dumps(sarif_log))
     else:
+        team = artifact.team
         text = render_terminal_report(
             blast_radius=blast_radius,
             verdict=artifact.verdict,
@@ -2392,6 +2418,16 @@ def _gate_render_and_exit(
             findings=artifact.findings,
             authority_delta=artifact.authority_delta,
             suppressions=artifact.suppressions,
+            excepted_until={
+                record.finding_fingerprint: record.expires_at.date().isoformat()
+                for record in (team.applied_exceptions if team is not None else ())
+                if record.state is ExceptionState.APPLIED
+            },
+            organization_actions={
+                record.finding_id: record.action
+                for record in (team.finding_actions if team is not None else ())
+                if record.source == ActionSource.ORGANIZATION
+            },
             color_enabled=False,
         )
         # The active setting is stated in the gate result. Appended by this
@@ -2623,6 +2659,10 @@ def gate(
                 severity=DiagnosticSeverity.WARNING,
             )
 
+    # Each organization rule's `action` decides what its findings do to
+    # the verdict; a rule without one, and every Community gate, keeps the
+    # severity threshold.
+    rule_actions = team.preparation.rule_actions() if team is not None else {}
     gate_verdict = evaluate_gate(
         effective_findings,
         policy_config,
@@ -2630,6 +2670,7 @@ def gate(
         rule_pack_name=CURRENT_RULE_PACK.name,
         rule_pack_version=CURRENT_RULE_PACK.version,
         rule_pack_fingerprint=rule_pack_fingerprint(CURRENT_RULE_PACK),
+        rule_actions=rule_actions,
     )
 
     blast_radius = compute_blast_radius(current_document.nodes, current_document.edges)
@@ -2642,9 +2683,12 @@ def gate(
         analysis_incomplete=analysis_incomplete,
         completeness_enforcement=policy_config.completeness_enforcement,
         # An unsanctioned grant requires review by default; an
-        # organization makes it fail with a severity floor that blocks.
-        review_required=any(
+        # organization makes it fail with a severity floor that blocks,
+        # or decides it outright with the rule's action.
+        review_required=bool(gate_verdict.review_findings)
+        or any(
             finding.rule_id == UNSANCTIONED_AGENT_COMPONENT_RULE_ID
+            and finding.rule_id not in rule_actions
             for finding in effective_findings
         ),
     )
@@ -2680,6 +2724,7 @@ def gate(
                     and team.preparation.organization_bundle_version
                     else None,
                 ),
+                _gate_finding_actions(findings, policy_config, rule_actions),
             )
             if team is not None and exception_outcome is not None
             else None

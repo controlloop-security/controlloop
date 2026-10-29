@@ -6,8 +6,49 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **The Team gate honors each rule's organization `action`.** On a Team
+  gate, a finding's effect on the verdict comes from its rule's `action`
+  in the organization's policy, whatever the finding's severity or
+  confidence:
+  - `fail` blocks (`deployment_blocked`, exit `1`).
+  - `require_review` gives `review_required` (exit `3`) unless something
+    else blocks.
+  - `warn` reports without blocking.
+  - `pass` reports and never affects the verdict.
+
+  A rule with no `action` keeps the severity-against-`severity_threshold`
+  behavior, so bundles without actions gate as before. An action this CLI
+  does not recognize is enforced as `fail`. Organization exceptions and
+  repository suppressions still apply first. Community gates are
+  unchanged.
+- **A finding an organization action decided says so.** In `gate` text
+  output it takes the action's glyph and a closing line such as
+  ``organization action `warn`: reported, does not block``.
+- **Evidence records each finding's action** (evidence schema `1.6.0`).
+  Each `team.effective_policy` rule records its `action` when it has one.
+  `team.finding_actions` records, for every finding, the action the gate
+  took and what decided it: the organization's rule (`organization`) or
+  the severity threshold (`severity_threshold`). Both fields are left out
+  when empty.
+
+### Changed
+
+- **Merge semantics `1.2.0`: a rule's `action` merges strengthen-only.**
+  Actions are ordered `pass` < `warn` < `require_review` < `fail`. A
+  repository may raise a rule's action but never lower it. A lowering is
+  refused and reported like a lowered severity floor. An organization
+  rule with no action counts as `fail`. The platform contract's
+  `policy-merge-vectors.json` gains six `action` cases.
+
 ### Fixed
 
+- **An excepted finding looked like a blocking one.** In `gate` text
+  output, a finding covered by an applied organization exception keeps
+  its severity but takes the neutral `•` glyph and a closing line,
+  `organization exception until YYYY-MM-DD; does not affect the verdict`,
+  instead of printing as `✕ HIGH`.
 - **The Homebrew formula passes `brew audit --strict`.** It no longer
   repeats the version Homebrew already reads from the release URL.
 

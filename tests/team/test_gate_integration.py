@@ -365,7 +365,7 @@ class TestEvidence:
         team = _evidence(tmp_path)["team"]
         assert isinstance(team, dict)
         assert team["organization_bundle_version"] == "7"
-        assert team["merge_semantics_version"] == "1.1.0"
+        assert team["merge_semantics_version"] == "1.2.0"
         assert team["policy_source"] == "fetched"
         assert team["entitlement_state"] == "entitled"
 
@@ -560,6 +560,165 @@ class TestUploadNeverChangesTheVerdict:
         result = _run(tmp_path, monkeypatch, transport)
 
         assert "replay" in result.output
+
+
+_CEILING = "policy.capability-ceiling"
+_UNDECLARED = "policy.undeclared-tools"
+
+
+def _rule(rule_id: str, action: str | None = None) -> dict[str, object]:
+    rule: dict[str, object] = {"rule_id": rule_id, "enabled": True, "mandatory": False}
+    if action is not None:
+        rule["action"] = action
+    return rule
+
+
+def _policy_transport(
+    *rules: dict[str, object], exceptions: tuple[dict[str, str], ...] = ()
+) -> _ScriptedTransport:
+    return _ScriptedTransport(
+        {
+            "/entitlement": _json(_ENTITLED),
+            "/effective-policy": _json({**_POLICY, "rules": list(rules)}),
+            "/active-exceptions": _json(list(exceptions)),
+            "/scans": _json(_ACCEPTED, status=202),
+        }
+    )
+
+
+class TestOrganizationActions:
+    """Each rule's organization action decides what its findings do to the
+    verdict, whatever their severity. The fixture has a critical
+    capability-ceiling finding, which blocks at the default `high`
+    threshold, and a medium undeclared-tools finding, which does not."""
+
+    def _actions(self, tmp_path: Path) -> dict[str, tuple[str, str]]:
+        team = _evidence(tmp_path)["team"]
+        assert isinstance(team, dict)
+        return {
+            record["rule_id"]: (record["action"], record["source"])
+            for record in team["finding_actions"]
+        }
+
+    def test_fail_blocks_a_finding_below_the_threshold(
+        self, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _team_repository(tmp_path)
+        transport = _policy_transport(
+            _rule(_UNDECLARED, "fail"), _rule(_CEILING, "pass")
+        )
+
+        result = _run(tmp_path, monkeypatch, transport)
+
+        assert result.exit_code == ExitCode.POLICY_FAIL
+        assert _evidence(tmp_path)["verdict"] == "deployment_blocked"
+        assert self._actions(tmp_path) == {
+            _UNDECLARED: ("fail", "organization"),
+            _CEILING: ("pass", "organization"),
+        }
+        assert "✕ MEDIUM   policy.undeclared-tools" in result.output
+        assert "organization action `fail`: blocks" in result.output
+
+    def test_require_review_requires_review(
+        self, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _team_repository(tmp_path)
+        transport = _policy_transport(
+            _rule(_UNDECLARED, "require_review"), _rule(_CEILING, "pass")
+        )
+
+        result = _run(tmp_path, monkeypatch, transport)
+
+        assert result.exit_code == ExitCode.INCOMPLETE_ANALYSIS
+        assert _evidence(tmp_path)["verdict"] == "review_required"
+
+    def test_require_review_loses_to_a_block(
+        self, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _team_repository(tmp_path)
+        transport = _policy_transport(_rule(_UNDECLARED, "require_review"))
+
+        result = _run(tmp_path, monkeypatch, transport)
+
+        assert result.exit_code == ExitCode.POLICY_FAIL
+
+    def test_warn_reports_a_critical_finding_without_blocking(
+        self, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _team_repository(tmp_path)
+        transport = _policy_transport(
+            _rule(_UNDECLARED, "warn"), _rule(_CEILING, "warn")
+        )
+
+        result = _run(tmp_path, monkeypatch, transport)
+
+        assert result.exit_code == ExitCode.PASS
+        assert _evidence(tmp_path)["verdict"] == "passed_with_warnings"
+        assert "! CRITICAL policy.capability-ceiling" in result.output
+        assert "organization action `warn`: reported, does not block" in result.output
+
+    def test_pass_never_affects_the_verdict(
+        self, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _team_repository(tmp_path)
+        transport = _policy_transport(
+            _rule(_UNDECLARED, "pass"), _rule(_CEILING, "pass")
+        )
+
+        result = _run(tmp_path, monkeypatch, transport)
+
+        assert result.exit_code == ExitCode.PASS
+        assert _evidence(tmp_path)["verdict"] == "passed"
+        # Still reported: `pass` is monitor mode, not a disabled rule.
+        assert "policy.capability-ceiling" in result.output
+
+    def test_a_rule_without_an_action_keeps_the_threshold(
+        self, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _team_repository(tmp_path)
+        transport = _policy_transport(_rule(_CEILING), _rule(_UNDECLARED))
+
+        result = _run(tmp_path, monkeypatch, transport)
+
+        assert result.exit_code == ExitCode.POLICY_FAIL
+        assert self._actions(tmp_path) == {
+            _CEILING: ("fail", "severity_threshold"),
+            _UNDECLARED: ("pass", "severity_threshold"),
+        }
+        team = _evidence(tmp_path)["team"]
+        assert isinstance(team, dict)
+        assert all("action" not in rule for rule in team["effective_policy"])
+        assert "organization action" not in result.output
+
+    def test_an_excepted_finding_prints_as_excepted(
+        self, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _team_repository(tmp_path)
+        _run(tmp_path, monkeypatch, _policy_transport())
+        findings = _evidence(tmp_path)["findings"]
+        assert isinstance(findings, list)
+        ceiling = next(item["id"] for item in findings if item["rule_id"] == _CEILING)
+
+        result = _run(
+            tmp_path,
+            monkeypatch,
+            _policy_transport(
+                exceptions=(
+                    {
+                        "finding_fingerprint": ceiling,
+                        "expires_at": "2099-01-01T00:00:00Z",
+                    },
+                )
+            ),
+        )
+
+        assert result.exit_code == ExitCode.PASS
+        assert "✕ CRITICAL" not in result.output
+        assert "• CRITICAL policy.capability-ceiling" in result.output
+        assert (
+            "organization exception until 2099-01-01; does not affect the verdict"
+            in result.output
+        )
 
 
 class TestPolicyRejectionIsReported:

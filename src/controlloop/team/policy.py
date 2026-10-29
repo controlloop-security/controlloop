@@ -39,7 +39,10 @@ rules in different orders get identical results.
 
 `enabled: false` on a merged rule disables that rule for local evaluation.
 A merged `severity_floor` raises a finding's severity to the floor when it
-sits below it (`apply_severity_floors`).
+sits below it (`apply_severity_floors`). A merged `action` decides what a
+finding from that rule does to the verdict
+(`controlloop.policy.thresholds.evaluate_gate`); a rule without one keeps
+the severity-against-threshold behaviour.
 
 `approved_components` is merged strengthen-only too (merge semantics
 1.1.0): a repository may drop an organization entry or narrow its
@@ -71,7 +74,16 @@ SEVERITY_ORDER: Final = ("info", "low", "medium", "high", "critical")
 #: 1.1.0: approved-component
 #: constraints merge strengthen-only. An entry without constraints merges
 #: exactly as under 1.0.0.
-MERGE_SEMANTICS_VERSION: Final = "1.1.0"
+#: 1.2.0: a rule's `action` merges strengthen-only in `ACTION_ORDER`. A
+#: rule without an `action` merges exactly as under 1.1.0.
+MERGE_SEMANTICS_VERSION: Final = "1.2.0"
+
+#: Rule actions, weakest first. Mirrors the platform's `ACTION_ORDER`.
+ACTION_ORDER: Final = ("pass", "warn", "require_review", "fail")
+
+#: What an organization rule without an `action` compares as when a
+#: repository proposes one: the platform's stored default.
+DEFAULT_ACTION: Final = "fail"
 
 
 def _rank(severity: str) -> int:
@@ -90,6 +102,16 @@ def _rank(severity: str) -> int:
         return -1
 
 
+def _action_rank(action: str) -> int:
+    """Comparable rank, or `-1` for an action this codebase does not know,
+    for the same reason `_rank` gives an unknown severity `-1`."""
+
+    try:
+        return ACTION_ORDER.index(action)
+    except ValueError:
+        return -1
+
+
 @dataclass(frozen=True, slots=True)
 class RuleSpec:
     """One rule's configuration, on either side of the merge.
@@ -97,12 +119,17 @@ class RuleSpec:
     `mandatory` is meaningful only on the organization side; a repository
     cannot declare its own rule mandatory, and the merge sets `False` for
     rules the organization never configured.
+
+    `action` is what a finding from this rule does to a Team gate's
+    verdict (`ACTION_ORDER`); `None` leaves the verdict to the finding's
+    severity against `severity_threshold`.
     """
 
     rule_id: str
     enabled: bool = True
     severity_floor: str | None = None
     mandatory: bool = False
+    action: str | None = None
 
 
 #: One approved-component entry with its constraints. The name is
@@ -151,6 +178,13 @@ class MergeResult:
             if rule.severity_floor is not None
         }
 
+    def actions(self) -> dict[str, str]:
+        """Per-rule actions the effective policy sets."""
+
+        return {
+            rule.rule_id: rule.action for rule in self.rules if rule.action is not None
+        }
+
 
 def merge_policy(
     *,
@@ -168,11 +202,13 @@ def merge_policy(
     | Repository asks to | Classified as | Result |
     | --- | --- | --- |
     | Raise a rule's severity floor | tightening | applied |
+    | Raise a rule's action | tightening | applied |
     | Disable a non-mandatory rule | tightening | applied |
     | Add a rule the organization did not configure | tightening | applied |
     | Remove an approved-component entry | tightening | applied |
     | Narrow an approved component's constraints | tightening | applied |
     | Lower a rule's severity floor | weakening | rejected |
+    | Lower a rule's action | weakening | rejected |
     | Disable a mandatory rule | weakening | rejected |
     | Add an approved-component entry | weakening | rejected |
     | Widen an approved component's constraints | weakening | rejected |
@@ -239,6 +275,28 @@ def merge_policy(
             effective[override.rule_id] = replace(
                 effective[override.rule_id],
                 severity_floor=override.severity_floor,
+            )
+
+        if override.action is not None:
+            organization_action = organization_rule.action or DEFAULT_ACTION
+            if _action_rank(override.action) < _action_rank(organization_action):
+                rejections.append(
+                    MergeRejection(
+                        rule_id=override.rule_id,
+                        organization_bundle_version=organization_bundle_version,
+                        reason=(
+                            f"Repository policy lowers the action of "
+                            f"`{override.rule_id}` from `{organization_action}` "
+                            f"to `{override.action}`, which organization policy "
+                            f"version {organization_bundle_version} does not "
+                            f"permit. A repository may raise an action, never "
+                            f"lower it."
+                        ),
+                    )
+                )
+                continue
+            effective[override.rule_id] = replace(
+                effective[override.rule_id], action=override.action
             )
 
     organization_by_key = {

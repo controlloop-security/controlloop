@@ -51,6 +51,7 @@ def _rules(raw: list[dict[str, Any]]) -> tuple[RuleSpec, ...]:
             enabled=item.get("enabled", True),
             severity_floor=item.get("severity_floor"),
             mandatory=item.get("mandatory", False),
+            action=item.get("action"),
         )
         for item in raw
     )
@@ -75,6 +76,8 @@ def _as_json(result: MergeResult) -> dict[str, Any]:
                 "enabled": rule.enabled,
                 "severity_floor": rule.severity_floor,
                 "mandatory": rule.mandatory,
+                # The platform's rule has no `action` key when none is set.
+                **({"action": rule.action} if rule.action is not None else {}),
             }
             for rule in result.rules
         ],
@@ -122,9 +125,10 @@ class TestSharedVectors:
     def test_the_vector_file_covers_every_documented_classification(self) -> None:
         """A vector file that drifted into covering only the easy cases
         would still pass every assertion above while proving nothing. This
-        holds it to the seven classifications
+        holds it to the nine classifications
         `docs/reference/policy-merge-semantics.md` tabulates, plus the
-        unrecognized-severity rule that page states in prose."""
+        unrecognized-severity and unrecognized-action rules and the
+        default-action rule that page states in prose."""
 
         names = {vector["name"] for vector in _VECTORS}
         assert {
@@ -136,6 +140,11 @@ class TestSharedVectors:
             "repository-removes-an-approved-component",
             "repository-adds-an-approved-component",
             "repository-proposes-an-unrecognized-severity",
+            "repository-raises-an-action",
+            "repository-lowers-an-action",
+            "repository-restates-the-default-action",
+            "repository-lowers-the-default-action",
+            "repository-proposes-an-unrecognized-action",
         } <= names
 
     def test_every_weakening_vector_actually_rejects(self) -> None:
@@ -156,12 +165,18 @@ class TestSharedVectors:
             "repository-proposes-an-unrecognized-severity",
             "a-refused-override-is-refused-whole",
             "several-weakenings-are-all-reported",
+            "repository-lowers-an-action",
+            "repository-lowers-the-default-action",
+            "repository-proposes-an-unrecognized-action",
         }
         tightening = {
             "repository-raises-a-severity-floor",
             "repository-disables-a-non-mandatory-rule",
             "repository-adds-a-rule-the-organization-never-configured",
             "repository-removes-an-approved-component",
+            "repository-raises-an-action",
+            "repository-restates-the-default-action",
+            "repository-adds-a-rule-with-its-own-action",
         }
         seen_weakening: set[str] = set()
         seen_tightening: set[str] = set()
@@ -271,6 +286,21 @@ class TestRejectionMessages:
         assert "`high`" in result.rejections[0].reason
         assert "`low`" in result.rejections[0].reason
 
+    def test_a_lowered_action_names_both_actions(self) -> None:
+        result = merge_policy(
+            organization_rules=(RuleSpec("policy.undeclared-tools", action="fail"),),
+            organization_components=(),
+            repository_rules=(RuleSpec("policy.undeclared-tools", action="warn"),),
+            organization_bundle_version="12",
+        )
+
+        assert result.rejections[0].reason == (
+            "Repository policy lowers the action of `policy.undeclared-tools` "
+            "from `fail` to `warn`, which organization policy version 12 does "
+            "not permit. A repository may raise an action, never lower it."
+        )
+        assert result.actions() == {"policy.undeclared-tools": "fail"}
+
     def test_every_weakening_is_reported_not_only_the_first(self) -> None:
         result = merge_policy(
             organization_rules=(
@@ -313,6 +343,16 @@ class TestAccessors:
         )
 
         assert result.severity_floors() == {"a.rule": "high"}
+
+    def test_actions_reports_only_rules_that_set_one(self) -> None:
+        result = merge_policy(
+            organization_rules=(RuleSpec("a.rule", action="warn"), RuleSpec("b.rule")),
+            organization_components=(),
+            repository_rules=(RuleSpec("a.rule", action="require_review"),),
+            organization_bundle_version="1",
+        )
+
+        assert result.actions() == {"a.rule": "require_review"}
 
 
 def _finding(rule_id: str, severity: FindingSeverity) -> Finding:

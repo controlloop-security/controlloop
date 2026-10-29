@@ -12,6 +12,11 @@ delta as it was sent, the effective policy that resulted, every rejection
 the merge produced, every exception and its disposition, and the
 entitlement state at the time.
 
+Each rule in the effective policy records its `action` when it has one,
+and `finding_actions` records, for every finding, the action the gate
+took on it and whether that came from the organization's rule or from
+the severity threshold.
+
 It also records the sanctioned-list inputs and outputs: each approved
 entry with its package, version-range, digest, command-pattern, and
 pin constraints, `approved_components_digest` over the effective list,
@@ -44,7 +49,7 @@ import hashlib
 import json
 from collections.abc import Iterable
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from controlloop.team.components import DeltaJudgment
 from controlloop.team.exceptions import ExceptionRecord
@@ -76,6 +81,9 @@ class PolicyRuleRecord(_TeamEvidenceModel):
     enabled: bool
     severity_floor: str | None = None
     mandatory: bool = False
+    #: Omitted when the rule has none, so a bundle without actions records
+    #: exactly what it did before.
+    action: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @classmethod
     def from_spec(cls, spec: RuleSpec) -> PolicyRuleRecord:
@@ -84,7 +92,25 @@ class PolicyRuleRecord(_TeamEvidenceModel):
             enabled=spec.enabled,
             severity_floor=spec.severity_floor,
             mandatory=spec.mandatory,
+            action=spec.action,
         )
+
+
+class FindingActionRecord(_TeamEvidenceModel):
+    """The action a Team gate took on one finding.
+
+    `action` is one of `fail`, `require_review`, `warn`, `pass`. `source`
+    is `organization` when the rule's organization `action` decided it,
+    and `severity_threshold` when the rule has none and the finding's
+    severity against `severity_threshold` did. Recorded for a finding a
+    suppression or exception kept out of the verdict too; those records
+    say why it did not count.
+    """
+
+    finding_id: str
+    rule_id: str
+    action: str
+    source: str
 
 
 class ApprovedComponentRecord(_TeamEvidenceModel):
@@ -201,6 +227,9 @@ class TeamEvidence(_TeamEvidenceModel):
     applied_exceptions: tuple[ExceptionRecord, ...] = ()
     sanction_judgments: tuple[SanctionJudgmentRecord, ...] = ()
     sanction_note: str | None = None
+    finding_actions: tuple[FindingActionRecord, ...] = Field(
+        default=(), exclude_if=lambda value: not value
+    )
 
     @classmethod
     def from_merge(
@@ -214,6 +243,7 @@ class TeamEvidence(_TeamEvidenceModel):
         repository_delta: tuple[RuleSpec, ...] = (),
         exception_records: tuple[ExceptionRecord, ...] = (),
         judgments: tuple[DeltaJudgment, ...] = (),
+        finding_actions: tuple[FindingActionRecord, ...] = (),
     ) -> TeamEvidence:
         """Build the block from an already-computed merge.
 
@@ -251,4 +281,5 @@ class TeamEvidence(_TeamEvidenceModel):
                 for judged in judgments
             ),
             sanction_note=None if organization_bundle_version else UNEVALUATED_NOTE,
+            finding_actions=finding_actions,
         )

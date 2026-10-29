@@ -452,9 +452,21 @@ With `team_enabled = true` (see [Configuration](configuration.md#team-keys)),
    [How organization and repository policy combine](policy-merge-semantics.md).
 3. **Fetches active exceptions** and honors unexpired ones by exact
    finding fingerprint. An exception that has expired re-blocks its
-   finding and its expiry date is printed.
+   finding and its expiry date is printed. A finding an applied exception
+   covers prints with the neutral `•` glyph and `organization exception
+   until <date>; does not affect the verdict`.
 4. **Uploads a sanitized scan envelope** after the verdict is decided and
    evidence is written. See [What a Team gate sends](team-envelope.md).
+
+Between steps 3 and 4, each remaining finding's effect on the verdict
+comes from its rule's organization `action`: `fail` blocks (exit `1`),
+`require_review` requires review (exit `3`) unless something blocks,
+`warn` reports without blocking, and `pass` never affects the verdict. A
+rule with no action keeps the severity-against-`severity_threshold`
+behavior. A finding an action decided says so on its own line, such as
+``organization action `warn`: reported, does not block``, and the evidence
+records each finding's action in `team.finding_actions`. See [The four
+actions](policy-merge-semantics.md#the-four-actions).
 
 None of this runs with Team disabled, which is the default: no request is
 attempted and no token is read. An upload failure is reported on standard

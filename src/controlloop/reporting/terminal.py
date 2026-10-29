@@ -37,7 +37,7 @@ follows.
 from __future__ import annotations
 
 import textwrap
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from enum import StrEnum
 
 from controlloop.capability.blast_radius import (
@@ -194,6 +194,8 @@ def _render_findings(
     *,
     width: int,
     suppressions: tuple[SuppressionRecord, ...] = (),
+    excepted_until: Mapping[str, str] | None = None,
+    organization_actions: Mapping[str, str] | None = None,
 ) -> str:
     """The report's fourth section. `None` means no policy was evaluated at
     all (true of every repository today, since
@@ -216,6 +218,8 @@ def _render_findings(
             render_finding_text(
                 finding,
                 suppressed_until=suppressed_until.get((finding.rule_id, finding.id)),
+                excepted_until=(excepted_until or {}).get(finding.id),
+                organization_action=(organization_actions or {}).get(finding.id),
             ),
             width=width,
         )
@@ -277,6 +281,8 @@ def render_terminal_report(
     findings: tuple[Finding, ...] | None = None,
     authority_delta: AuthorityDelta | None = None,
     suppressions: tuple[SuppressionRecord, ...] = (),
+    excepted_until: Mapping[str, str] | None = None,
+    organization_actions: Mapping[str, str] | None = None,
     color_enabled: bool = False,
     width: int = _DEFAULT_WIDTH,
 ) -> str:
@@ -296,7 +302,12 @@ def render_terminal_report(
 
     `suppressions` marks each finding an active suppression covers, so
     it reads as suppressed rather than blocking; the full list of
-    suppressions is still rendered separately by `render_suppressions`."""
+    suppressions is still rendered separately by `render_suppressions`.
+
+    On a Team gate, `excepted_until` maps the ID of each finding an
+    applied organization exception covers to the exception's expiry date,
+    and `organization_actions` maps a finding ID to the organization
+    action that decided it; both mark the finding the same way."""
 
     sections = [
         _wrap_lines(describe_blast_radius(blast_radius), width=width),
@@ -309,7 +320,13 @@ def render_terminal_report(
     sections.extend(
         [
             _render_material_changes(material_changes, width=width),
-            _render_findings(findings, width=width, suppressions=suppressions),
+            _render_findings(
+                findings,
+                width=width,
+                suppressions=suppressions,
+                excepted_until=excepted_until,
+                organization_actions=organization_actions,
+            ),
         ]
     )
     return "\n\n".join(sections)

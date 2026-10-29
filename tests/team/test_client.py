@@ -262,6 +262,27 @@ class TestEffectivePolicy:
         assert fetch.policy is not None
         assert fetch.policy.organization_bundle_version == "7"
 
+    def test_a_rule_action_is_parsed(self) -> None:
+        policy = {
+            **_POLICY,
+            "rules": [
+                {
+                    "rule_id": "policy.undeclared-tools",
+                    "enabled": True,
+                    "severity_floor": "medium",
+                    "action": "warn",
+                    "mandatory": False,
+                }
+            ],
+        }
+        transport = FakeTransport([json_response(policy)])
+        client, _ = _client(transport)
+
+        fetch = client.fetch_effective_policy()
+
+        assert fetch.policy is not None
+        assert fetch.policy.rules[0].action == "warn"
+
     def test_an_etag_is_sent_as_if_none_match(self) -> None:
         transport = FakeTransport([HttpResponse(status=304, body=b"")])
         client, _ = _client(transport)

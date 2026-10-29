@@ -116,14 +116,18 @@ class RuleConfigurationResponse(_ResponseModel):
     """The platform contract's `RuleConfiguration`.
 
     Only `enabled` is required by the contract; `rule_id`,
-    `severity_floor`, and `mandatory` are optional there and stay optional
-    here rather than being invented with defaults the server never sent.
+    `severity_floor`, `mandatory`, and `action` are optional there and stay
+    optional here rather than being invented with defaults the server never
+    sent. `action` stays a plain string: a value this CLI does not know is
+    enforced as `fail` (`controlloop.policy.thresholds.RuleAction.parse`),
+    not refused, so a newer platform cannot switch a gate off.
     """
 
     rule_id: str | None = None
     enabled: bool
     severity_floor: str | None = None
     mandatory: bool | None = None
+    action: str | None = None
 
 
 class ApprovedComponentResponse(_ResponseModel):
