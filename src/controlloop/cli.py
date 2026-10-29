@@ -102,10 +102,13 @@ from controlloop.policy.authority_scope import without_agent_authority
 from controlloop.policy.rulepack import CURRENT_RULE_PACK
 from controlloop.policy.rules import (
     AGENT_HOOK_COMMAND_CHANGE_RULE_ID,
+    AGENT_SANDBOX_WEAKENED_RULE_ID,
     ALL_RULES,
     BROAD_PERMISSION_RULE_ID,
     CAPABILITY_CEILING_RULE_ID,
     COMPONENT_SELF_GRANT_RULE_ID,
+    COMPONENT_SHELL_EXECUTION_RULE_ID,
+    CREDENTIALED_REMOTE_MCP_SERVER_RULE_ID,
     DESTRUCTIVE_OR_FINANCIAL_ACTION_RULE_ID,
     EXFILTRATION_TRIANGLE_RULE_ID,
     HARDCODED_SECRETS_RULE_ID,
@@ -113,6 +116,7 @@ from controlloop.policy.rules import (
     MISSING_ACTION_LOGGING_RULE_ID,
     OVERPRIVILEGED_AGENT_WORKFLOW_RULE_ID,
     PERMISSION_BYPASS_FROM_PROJECT_RULE_ID,
+    SECRET_EXPOSED_TO_UNTRUSTED_AGENT_RUN_RULE_ID,
     SENSITIVE_WRITE_WITHOUT_APPROVAL_RULE_ID,
     UNAUTHORIZED_DELEGATION_RULE_ID,
     UNDECLARED_TOOLS_RULE_ID,
@@ -120,10 +124,14 @@ from controlloop.policy.rules import (
     UNRESOLVED_DYNAMIC_REGISTRATION_RULE_ID,
     UNSANCTIONED_AGENT_COMPONENT_RULE_ID,
     WIDENED_PERMISSION_RULE_RULE_ID,
+    WORKSPACE_SCOPE_EXPANSION_RULE_ID,
     agent_hook_command_change_findings,
+    agent_sandbox_weakened_findings,
     broad_permission_findings,
     capability_ceiling_findings,
     component_self_grant_findings,
+    component_shell_execution_findings,
+    credentialed_remote_mcp_server_findings,
     destructive_or_financial_action_findings,
     exfiltration_triangle_findings,
     hardcoded_secrets_findings,
@@ -131,6 +139,7 @@ from controlloop.policy.rules import (
     missing_action_logging_findings,
     overprivileged_agent_workflow_findings,
     permission_bypass_from_project_findings,
+    secret_exposed_to_untrusted_agent_run_findings,
     sensitive_write_without_approval_findings,
     unauthorized_delegation_findings,
     undeclared_tools_findings,
@@ -138,6 +147,7 @@ from controlloop.policy.rules import (
     unresolved_dynamic_registration_findings,
     unsanctioned_agent_component_findings,
     widened_permission_rule_findings,
+    workspace_scope_expansion_findings,
 )
 from controlloop.policy.rules._shared import documentation_url
 from controlloop.reporting import (
@@ -202,6 +212,13 @@ _RULE_FINDINGS_BY_ID: dict[str, Callable[[RuleContext], tuple[Finding, ...]]] = 
     WIDENED_PERMISSION_RULE_RULE_ID: widened_permission_rule_findings,
     PERMISSION_BYPASS_FROM_PROJECT_RULE_ID: permission_bypass_from_project_findings,
     UNSANCTIONED_AGENT_COMPONENT_RULE_ID: unsanctioned_agent_component_findings,
+    AGENT_SANDBOX_WEAKENED_RULE_ID: agent_sandbox_weakened_findings,
+    SECRET_EXPOSED_TO_UNTRUSTED_AGENT_RUN_RULE_ID: (
+        secret_exposed_to_untrusted_agent_run_findings
+    ),
+    CREDENTIALED_REMOTE_MCP_SERVER_RULE_ID: credentialed_remote_mcp_server_findings,
+    WORKSPACE_SCOPE_EXPANSION_RULE_ID: workspace_scope_expansion_findings,
+    COMPONENT_SHELL_EXECUTION_RULE_ID: component_shell_execution_findings,
 }
 
 app = typer.Typer(

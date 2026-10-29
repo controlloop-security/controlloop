@@ -112,6 +112,12 @@ _E18_RULE_IDS = frozenset(
         "policy.permission-bypass-from-project",
         # Judges the authority delta on a Team gate.
         "policy.unsanctioned-agent-component",
+        # Rule pack 0.8.0's coding-agent rules.
+        "policy.agent-sandbox-weakened",
+        "policy.secret-exposed-to-untrusted-agent-run",
+        "policy.credentialed-remote-mcp-server",
+        "policy.workspace-scope-expansion",
+        "policy.component-shell-execution",
     }
 )
 

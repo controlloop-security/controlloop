@@ -6,6 +6,47 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Rule pack `0.8.0`: five coding-agent rules, 23 in total.** Each
+  reads attributes the adapters already record; no adapter changed.
+  - `policy.agent-sandbox-weakened`: a change that turns off a coding
+    agent's sandbox, lets commands run outside it, auto-approves commands
+    because of it, or opens its network egress (Claude Code `sandbox`
+    settings, Codex and Gemini CLI network access, Gemini CLI
+    `tools.sandbox`, Cursor `egressMode`). Loosened `high`; a setting
+    already at the loose end on a first scan `low`.
+  - `policy.secret-exposed-to-untrusted-agent-run`: a workflow job that
+    runs a coding agent on untrusted input and is given a repository
+    secret, named but never read. Added or newly exposed `high`; first
+    scan `medium`.
+  - `policy.credentialed-remote-mcp-server`: an HTTP or SSE MCP server
+    whose declaration sends a credential-named header or variable to its
+    host. Host changed `high`; added, or a credential name added,
+    `medium`; first scan `low`.
+  - `policy.workspace-scope-expansion`: a Claude Code
+    `additionalDirectories` entry outside the repository. Added `high`;
+    an inside directory added, or an outside one on a first scan, `low`.
+  - `policy.component-shell-execution`: a skill shell line or a plugin
+    `bin/` directory added or changed. `high`; removed `info`; first
+    scan `low`, once per skill or plugin.
+
+  The new rules are not mandatory. Reports and gate results show
+  `controlloop-community` `0.8.0` with a new fingerprint.
+
+### Changed
+
+- **Two findings move to the new rules.** Claude Code's
+  `sandbox.enabled` turned off was reported by
+  `policy.permission-bypass-from-project`; it is now
+  `policy.agent-sandbox-weakened` (`permission-bypass-from-project`
+  1.1.0). A skill shell line or plugin `bin/` directory was reported by
+  `policy.agent-hook-command-change` as a "Setting 'skill-shell'" or
+  "Setting 'plugin-bin'" finding; it is now
+  `policy.component-shell-execution` (`agent-hook-command-change`
+  1.1.0). Severities are unchanged. A suppression of one of those older
+  findings reports `stale`; suppress the new finding's `id` instead.
+
 ## [0.3.0] - 2026-10-29
 
 A Team gate now does what each rule's organization action says.

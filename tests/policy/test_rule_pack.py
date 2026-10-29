@@ -264,6 +264,11 @@ _EXPECTED_MANDATORY_BY_RULE_ID: dict[str, bool] = {
     "policy.widened-permission-rule": False,
     "policy.permission-bypass-from-project": False,
     "policy.unsanctioned-agent-component": False,
+    "policy.agent-sandbox-weakened": False,
+    "policy.secret-exposed-to-untrusted-agent-run": False,
+    "policy.credentialed-remote-mcp-server": False,
+    "policy.workspace-scope-expansion": False,
+    "policy.component-shell-execution": False,
 }
 
 
@@ -277,11 +282,10 @@ class TestCurrentRulePack:
         paired with its decided `mandatory` governance flag."""
 
         assert CURRENT_RULE_PACK.name == "controlloop-community"
-        # Includes the seven agent-authority rules and the Team
-        # sanctioned-list rule. 0.6.0 fingerprints rule modules and shared
-        # helpers; its rules are 0.5.0's, with per-occurrence secret IDs.
-        assert CURRENT_RULE_PACK.version == "0.7.0"
-        assert len(ALL_RULES) == 18
+        # Includes the agent-authority rules, the Team sanctioned-list
+        # rule, and 0.8.0's five coding-agent rules.
+        assert CURRENT_RULE_PACK.version == "0.8.0"
+        assert len(ALL_RULES) == 23
         assert set(CURRENT_RULE_PACK.rules) == set(ALL_RULES)
         assert {rule.id for rule in CURRENT_RULE_PACK.rules} == {
             rule.id for rule in ALL_RULES

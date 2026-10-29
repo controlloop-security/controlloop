@@ -69,6 +69,16 @@ _ISSUE_441_RULE_IDS = frozenset(
     }
 )
 _ISSUE_451_RULE_IDS = frozenset({"policy.unsanctioned-agent-component"})
+#: Rule pack 0.8.0's coding-agent rules.
+_RULE_PACK_0_8_0_RULE_IDS = frozenset(
+    {
+        "policy.agent-sandbox-weakened",
+        "policy.secret-exposed-to-untrusted-agent-run",
+        "policy.credentialed-remote-mcp-server",
+        "policy.workspace-scope-expansion",
+        "policy.component-shell-execution",
+    }
+)
 
 
 def _empty_document() -> ACBOMDocument:
@@ -108,6 +118,7 @@ class TestAllRulesRegistry:
             | _ISSUE_442_RULE_IDS
             | _ISSUE_441_RULE_IDS
             | _ISSUE_451_RULE_IDS
+            | _RULE_PACK_0_8_0_RULE_IDS
         )
 
     def test_every_rule_id_is_unique(self) -> None:

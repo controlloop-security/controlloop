@@ -92,6 +92,20 @@ from controlloop.policy.rules.agent_hook_command_change import (
 from controlloop.policy.rules.agent_hook_command_change import (
     findings as agent_hook_command_change_findings,
 )
+
+#: Every rule this package currently defines, in a fixed, explicit order
+#: (not import order, which is not itself guaranteed meaningful) -- see
+#: this module's own docstring for what this registry is, and is not, and
+#: for why it is named `ALL_RULES` rather than the original `RULES`.
+from controlloop.policy.rules.agent_sandbox_weakened import (
+    RULE as AGENT_SANDBOX_WEAKENED_RULE,
+)
+from controlloop.policy.rules.agent_sandbox_weakened import (
+    RULE_ID as AGENT_SANDBOX_WEAKENED_RULE_ID,
+)
+from controlloop.policy.rules.agent_sandbox_weakened import (
+    findings as agent_sandbox_weakened_findings,
+)
 from controlloop.policy.rules.broad_permission import RULE as BROAD_PERMISSION_RULE
 from controlloop.policy.rules.broad_permission import (
     RULE_ID as BROAD_PERMISSION_RULE_ID,
@@ -116,6 +130,24 @@ from controlloop.policy.rules.component_self_grant import (
 )
 from controlloop.policy.rules.component_self_grant import (
     findings as component_self_grant_findings,
+)
+from controlloop.policy.rules.component_shell_execution import (
+    RULE as COMPONENT_SHELL_EXECUTION_RULE,
+)
+from controlloop.policy.rules.component_shell_execution import (
+    RULE_ID as COMPONENT_SHELL_EXECUTION_RULE_ID,
+)
+from controlloop.policy.rules.component_shell_execution import (
+    findings as component_shell_execution_findings,
+)
+from controlloop.policy.rules.credentialed_remote_mcp_server import (
+    RULE as CREDENTIALED_REMOTE_MCP_SERVER_RULE,
+)
+from controlloop.policy.rules.credentialed_remote_mcp_server import (
+    RULE_ID as CREDENTIALED_REMOTE_MCP_SERVER_RULE_ID,
+)
+from controlloop.policy.rules.credentialed_remote_mcp_server import (
+    findings as credentialed_remote_mcp_server_findings,
 )
 from controlloop.policy.rules.destructive_or_financial_action import (
     RULE as DESTRUCTIVE_OR_FINANCIAL_ACTION_RULE,
@@ -178,6 +210,15 @@ from controlloop.policy.rules.permission_bypass_from_project import (
 from controlloop.policy.rules.permission_bypass_from_project import (
     findings as permission_bypass_from_project_findings,
 )
+from controlloop.policy.rules.secret_exposed_to_untrusted_agent_run import (
+    RULE as SECRET_EXPOSED_TO_UNTRUSTED_AGENT_RUN_RULE,
+)
+from controlloop.policy.rules.secret_exposed_to_untrusted_agent_run import (
+    RULE_ID as SECRET_EXPOSED_TO_UNTRUSTED_AGENT_RUN_RULE_ID,
+)
+from controlloop.policy.rules.secret_exposed_to_untrusted_agent_run import (
+    findings as secret_exposed_to_untrusted_agent_run_findings,
+)
 from controlloop.policy.rules.sensitive_write_without_approval import (
     RULE as SENSITIVE_WRITE_WITHOUT_APPROVAL_RULE,
 )
@@ -239,11 +280,16 @@ from controlloop.policy.rules.widened_permission_rule import (
 from controlloop.policy.rules.widened_permission_rule import (
     findings as widened_permission_rule_findings,
 )
+from controlloop.policy.rules.workspace_scope_expansion import (
+    RULE as WORKSPACE_SCOPE_EXPANSION_RULE,
+)
+from controlloop.policy.rules.workspace_scope_expansion import (
+    RULE_ID as WORKSPACE_SCOPE_EXPANSION_RULE_ID,
+)
+from controlloop.policy.rules.workspace_scope_expansion import (
+    findings as workspace_scope_expansion_findings,
+)
 
-#: Every rule this package currently defines, in a fixed, explicit order
-#: (not import order, which is not itself guaranteed meaningful) -- see
-#: this module's own docstring for what this registry is, and is not, and
-#: for why it is named `ALL_RULES` rather than the original `RULES`.
 ALL_RULES: tuple[Rule, ...] = (
     UNDECLARED_TOOLS_RULE,
     DESTRUCTIVE_OR_FINANCIAL_ACTION_RULE,
@@ -263,11 +309,18 @@ ALL_RULES: tuple[Rule, ...] = (
     WIDENED_PERMISSION_RULE_RULE,
     PERMISSION_BYPASS_FROM_PROJECT_RULE,
     UNSANCTIONED_AGENT_COMPONENT_RULE,
+    AGENT_SANDBOX_WEAKENED_RULE,
+    SECRET_EXPOSED_TO_UNTRUSTED_AGENT_RUN_RULE,
+    CREDENTIALED_REMOTE_MCP_SERVER_RULE,
+    WORKSPACE_SCOPE_EXPANSION_RULE,
+    COMPONENT_SHELL_EXECUTION_RULE,
 )
 
 __all__ = [
     "AGENT_HOOK_COMMAND_CHANGE_RULE",
     "AGENT_HOOK_COMMAND_CHANGE_RULE_ID",
+    "AGENT_SANDBOX_WEAKENED_RULE",
+    "AGENT_SANDBOX_WEAKENED_RULE_ID",
     "ALL_RULES",
     "BROAD_PERMISSION_RULE",
     "BROAD_PERMISSION_RULE_ID",
@@ -275,6 +328,10 @@ __all__ = [
     "CAPABILITY_CEILING_RULE_ID",
     "COMPONENT_SELF_GRANT_RULE",
     "COMPONENT_SELF_GRANT_RULE_ID",
+    "COMPONENT_SHELL_EXECUTION_RULE",
+    "COMPONENT_SHELL_EXECUTION_RULE_ID",
+    "CREDENTIALED_REMOTE_MCP_SERVER_RULE",
+    "CREDENTIALED_REMOTE_MCP_SERVER_RULE_ID",
     "DESTRUCTIVE_OR_FINANCIAL_ACTION_RULE",
     "DESTRUCTIVE_OR_FINANCIAL_ACTION_RULE_ID",
     "EXFILTRATION_TRIANGLE_RULE",
@@ -289,6 +346,8 @@ __all__ = [
     "OVERPRIVILEGED_AGENT_WORKFLOW_RULE_ID",
     "PERMISSION_BYPASS_FROM_PROJECT_RULE",
     "PERMISSION_BYPASS_FROM_PROJECT_RULE_ID",
+    "SECRET_EXPOSED_TO_UNTRUSTED_AGENT_RUN_RULE",
+    "SECRET_EXPOSED_TO_UNTRUSTED_AGENT_RUN_RULE_ID",
     "SENSITIVE_WRITE_WITHOUT_APPROVAL_RULE",
     "SENSITIVE_WRITE_WITHOUT_APPROVAL_RULE_ID",
     "UNAUTHORIZED_DELEGATION_RULE",
@@ -303,11 +362,16 @@ __all__ = [
     "UNSANCTIONED_AGENT_COMPONENT_RULE_ID",
     "WIDENED_PERMISSION_RULE_RULE",
     "WIDENED_PERMISSION_RULE_RULE_ID",
+    "WORKSPACE_SCOPE_EXPANSION_RULE",
+    "WORKSPACE_SCOPE_EXPANSION_RULE_ID",
     "Rule",
     "agent_hook_command_change_findings",
+    "agent_sandbox_weakened_findings",
     "broad_permission_findings",
     "capability_ceiling_findings",
     "component_self_grant_findings",
+    "component_shell_execution_findings",
+    "credentialed_remote_mcp_server_findings",
     "destructive_or_financial_action_findings",
     "exfiltration_triangle_findings",
     "hardcoded_secrets_findings",
@@ -315,6 +379,7 @@ __all__ = [
     "missing_action_logging_findings",
     "overprivileged_agent_workflow_findings",
     "permission_bypass_from_project_findings",
+    "secret_exposed_to_untrusted_agent_run_findings",
     "sensitive_write_without_approval_findings",
     "unauthorized_delegation_findings",
     "undeclared_tools_findings",
@@ -322,4 +387,5 @@ __all__ = [
     "unresolved_dynamic_registration_findings",
     "unsanctioned_agent_component_findings",
     "widened_permission_rule_findings",
+    "workspace_scope_expansion_findings",
 ]
