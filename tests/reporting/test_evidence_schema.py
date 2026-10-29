@@ -23,7 +23,7 @@ from controlloop.reporting.evidence import (
 )
 
 _CLI_ROOT = Path(__file__).resolve().parents[2]
-_SCHEMA_PATH = _CLI_ROOT / "src/controlloop/schemas/evidence/1.5.0/evidence.schema.json"
+_SCHEMA_PATH = _CLI_ROOT / "src/controlloop/schemas/evidence/1.6.0/evidence.schema.json"
 
 # Regenerate by hashing the schema file after a deliberate, version-bumped
 # change: `hashlib.sha256(_SCHEMA_PATH.read_bytes()).hexdigest()`.
@@ -40,16 +40,17 @@ _SCHEMA_PATH = _CLI_ROOT / "src/controlloop/schemas/evidence/1.5.0/evidence.sche
 # current version; 1.0.0 and 1.1.0 stay frozen at their original domain.
 # 1.4.0 (from 1.3.0) added an optional `authority_delta`, left out when
 # empty. 1.5.0 (from 1.4.0) added sanction judgments in the optional `team`
-# block.
-_GOLDEN_SCHEMA_DIGEST_FOR_1_5_0 = (
-    "b9d3d63100afd195df889e65864ca17db50516f0e02a4603900f1fc13e702e54"
+# block. 1.6.0 (from 1.5.0) added each rule's `action` and the per-finding
+# `finding_actions` to the `team` block, both left out when empty.
+_GOLDEN_SCHEMA_DIGEST_FOR_1_6_0 = (
+    "f96274530d1fa1af2b53e4e2cb24b92b147266dfc8d6bba92134a1a40d4c1abc"
 )
 
 
 def test_packaged_schema_matches_its_golden_digest() -> None:
     actual_digest = hashlib.sha256(_SCHEMA_PATH.read_bytes()).hexdigest()
 
-    assert actual_digest == _GOLDEN_SCHEMA_DIGEST_FOR_1_5_0, (
+    assert actual_digest == _GOLDEN_SCHEMA_DIGEST_FOR_1_6_0, (
         "the packaged evidence schema file changed without updating the "
         "golden digest -- decide whether this is a MAJOR/MINOR/PATCH "
         "bump before updating this constant"

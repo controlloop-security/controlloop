@@ -15,7 +15,7 @@ regenerating -- writing to a *new* version directory named after
 -> 1.1.0, its second 1.1.0 -> 1.2.0):
 
     uv run python tests/reporting/generate_evidence_schema.py \\
-        > src/controlloop/schemas/evidence/1.5.0/evidence.schema.json
+        > src/controlloop/schemas/evidence/1.6.0/evidence.schema.json
 
 After regenerating, `tests/reporting/test_evidence_schema.py`'s
 golden-digest test will fail until its committed digest constant is

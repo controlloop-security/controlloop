@@ -42,6 +42,7 @@ Applied without comment:
 | Change | Why it tightens |
 | --- | --- |
 | Raise a rule's severity floor | More findings reach the threshold |
+| Raise a rule's `action` | A finding does more to the verdict |
 | Disable a rule the organization did **not** mark mandatory | Removes an allowance the repository had been granted |
 | Add a rule the organization never configured | Adds a check that did not exist |
 | Remove an approved-component entry | Fewer components are sanctioned |
@@ -53,12 +54,26 @@ Refused, every time:
 | Change | Why it weakens |
 | --- | --- |
 | Lower a rule's severity floor | Findings that would have blocked now pass |
+| Lower a rule's `action` | A finding the organization requires to block, or to be reviewed, now does less |
 | Disable a rule the organization marked **mandatory** | Removes a check the organization requires |
 | Add an approved-component entry | This is precisely how an unsanctioned dependency becomes invisible |
 
 An unrecognized severity value is also refused. It cannot be shown to be
 tightening, and "unknown, therefore allowed" is the wrong default for a
-security control.
+security control. An unrecognized `action` is refused for the same
+reason.
+
+Actions are ordered `pass` < `warn` < `require_review` < `fail`. An
+organization rule with no `action` counts as `fail`, the default, so a
+repository may restate `fail` on it and nothing lower. A refusal reads:
+
+```text
+Repository policy lowers the action of `policy.undeclared-tools` from `fail` to `warn`, which organization policy version 7 does not permit. A repository may raise an action, never lower it.
+```
+
+Action changes are classified from merge semantics `1.2.0`. A scan
+recorded under `1.1.0` or earlier re-derives as it was: those semantics
+neither applied nor refused a repository's `action`.
 
 ## Approved-component constraints
 
@@ -204,9 +219,9 @@ set of words to learn:
 
 | Action | Effect |
 | --- | --- |
-| `fail` | A finding blocks. This is the default, and what every bundle written before the field existed does. |
-| `require_review` | A finding marks the scan as needing a human. |
-| `warn` | A finding is reported without blocking. |
+| `fail` | A finding blocks: `deployment_blocked`, exit `1`. This is the default. |
+| `require_review` | A finding marks the scan as needing a human: `review_required`, exit `3`, unless something else blocks. |
+| `warn` | A finding is reported without blocking: `passed_with_warnings`, exit `0`. |
 | `pass` | The rule runs and reports, but never affects the verdict. |
 
 `pass` is **monitor mode**, and it is not the same as `enabled: false`.
@@ -215,10 +230,20 @@ runs, and its findings appear in scans, reports, and the fleet view
 while never failing a build. That is the state to use when adopting a
 new rule across a fleet before enforcing it.
 
-> **Availability:** `action` is carried by the contract and stored with
-> the bundle today. **The CLI gate does not honor it yet.** Until then a gate applies its existing behavior
-> regardless of what `action` says, so setting a rule to `warn` or
-> `pass` does not yet change a build outcome.
+An action decides a finding's effect **whatever its severity or
+confidence**: a `low` finding from a `fail` rule blocks, a `critical`
+finding from a `warn` rule does not, and a repository's
+`low_confidence_action` cannot turn a `fail` into a warning. A rule with
+no `action` keeps the gate's severity-against-`severity_threshold`
+behavior, so a bundle written before the field existed gates exactly as
+it did. An action this CLI does not recognize is enforced as `fail`.
+
+Exceptions and suppressions apply first: a finding they cover does not
+count, whatever its rule's action.
+
+> **Availability:** A Team gate honors `action` from CLI `0.3.0` (merge
+> semantics `1.2.0`). Earlier CLIs ignore it and gate on severity alone.
+> A Community gate has no organization policy and is unchanged.
 
 ## What a project's gate behaviour means
 
@@ -278,9 +303,8 @@ look plausible and be wrong.
   policy it computed itself rather than one a client asserted.
   Shared vectors in the platform's contract, generated from the platform
   implementation, are what the CLI is asserted against (the CLI's copy
-  is `tests/fixtures/contract/policy-merge-vectors.json`). Binding
-  the *platform* to the same file is not done yet, so the vectors
-  currently guard one side of the pair.
+  is `tests/fixtures/contract/policy-merge-vectors.json`). The platform
+  runs the same file against its own implementation.
 - The repository delta the CLI sends is its disabled rules only.
   `severity_threshold`, `low_confidence_action`, and
   `completeness_enforcement` are gate-wide thresholds rather than per-rule

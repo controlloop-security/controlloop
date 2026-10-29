@@ -108,6 +108,14 @@ package, version-range, digest, command-pattern, and pin constraints, and
 the block gains `approved_components_digest`, `sanction_judgments`, and
 `sanction_note`. All are optional with defaults, so every earlier artifact
 still reads -- a MINOR bump.
+
+## Why the schema version is 1.6.0, not 1.5.0
+
+Schema 1.6.0 extends the `team` block again: each effective-policy rule
+records its organization `action` when it has one, and the block gains
+`finding_actions`, the action the gate took on each finding and whether
+the organization's rule or the severity threshold decided it. Both are
+optional and left out when empty -- a MINOR bump.
 """
 
 from __future__ import annotations
@@ -132,7 +140,7 @@ from controlloop.reporting.authority import AuthorityDelta
 from controlloop.reporting.terminal import Verdict
 from controlloop.team.evidence import TeamEvidence
 
-CURRENT_EVIDENCE_SCHEMA_VERSION = "1.5.0"
+CURRENT_EVIDENCE_SCHEMA_VERSION = "1.6.0"
 
 
 class _EvidenceModel(BaseModel):

@@ -17,14 +17,17 @@ from controlloop.findings.models import (
     FindingSeverity,
 )
 from controlloop.policy.thresholds import (
+    ActionSource,
     CompletenessEnforcement,
     GateStatus,
     GateVerdict,
     LowConfidenceAction,
     PolicyConfig,
     PolicyConfigError,
+    RuleAction,
     RuleMetadata,
     evaluate_gate,
+    finding_action,
     resolve_policy_config,
     severity_at_least,
     severity_rank,
@@ -461,6 +464,125 @@ class TestEvaluateGate:
         assert verdict.status is GateStatus.FAIL
         assert verdict.blocking_findings == (blocking,)
         assert verdict.warning_findings == (warning,)
+
+
+class TestOrganizationActions:
+    """On a Team gate a rule's organization action, not the finding's
+    severity, decides what the finding does to the verdict."""
+
+    def _evaluate(
+        self,
+        findings: tuple[Finding, ...],
+        actions: dict[str, str],
+        policy: PolicyConfig | None = None,
+    ) -> GateVerdict:
+        return evaluate_gate(
+            findings,
+            policy or _policy_config(severity_threshold=FindingSeverity.HIGH),
+            scanner_version="1.2.3",
+            rule_pack_name="test-pack",
+            rule_pack_version="9.9.9",
+            rule_pack_fingerprint="deadbeef",
+            rule_actions=actions,
+        )
+
+    def test_fail_blocks_a_finding_below_the_threshold(self) -> None:
+        low = _finding(finding_id_suffix="1", severity=FindingSeverity.LOW)
+
+        verdict = self._evaluate((low,), {"policy.undeclared-tools": "fail"})
+
+        assert verdict.status is GateStatus.FAIL
+        assert verdict.blocking_findings == (low,)
+
+    def test_require_review_neither_blocks_nor_warns(self) -> None:
+        high = _finding(finding_id_suffix="1")
+
+        verdict = self._evaluate((high,), {"policy.undeclared-tools": "require_review"})
+
+        assert verdict.status is GateStatus.PASS
+        assert verdict.review_findings == (high,)
+        assert verdict.blocking_findings == ()
+        assert verdict.warning_findings == ()
+
+    def test_warn_reports_a_finding_above_the_threshold_without_blocking(self) -> None:
+        critical = _finding(finding_id_suffix="1", severity=FindingSeverity.CRITICAL)
+
+        verdict = self._evaluate((critical,), {"policy.undeclared-tools": "warn"})
+
+        assert verdict.status is GateStatus.PASS
+        assert verdict.warning_findings == (critical,)
+
+    def test_pass_never_affects_the_verdict(self) -> None:
+        critical = _finding(finding_id_suffix="1", severity=FindingSeverity.CRITICAL)
+
+        verdict = self._evaluate((critical,), {"policy.undeclared-tools": "pass"})
+
+        assert verdict.status is GateStatus.PASS
+        assert verdict.blocking_findings == ()
+        assert verdict.review_findings == ()
+        assert verdict.warning_findings == ()
+
+    def test_a_rule_without_an_action_keeps_the_threshold(self) -> None:
+        high = _finding(finding_id_suffix="1")
+        low = _finding(
+            finding_id_suffix="2",
+            rule_id="policy.broad-permission",
+            severity=FindingSeverity.LOW,
+        )
+
+        verdict = self._evaluate((high, low), {"policy.other-rule": "pass"})
+
+        assert verdict.blocking_findings == (high,)
+        assert verdict.warning_findings == ()
+
+    def test_fail_is_not_softened_by_low_confidence_action(self) -> None:
+        low_confidence = _finding(finding_id_suffix="1", confidence=Confidence.LOW)
+        policy = _policy_config(
+            severity_threshold=FindingSeverity.HIGH,
+            low_confidence_action=LowConfidenceAction.WARN,
+        )
+
+        verdict = self._evaluate(
+            (low_confidence,), {"policy.undeclared-tools": "fail"}, policy
+        )
+
+        assert verdict.blocking_findings == (low_confidence,)
+
+    def test_an_unknown_action_is_enforced_as_fail(self) -> None:
+        low = _finding(finding_id_suffix="1", severity=FindingSeverity.LOW)
+
+        verdict = self._evaluate((low,), {"policy.undeclared-tools": "quarantine"})
+
+        assert verdict.blocking_findings == (low,)
+
+    def test_a_disabled_rule_is_still_dropped(self) -> None:
+        high = _finding(finding_id_suffix="1")
+        policy = _policy_config(
+            severity_threshold=FindingSeverity.HIGH,
+            disabled_rule_ids=frozenset({"policy.undeclared-tools"}),
+        )
+
+        verdict = self._evaluate((high,), {"policy.undeclared-tools": "fail"}, policy)
+
+        assert verdict.blocking_findings == ()
+
+    def test_finding_action_names_its_source(self) -> None:
+        policy = _policy_config(severity_threshold=FindingSeverity.HIGH)
+        high = _finding(finding_id_suffix="1")
+        low = _finding(finding_id_suffix="2", severity=FindingSeverity.LOW)
+
+        assert finding_action(high, policy, {"policy.undeclared-tools": "warn"}) == (
+            RuleAction.WARN,
+            ActionSource.ORGANIZATION,
+        )
+        assert finding_action(high, policy) == (
+            RuleAction.FAIL,
+            ActionSource.SEVERITY_THRESHOLD,
+        )
+        assert finding_action(low, policy) == (
+            RuleAction.PASS,
+            ActionSource.SEVERITY_THRESHOLD,
+        )
 
 
 class TestOffline:

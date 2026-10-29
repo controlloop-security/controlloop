@@ -256,7 +256,7 @@ class TestEvidence:
             }
         ]
         assert team["approved_components_digest"].startswith("sha256:")
-        assert team["merge_semantics_version"] == "1.1.0"
+        assert team["merge_semantics_version"] == "1.2.0"
 
     def test_a_repository_approval_does_not_clear_an_organization_judgment(
         self, tmp_path: Path, monkeypatch: MonkeyPatch

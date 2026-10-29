@@ -72,7 +72,7 @@ from controlloop.team.envelope import (
     ScanEnvelope,
     serialize_envelope,
 )
-from controlloop.team.evidence import TeamEvidence
+from controlloop.team.evidence import FindingActionRecord, TeamEvidence
 from controlloop.team.exceptions import (
     ActiveException,
     ExceptionOutcome,
@@ -129,6 +129,9 @@ class TeamPreparation:
 
     def severity_floors(self) -> dict[str, str]:
         return self.merge.severity_floors() if self.merge is not None else {}
+
+    def rule_actions(self) -> dict[str, str]:
+        return self.merge.actions() if self.merge is not None else {}
 
 
 def repository_delta_from(disabled_rule_ids: frozenset[str]) -> tuple[RuleSpec, ...]:
@@ -242,9 +245,11 @@ def build_evidence(
     preparation: TeamPreparation,
     exception_outcome: ExceptionOutcome,
     judgments: tuple[DeltaJudgment, ...] = (),
+    finding_actions: tuple[FindingActionRecord, ...] = (),
 ) -> TeamEvidence | None:
     """The evidence block for this run, or `None` when no merge happened.
-    `judgments` are the sanction judgments of the authority delta."""
+    `judgments` are the sanction judgments of the authority delta, and
+    `finding_actions` the action the gate took on each finding."""
 
     if preparation.merge is None:
         return None
@@ -257,6 +262,7 @@ def build_evidence(
         repository_delta=preparation.repository_delta,
         exception_records=exception_outcome.records,
         judgments=judgments,
+        finding_actions=finding_actions,
     )
 
 
@@ -509,6 +515,7 @@ def _organization_rules(policy: EffectivePolicyResponse) -> tuple[RuleSpec, ...]
             enabled=rule.enabled,
             severity_floor=rule.severity_floor,
             mandatory=bool(rule.mandatory),
+            action=rule.action,
         )
         for rule in policy.rules
         if rule.rule_id

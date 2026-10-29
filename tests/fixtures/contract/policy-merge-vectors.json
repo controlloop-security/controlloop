@@ -1,6 +1,6 @@
 {
   "$comment": "Shared strengthen-only policy merge vectors, recorded from the ControlLoop platform's own merge and asserted against controlloop.team.policy.merge_policy by tests/team/test_policy_merge.py. See docs/reference/policy-merge-semantics.md for the semantics these encode.",
-  "merge_semantics_version": "1.0.0",
+  "merge_semantics_version": "1.2.0",
   "vectors": [
     {
       "name": "empty-organization-bundle-and-no-repository-policy",
@@ -400,6 +400,259 @@
             "reason": "Repository policy lowers the severity floor of `secrets.hardcoded` from `medium` to `catastrophic`, which organization policy version 7 does not permit. A repository may raise a floor, never lower it."
           }
         ]
+      }
+    },
+    {
+      "name": "repository-raises-an-action",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [
+          {
+            "rule_id": "policy.undeclared-tools",
+            "enabled": true,
+            "severity_floor": "medium",
+            "action": "warn",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "repository": {
+        "rules": [
+          {
+            "rule_id": "policy.undeclared-tools",
+            "enabled": true,
+            "severity_floor": "medium",
+            "action": "require_review",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "policy.undeclared-tools",
+            "enabled": true,
+            "severity_floor": "medium",
+            "action": "require_review",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [],
+        "rejections": []
+      }
+    },
+    {
+      "name": "repository-lowers-an-action",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [
+          {
+            "rule_id": "policy.undeclared-tools",
+            "enabled": true,
+            "severity_floor": "medium",
+            "action": "fail",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "repository": {
+        "rules": [
+          {
+            "rule_id": "policy.undeclared-tools",
+            "enabled": true,
+            "severity_floor": "medium",
+            "action": "warn",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "policy.undeclared-tools",
+            "enabled": true,
+            "severity_floor": "medium",
+            "action": "fail",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [],
+        "rejections": [
+          {
+            "rule_id": "policy.undeclared-tools",
+            "organization_bundle_version": "7",
+            "reason": "Repository policy lowers the action of `policy.undeclared-tools` from `fail` to `warn`, which organization policy version 7 does not permit. A repository may raise an action, never lower it."
+          }
+        ]
+      }
+    },
+    {
+      "name": "repository-restates-the-default-action",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "high",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "repository": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "high",
+            "action": "fail",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "high",
+            "mandatory": false,
+            "action": "fail"
+          }
+        ],
+        "approved_components": [],
+        "rejections": []
+      }
+    },
+    {
+      "name": "repository-lowers-the-default-action",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "high",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "repository": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "high",
+            "action": "pass",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "enabled": true,
+            "severity_floor": "high",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [],
+        "rejections": [
+          {
+            "rule_id": "secrets.hardcoded",
+            "organization_bundle_version": "7",
+            "reason": "Repository policy lowers the action of `secrets.hardcoded` from `fail` to `pass`, which organization policy version 7 does not permit. A repository may raise an action, never lower it."
+          }
+        ]
+      }
+    },
+    {
+      "name": "repository-proposes-an-unrecognized-action",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [
+          {
+            "rule_id": "policy.undeclared-tools",
+            "enabled": true,
+            "severity_floor": "medium",
+            "action": "warn",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "repository": {
+        "rules": [
+          {
+            "rule_id": "policy.undeclared-tools",
+            "enabled": true,
+            "severity_floor": "medium",
+            "action": "block",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "policy.undeclared-tools",
+            "enabled": true,
+            "severity_floor": "medium",
+            "action": "warn",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [],
+        "rejections": [
+          {
+            "rule_id": "policy.undeclared-tools",
+            "organization_bundle_version": "7",
+            "reason": "Repository policy lowers the action of `policy.undeclared-tools` from `warn` to `block`, which organization policy version 7 does not permit. A repository may raise an action, never lower it."
+          }
+        ]
+      }
+    },
+    {
+      "name": "repository-adds-a-rule-with-its-own-action",
+      "organization_bundle_version": "7",
+      "organization": {
+        "rules": [],
+        "approved_components": []
+      },
+      "repository": {
+        "rules": [
+          {
+            "rule_id": "policy.unpinned-mcp-package",
+            "enabled": true,
+            "severity_floor": "low",
+            "action": "pass",
+            "mandatory": false
+          }
+        ],
+        "approved_components": []
+      },
+      "expected": {
+        "rules": [
+          {
+            "rule_id": "policy.unpinned-mcp-package",
+            "enabled": true,
+            "severity_floor": "low",
+            "action": "pass",
+            "mandatory": false
+          }
+        ],
+        "approved_components": [],
+        "rejections": []
       }
     },
     {

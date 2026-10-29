@@ -72,8 +72,23 @@ def _located_evidence(evidence: tuple[Evidence, ...]) -> tuple[Evidence, ...]:
     return tuple(item for item in evidence if item.path is not None)
 
 
+#: The glyph and closing line for a finding whose organization `action`
+#: decided its effect on a Team gate verdict. Keyed by the action's wire
+#: value: this module does not import `controlloop.policy`.
+_ACTION_TEXT: dict[str, tuple[str, str]] = {
+    "fail": ("✕", "organization action `fail`: blocks"),
+    "require_review": ("!", "organization action `require_review`: needs review"),
+    "warn": ("!", "organization action `warn`: reported, does not block"),
+    "pass": ("•", "organization action `pass`: does not affect the verdict"),
+}
+
+
 def render_finding_text(
-    finding: Finding, *, suppressed_until: str | None = None
+    finding: Finding,
+    *,
+    suppressed_until: str | None = None,
+    excepted_until: str | None = None,
+    organization_action: str | None = None,
 ) -> str:
     """Return `finding`'s brand-consistent, glyph-prefixed human text:
     one summary line, followed by one indented location line per
@@ -85,9 +100,31 @@ def render_finding_text(
     `suppressed_until` is the expiry date of an active suppression that
     covers this finding. The finding is still shown at its own severity,
     but with the neutral `•` glyph and a closing line saying it is
-    suppressed, so it never reads as one that blocks."""
+    suppressed, so it never reads as one that blocks.
 
-    glyph = "•" if suppressed_until is not None else _SEVERITY_GLYPH[finding.severity]
+    `excepted_until` does the same for an organization exception that
+    covers this finding on a Team gate, with its expiry date.
+
+    `organization_action` is the action the finding's organization rule
+    sets (`fail`, `require_review`, `warn`, `pass`). It decided the
+    finding's effect on the verdict instead of its severity, so its glyph
+    follows the action, and a closing line names it. An action this
+    function does not know reads as `fail`, as it is enforced."""
+
+    closing: str | None = None
+    if suppressed_until is not None:
+        glyph = "•"
+        closing = f"suppressed until {suppressed_until}; does not affect the verdict"
+    elif excepted_until is not None:
+        glyph = "•"
+        closing = (
+            f"organization exception until {excepted_until}; "
+            "does not affect the verdict"
+        )
+    elif organization_action is not None:
+        glyph, closing = _ACTION_TEXT.get(organization_action, _ACTION_TEXT["fail"])
+    else:
+        glyph = _SEVERITY_GLYPH[finding.severity]
     label = finding.severity.value.upper()
     lines = [f"{glyph} {label:<{_LABEL_WIDTH}}{finding.rule_id}: {finding.message}"]
     for evidence in _located_evidence(finding.evidence):
@@ -98,10 +135,8 @@ def render_finding_text(
             line_end=evidence.line_end,
         )
         lines.append(f"    at {location}")
-    if suppressed_until is not None:
-        lines.append(
-            f"    suppressed until {suppressed_until}; does not affect the verdict"
-        )
+    if closing is not None:
+        lines.append(f"    {closing}")
     return "\n".join(lines)
 
 
