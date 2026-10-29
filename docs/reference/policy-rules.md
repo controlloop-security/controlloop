@@ -1351,6 +1351,58 @@ file is still reported, because other versions honor it. Cursor's
 `egressMode` order comes from its environment schema's descriptions;
 the documentation states none.
 
+<a id="secret-exposed-to-untrusted-agent-run"></a>
+## Secret exposed to an untrusted agent run
+
+**Outcome:** a workflow job that runs a coding agent on untrusted input
+and is given a repository secret is reported, naming the secrets and the
+trigger.
+
+**Why this matters:** this is the [exfiltration
+triangle](#exfiltration-triangle) for CI agents. Whoever opens the pull
+request or writes the comment can steer the agent (untrusted input), the
+job holds the secret (sensitive data), and the agent can reach the
+network. An injected instruction can read the secret and send it out.
+It is a separate rule because the triangle reads agent, resource, and
+tool nodes, and this reads one workflow job's recorded triggers and
+secret names.
+
+**Example:** a job on `pull_request_target` runs
+`anthropics/claude-code-action@v1` with `env: DEPLOY_KEY: ${{
+secrets.DEPLOY_KEY }}`. The finding reads "Job 'agent / review' runs an
+agent on untrusted input (pull_request_target) and is given secret
+DEPLOY_KEY." at `high`.
+
+Untrusted input is a job triggered by `pull_request_target`,
+`issue_comment`, `workflow_run`, `issues`,
+`pull_request_review_comment`, or `discussion_comment`, or one that
+checks out the pull request head. A secret is any `secrets.<NAME>` the
+job's `env` or the agent step references, except `GITHUB_TOKEN`, whose
+permissions are [over-privileged agent
+workflow](#overprivileged-agent-workflow)'s. The agent's own API key
+(`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`) counts: it can
+still be read and sent out.
+
+| Change state | Severity |
+| --- | --- |
+| Added, changed into this state, or given another secret | `high` |
+| No baseline (first scan) | `medium` |
+| Exposed secrets unchanged since the baseline, trigger or secrets removed | none |
+
+**Change states and confidence:** `added` or `changed` (`high`, naming only the secrets the change newly exposes); `not-compared` on a scan with no baseline (`medium`). Confidence is `high`. Secret names are reported; values are never read.
+
+**Approving or suppressing:** these findings are change-only, so a reviewed change stops producing one once it is in the baseline. To let a reviewed change through before then, add a `controlloop.yaml` approval whose `capability` names the component (`<file>#<key path>`, its name, or its node ID): the finding is kept at `info` with the approver's name, so it no longer blocks, and the [authority statement](authority-statement.md) says "Approval recorded." An expired approval does nothing. A time-limited [suppression](suppressions.md) naming the finding's `id` works too.
+
+**Remediation:** run the agent on `pull_request` from the base branch,
+move the secret to a job the agent does not run in, or gate the job on an
+environment that needs approval. If the secret is the agent's own API
+key, scope it to this job and set a spend limit.
+
+**False positives:** a job whose runner blocks outbound network access
+is still reported; the rule does not read runner or firewall settings.
+So is a `pull_request_target` job limited to collaborators by a job
+condition, since the condition is not evaluated.
+
 ## Known limitations
 
 - `controlloop scan` and `controlloop gate` both consume every rule
