@@ -58,9 +58,10 @@ _GOLDEN_VERDICT = "passed"
 # Updated for the 0.1.0 -> 0.1.1 release: the scanner version is part of
 # the canonical bytes too, so every version bump changes this digest.
 # Updated again for 0.1.1 -> 0.2.0, for the same reason.
+# And for 0.2.0 -> 0.3.0.
 # Stable across 3 repeated local runs before being recorded.
 _GOLDEN_DIGEST = (
-    "sha256:b2fba92bbddc32b1ef487975d81a90d2726ca2b4727b8ecaa019b5df19bee3ec"
+    "sha256:28f356a86858b95862f70c9ff9a199c2a5e14f2f07a5a6e1428d732a3fe2ae93"
 )
 
 
