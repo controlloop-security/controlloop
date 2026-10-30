@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-30
+
+The Action's description fits GitHub Marketplace, so the Action can be
+listed. Nothing else changes.
+
 ### Fixed
 
 - **The Action's description fits GitHub Marketplace.** `action.yml`'s
