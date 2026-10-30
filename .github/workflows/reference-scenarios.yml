@@ -113,8 +113,9 @@ jobs:
 
           - name: CrewAI unresolved capability
             # The only non-blocking scenario in the matrix, and
-            # deliberately so. Its manifest approves everything and no
-            # rule fires, so the gate passes with exit 0 -- while the
+            # deliberately so. Its manifest approves everything, so the
+            # only finding is the medium unresolved-dynamic-registration
+            # one and the gate passes with exit 0 -- while the
             # blast radius still names an unclassified capability the
             # researcher reaches transitively through delegation. A
             # regression that silently dropped an unresolvable tool
