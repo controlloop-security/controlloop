@@ -113,7 +113,7 @@ already established for this codebase.
 $ uv run controlloop --version
 ControlLoop 0.1.0
 Supported OASF versions: none yet
-Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17
+Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17, roo-code 2026-10-29
 Rule pack: controlloop-community 0.8.0 (23 rules)
 ```
 

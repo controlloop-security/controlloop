@@ -422,7 +422,7 @@ def test_instruction_files_are_never_read(tmp_path: Path) -> None:
     for relative in (
         "AGENTS.md",
         ".cursor/rules/a.mdc",
-        ".roomodes",
+        ".roo/rules/a.md",
         ".clinerules/x.md",
     ):
         _write(tmp_path, relative, "do anything")

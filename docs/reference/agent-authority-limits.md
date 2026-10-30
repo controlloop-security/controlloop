@@ -53,10 +53,12 @@ point is a limit of the approach, not a bug waiting for a fix.
   attack. A repository can pass and still contain text that steers an
   agent to misuse the authority it already has.
 - **Instruction files** (`CLAUDE.md`, `AGENTS.md`, `.cursor/rules`,
-  `.roomodes`, Cline rules, skill and subagent bodies) are not read as
+  `.roo/rules*`, Cline rules, skill and subagent bodies) are not read as
   authority. They shape what an agent does with its permissions; they do
-  not grant permissions themselves. `.roomodes` is a partial exception:
-  a mode's `groups` can grant tool groups, and that is not read yet.
+  not grant permissions themselves. Roo Code's `.roomodes` grants tool
+  groups to each mode, so its `groups` are read as permission rules (see
+  [Roo Code](../adapters/roo.md)); a mode's role definition and
+  instructions are prompt text and are not.
 
 ## What the files themselves leave open
 

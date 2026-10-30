@@ -59,7 +59,7 @@ def test_version_is_machine_stable() -> None:
         f"Supported OASF versions: {supported}\n"
         "Agent host key sets (documentation read on): claude-code 2026-10-17, "
         "codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, "
-        "kiro 2026-10-17\n"
+        "kiro 2026-10-17, roo-code 2026-10-29\n"
         f"Rule pack: {CURRENT_RULE_PACK.name} {CURRENT_RULE_PACK.version} "
         f"({len(CURRENT_RULE_PACK.rules)} rules)\n"
     )

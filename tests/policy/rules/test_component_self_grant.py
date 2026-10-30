@@ -154,3 +154,20 @@ def test_findings_never_carry_a_secret_and_are_deterministic(tmp_path: Path) -> 
 
     assert first == second
     assert SECRET not in json.dumps([f.model_dump(mode="json") for f in first])
+
+
+def test_a_roo_mode_group_is_left_to_the_widened_rule(tmp_path: Path) -> None:
+    """A `.roomodes` group is held by the Roo Code host as well as its
+    mode, so it is part of the host's allow set: one change produces the
+    widened-rule finding, not a second self-grant finding."""
+
+    base, head = repos(tmp_path)
+    write(base, ".roomodes", {"customModes": [{"slug": "ops", "groups": ["read"]}]})
+    write(
+        head,
+        ".roomodes",
+        {"customModes": [{"slug": "ops", "groups": ["read", "command"]}]},
+    )
+
+    assert component_self_grant_findings(context(head, base)) == ()
+    assert component_self_grant_findings(context(head)) == ()

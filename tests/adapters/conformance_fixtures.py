@@ -35,6 +35,7 @@ from controlloop.adapters import (
     OasfAdapter,
     OpenAiAgentsAdapter,
     OpenApiAdapter,
+    RooModesAdapter,
     ScanContext,
     run_adapters,
 )
@@ -246,6 +247,26 @@ def _gemini_write_privacy(tmp_path: Path) -> tuple[str, ...]:
     return (_CREDENTIAL, _ENV_VALUE)
 
 
+def _roo_write_privacy(tmp_path: Path) -> tuple[str, ...]:
+    _write_json(
+        tmp_path,
+        ".roomodes",
+        {
+            "customModes": [
+                {
+                    "slug": "reviewer",
+                    "roleDefinition": _PROMPT_BODY,
+                    "customInstructions": _PROMPT_BODY,
+                    "whenToUse": _PROMPT_BODY,
+                    "description": _PROMPT_BODY,
+                    "groups": ["read", "command"],
+                }
+            ]
+        },
+    )
+    return (_PROMPT_BODY,)
+
+
 def _cursor_write_privacy(tmp_path: Path) -> tuple[str, ...]:
     _write_json(
         tmp_path,
@@ -293,6 +314,7 @@ PRIVACY_REQUIRED_ADAPTERS = frozenset(
         "gemini-cli",
         "cursor",
         "kiro",
+        "roo-code",
     }
 )
 
@@ -1326,6 +1348,20 @@ KIRO_FIXTURE = _host_fixture(
     positive_subtypes=["hook", "host"],
     write_privacy=_kiro_write_privacy,
 )
+ROO_FIXTURE = _host_fixture(
+    name="roo-code",
+    adapter=RooModesAdapter,
+    path=".roomodes",
+    positive=json.dumps({"customModes": [{"slug": "reviewer", "groups": ["read"]}]}),
+    near_miss=".roomodes.bak",
+    malformed="{ not valid json at all !!! ",
+    boundary=lambda count: json.dumps(
+        {"customModes": [{"slug": f"mode-{i}", "groups": []} for i in range(count)]}
+    ),
+    boundary_subtype="subagent",
+    positive_subtypes=["host", "permission-rule", "subagent"],
+    write_privacy=_roo_write_privacy,
+)
 
 ALL_FIXTURES: tuple[ConformanceFixture, ...] = (
     MCP_FIXTURE,
@@ -1343,4 +1379,5 @@ ALL_FIXTURES: tuple[ConformanceFixture, ...] = (
     GEMINI_FIXTURE,
     CURSOR_FIXTURE,
     KIRO_FIXTURE,
+    ROO_FIXTURE,
 )
