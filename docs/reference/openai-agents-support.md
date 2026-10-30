@@ -20,8 +20,8 @@ registry as [CrewAI](crewai-support.md) and
 
 ## There is no configuration file
 
-Unlike CrewAI (`config/agents.yaml`) and LangGraph (`langgraph.json`),
-this SDK ships nothing declarative. Detection keys on the SDK's own
+Unlike LangGraph (`langgraph.json`), and CrewAI's scaffolded
+`config/agents.yaml`, this SDK ships nothing declarative. Detection keys on the SDK's own
 import instead:
 
 ```python

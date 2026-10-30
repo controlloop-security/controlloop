@@ -39,6 +39,16 @@ produces exit code 2 with a message naming the specific key, never a
 stack trace. No message contains a resolved value: not the endpoint,
 not an identifier, and above all not the token.
 
+## The branch comes from the CI when it is not configured
+
+`team_branch` wins whenever it is set. Otherwise the branch is read from
+the CI's own variables (`detect_branch`), then from the checked-out
+branch in git, so a plain `controlloop gate` upload still names its
+branch. A detached `HEAD` with no CI variable sends no branch rather than
+a guess. Like the token, the variables come from the injected
+environment mapping; git is consulted through a callable the caller
+supplies, so this module still runs no process of its own.
+
 ## Why `http` is allowed for loopback only
 
 An endpoint must be `https`, with one documented exception: a loopback
@@ -53,6 +63,7 @@ module can verify.
 from __future__ import annotations
 
 import ipaddress
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Final
@@ -77,6 +88,31 @@ _MAX_TOKEN_LENGTH: Final = 4096
 #: Hosts permitted to use `http` rather than `https`; see the module
 #: docstring.
 _LOOPBACK_HOSTNAMES: Final = frozenset({"localhost"})
+
+#: The CI variables a branch is read from when `team_branch` is unset, in
+#: order. A pull request's source branch comes before the ref the build
+#: ran on: GitHub sets `GITHUB_REF_NAME` to `<number>/merge` for a pull
+#: request, and Azure DevOps sets `BUILD_SOURCEBRANCH` to `refs/pull/...`.
+BRANCH_ENVIRONMENT_VARIABLES: Final = (
+    "GITHUB_HEAD_REF",
+    "GITHUB_REF_NAME",
+    "CI_COMMIT_REF_NAME",
+    "BITBUCKET_BRANCH",
+    "SYSTEM_PULLREQUEST_SOURCEBRANCH",
+    "BUILD_SOURCEBRANCH",
+)
+
+#: A variable that, when set, means the paired branch variable holds a
+#: tag rather than a branch, so it is skipped.
+_TAG_MARKERS: Final = {
+    "GITHUB_REF_NAME": ("GITHUB_REF_TYPE", "tag"),
+    "CI_COMMIT_REF_NAME": ("CI_COMMIT_TAG", None),
+}
+
+#: The platform stores at most this many characters of a branch name. A
+#: longer detected name is dropped rather than failing the upload; a
+#: configured `team_branch` is sent as written.
+_MAX_DETECTED_BRANCH_LENGTH: Final = 255
 
 
 class TeamFailMode(StrEnum):
@@ -265,10 +301,59 @@ def _validate_pull_request(raw: str) -> int | None:
     return number
 
 
+def _branch_from_variable(name: str, environ: Mapping[str, str]) -> str | None:
+    value = environ.get(name, "").strip()
+    if not value:
+        return None
+    marker = _TAG_MARKERS.get(name)
+    if marker is not None:
+        marker_name, marker_value = marker
+        marked = environ.get(marker_name, "").strip()
+        if marked and (marker_value is None or marked == marker_value):
+            return None
+    if name in ("BUILD_SOURCEBRANCH", "SYSTEM_PULLREQUEST_SOURCEBRANCH"):
+        # Azure DevOps gives the full ref. Only `refs/heads/` names a
+        # branch; `BUILD_SOURCEBRANCHNAME` is not used because it keeps
+        # only the last path segment (`feature/login` becomes `login`).
+        if not value.startswith("refs/heads/"):
+            return None
+        value = value.removeprefix("refs/heads/")
+    return value or None
+
+
+def detect_branch(
+    environ: Mapping[str, str],
+    *,
+    git_branch: Callable[[], str | None],
+) -> str | None:
+    """The branch a scan ran on, when `team_branch` is not set.
+
+    Reads the CI's branch variables in `BRANCH_ENVIRONMENT_VARIABLES` order, then
+    asks `git_branch` for the checked-out branch, which returns `None` on
+    a detached `HEAD`. A name longer than the platform stores is dropped.
+    """
+
+    for name in BRANCH_ENVIRONMENT_VARIABLES:
+        branch = _branch_from_variable(name, environ)
+        if branch is not None:
+            break
+    else:
+        branch = git_branch()
+        branch = branch.strip() if branch else None
+    if not branch or len(branch) > _MAX_DETECTED_BRANCH_LENGTH:
+        return None
+    return branch
+
+
+def _no_git_branch() -> str | None:
+    return None
+
+
 def resolve_team_config(
     resolved: ResolvedConfig,
     *,
     environ: dict[str, str],
+    git_branch: Callable[[], str | None] = _no_git_branch,
 ) -> TeamConfig | None:
     """Return the validated Team configuration, or `None` when Team is off.
 
@@ -279,7 +364,9 @@ def resolve_team_config(
     `environ` is injected rather than read from `os.environ` here, for the
     same reason `controlloop.config.load_config` takes it as a parameter:
     deterministic logic in this codebase does not depend on ambient
-    process state, and every test supplies its own mapping.
+    process state, and every test supplies its own mapping. `git_branch`
+    is the checked-out branch, consulted only when neither `team_branch`
+    nor a CI variable names one.
     """
 
     enabled = resolved.team_value("team_enabled")
@@ -293,7 +380,9 @@ def resolve_team_config(
     fail_mode_value = resolved.team_value("team_fail_mode")
     assert isinstance(fail_mode_value, str)
 
-    branch = _require_string(resolved, "team_branch").strip()
+    branch = _require_string(resolved, "team_branch").strip() or detect_branch(
+        environ, git_branch=git_branch
+    )
 
     return TeamConfig(
         endpoint=_validate_endpoint(_require_string(resolved, "team_endpoint")),

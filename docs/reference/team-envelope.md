@@ -34,7 +34,7 @@ values. No secrets. No file contents.**
 | --- | --- | --- |
 | `envelope_version` | The envelope schema version | A constant in the CLI |
 | `commit_sha` | The 40-character commit being gated | `git rev-parse HEAD` |
-| `branch` | Branch name, if you configured one | `team_branch` |
+| `branch` | Branch name, when one is known | `team_branch`, else the CI or git — see [Where the branch comes from](#where-the-branch-comes-from) |
 | `pull_request_number` | PR number, if you configured one | `team_pull_request` |
 | `scanner_version` | Which ControlLoop produced this | The installed version |
 | `policy_version` | Which rule pack was applied | The rule pack |
@@ -44,6 +44,27 @@ values. No secrets. No file contents.**
 | `components` | Normalized agents, tools, MCP servers, resources, identities, and (1.1.0) agent authority components | The ACBOM |
 | `repository_policy` | Your repository's own policy, as a delta | `disabled_rules` |
 | `authority_delta` | 1.1.0 only: what the change lets an agent do — see [Envelope 1.1.0](#envelope-110-agent-authority) | The authority statement |
+
+### Where the branch comes from
+
+The first of these that names a branch is sent:
+
+1. `team_branch` (or `CONTROLLOOP_TEAM_BRANCH`), when set. It always wins.
+2. The CI's branch variable, in this order:
+   - `GITHUB_HEAD_REF`, the source branch of a GitHub pull request.
+   - `GITHUB_REF_NAME`, unless `GITHUB_REF_TYPE` is `tag`.
+   - `CI_COMMIT_REF_NAME` on GitLab, unless `CI_COMMIT_TAG` is set.
+   - `BITBUCKET_BRANCH`.
+   - On Azure DevOps, `SYSTEM_PULLREQUEST_SOURCEBRANCH`, then
+     `BUILD_SOURCEBRANCH`, when either is a `refs/heads/` ref. The CLI
+     doesn't use `BUILD_SOURCEBRANCHNAME` because it keeps only the last
+     path segment, so `feature/login` would arrive as `login`.
+3. The branch checked out in git (`git symbolic-ref --short HEAD`).
+
+A detached `HEAD` with none of these sends no `branch` at all, never a
+guess. A detected name longer than 255 characters, the most the platform
+stores, is also dropped. The branch name is the only value the envelope
+takes from these variables.
 
 ### Inside one finding
 

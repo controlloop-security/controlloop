@@ -114,7 +114,7 @@ configures them resolves exactly as it did before these keys existed, and
 | `team_project_id` | This repository's project UUID. |
 | `team_fail_mode` | `closed` (default) or `open` — what a gate does when the platform is unreachable. |
 | `team_policy_cache_seconds` | How long a fetched organization policy bundle stays fresh. `300` by default. |
-| `team_branch` | Branch name recorded on the uploaded scan. Optional. |
+| `team_branch` | Branch name recorded on the uploaded scan. Optional: when unset, the CLI reads the CI's branch variable, then the branch checked out in git. See [Where the branch comes from](team-envelope.md#where-the-branch-comes-from). |
 | `team_pull_request` | Pull-request number recorded on the uploaded scan. Optional. |
 
 ### The project token is not a configuration key

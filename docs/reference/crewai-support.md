@@ -25,6 +25,30 @@ than parsed hopefully — see [Version handling](#version-handling).
 | each entry in `config/agents.yaml` | YAML | an `agent` node named by its `role` |
 | `allow_delegation: true` | YAML | a `delegates-to` edge to every other agent in the crew |
 | `tools=[SomeTool(), other.Tool()]` | `crew.py`, parsed | a `tool` node each, plus an `invokes` edge |
+| `Agent(role=..., tools=[...])` with no `config=` | any module that imports `crewai`, parsed | an `agent` node named by its `role` |
+| `allow_delegation=True` on an agent built in code | the same module | a `delegates-to` edge to every other agent that module builds |
+
+### Agents built in code
+
+A crew doesn't need `config/agents.yaml`. Any Python module that imports
+`crewai` is parsed, and each `Agent(...)` call with no `config=` becomes
+an agent of that module. Its tools resolve, and a list built at runtime
+is reported, exactly as for a YAML agent.
+
+```python
+from crewai import Agent
+
+researcher = Agent(
+    role="Researcher", goal="...", backstory="...", tools=[SerperDevTool()]
+)
+```
+
+The agent's identity is its `@agent` method name when it has one, then
+the variable it is assigned to, then its literal `role`. Renaming the
+role doesn't change an agent identified by its method or variable. An
+`Agent(...)` that none of these names, such as one built inline with a
+computed role, is reported as an unresolved reference rather than given
+a made-up identity.
 
 CrewAI does not let an agent name specific delegation targets, so
 `allow_delegation: true` becomes an edge to **every** other agent.

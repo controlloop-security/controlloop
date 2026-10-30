@@ -36,6 +36,7 @@ from controlloop.baseline import (
     NoGitHistoryError,
     build_acbom_at_revision,
     build_merge_base_acbom,
+    checked_out_branch,
     resolve_baseline,
     resolve_merge_base,
     resolve_revision_commit,
@@ -2201,7 +2202,11 @@ def _gate_team_prepare(
     """
 
     try:
-        config = resolve_team_config(resolved_config, environ=dict(os.environ))
+        config = resolve_team_config(
+            resolved_config,
+            environ=dict(os.environ),
+            git_branch=lambda: checked_out_branch(root),
+        )
     except TeamConfigError as error:
         _gate_error(str(error))
 

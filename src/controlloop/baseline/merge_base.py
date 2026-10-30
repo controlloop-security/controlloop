@@ -325,6 +325,14 @@ def _run_git(root: RepositoryRoot, args: list[str]) -> str | None:
     return output or None
 
 
+def checked_out_branch(root: RepositoryRoot) -> str | None:
+    """The branch checked out at `root`, or `None` on a detached `HEAD`,
+    outside a git repository, or when `git` is unavailable. Read-only and
+    local, like every other call here."""
+
+    return _run_git(root, ["symbolic-ref", "--quiet", "--short", "HEAD"])
+
+
 def _is_shallow(root: RepositoryRoot) -> bool:
     return _run_git(root, ["rev-parse", "--is-shallow-repository"]) == "true"
 

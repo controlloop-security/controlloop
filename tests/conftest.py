@@ -18,6 +18,8 @@ from collections.abc import Iterator
 
 import pytest
 
+from controlloop.team.config import BRANCH_ENVIRONMENT_VARIABLES
+
 
 class NetworkAccessDeniedError(RuntimeError):
     """A test attempted network access while the offline harness was active.
@@ -41,3 +43,13 @@ def _deny_network_access(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setattr(socket, "socket", _deny)
     monkeypatch.setattr(socket, "create_connection", _deny)
     yield
+
+
+@pytest.fixture(autouse=True)
+def _clear_ci_branch_variables(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A Team upload reads the branch from CI variables. Clearing them
+    keeps every test's envelope the same on a laptop and on a CI runner,
+    which sets them for its own build."""
+
+    for name in BRANCH_ENVIRONMENT_VARIABLES:
+        monkeypatch.delenv(name, raising=False)

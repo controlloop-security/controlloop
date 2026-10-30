@@ -31,6 +31,7 @@ from controlloop.baseline.merge_base import (
     NoGitHistoryError,
     build_acbom_at_revision,
     build_merge_base_acbom,
+    checked_out_branch,
     resolve_merge_base,
     resolve_revision_commit,
 )
@@ -86,6 +87,7 @@ __all__ = [
     "build_acbom_at_revision",
     "build_merge_base_acbom",
     "canonicalize_baseline",
+    "checked_out_branch",
     "compute_baseline_digest",
     "count_commits_between",
     "describe_provenance",
