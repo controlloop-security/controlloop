@@ -6,6 +6,17 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-30
+
+The same CLI as 0.6.1, built on a different macOS runner image.
+
+### Changed
+
+- **The macOS arm64 checks and standalone binary run on `macos-14`.**
+  GitHub's hosted `macos-15` arm64 runners were short of capacity, and
+  the 0.6.1 release could not get one. `macos-14` is also Apple Silicon,
+  so the binary's platform and architecture are unchanged.
+
 ## [0.6.1] - 2026-10-30
 
 The Action's description fits GitHub Marketplace, so the Action can be

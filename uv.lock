@@ -58,7 +58,7 @@ wheels = [
 
 [[package]]
 name = "controlloop"
-version = "0.6.1"
+version = "0.6.2"
 source = { editable = "." }
 dependencies = [
     { name = "pathspec" },
