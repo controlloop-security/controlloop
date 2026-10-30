@@ -113,6 +113,13 @@ with an external JSON Schema validator; `bom --validate` was never
 affected, because it validates with the model. Every committed golden
 ACBOM is now validated against the packaged schema in the test suite.
 
+Attribute keys recorded since `1.2.0` without a version change, since
+`attributes` already accepts any lowercase key and the wire format is
+unchanged: `script_path` and `script_digest` on `hook` and
+`helper-command` nodes (the script a command runs, by repository path
+and SHA-256, or `unknown`), and `slug`, `groups`, `mode`, and
+`docs_snapshot` on Roo Code mode nodes and their rules.
+
 The `1.1.0` bump added `ACBOMDocument.schema_url`, the
 permanent, versioned URL the document's schema is published at (where it is hosted is a separate, recorded decision). Every document `bom` generates populates it.
 `bom --validate` (see the [CLI reference](cli.md#bom)) validates an

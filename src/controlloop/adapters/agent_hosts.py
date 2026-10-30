@@ -47,6 +47,7 @@ from controlloop.adapters.claude_code import (
     hook_node,
 )
 from controlloop.adapters.framework import DetectionResult, DiscoveryResult, ScanContext
+from controlloop.adapters.script_digest import with_script_digests
 from controlloop.bounded_recursion import bounded_recursion
 
 DOCUMENTATION_SNAPSHOT = "2026-10-17"
@@ -305,7 +306,7 @@ class CodexConfigAdapter:
                     namespace="codex.hook",
                 )
                 host.take(found)
-        return host.result()
+        return with_script_digests(host.result(), context)
 
     def _config(
         self, host: _Host, found: ComponentDiscovery, payload: dict[str, Any]
@@ -467,7 +468,7 @@ class GeminiSettingsAdapter:
             if names:
                 host.attributes["env_names"] = aa.authority_text(",".join(names))
             host.evidence.extend(aa.evidence_for(self.name, _GEMINI_ENV))
-        return host.result()
+        return with_script_digests(host.result(), context)
 
     def _settings(
         self, host: _Host, found: ComponentDiscovery, payload: dict[str, Any]
@@ -609,7 +610,7 @@ class CursorConfigAdapter:
                 continue
             handler(host, found, payload)
             host.take(found)
-        return host.result()
+        return with_script_digests(host.result(), context)
 
     def _hooks(
         self, host: _Host, found: ComponentDiscovery, payload: dict[str, Any]
@@ -785,7 +786,7 @@ class KiroConfigAdapter:
                 else:
                     found.unparsed("hooks is not a list")
             host.take(found)
-        return host.result()
+        return with_script_digests(host.result(), context)
 
     def _hook(
         self, found: ComponentDiscovery, entry: dict[str, Any], component_key: str

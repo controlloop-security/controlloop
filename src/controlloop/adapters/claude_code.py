@@ -41,6 +41,7 @@ from controlloop.acbom import (
 from controlloop.adapters import agent_authority as aa
 from controlloop.adapters.framework import DetectionResult, DiscoveryResult, ScanContext
 from controlloop.adapters.mcp import discover_mcp_config
+from controlloop.adapters.script_digest import with_script_digests
 
 _NAME = "claude-code"
 HOST = "claude-code"
@@ -1103,6 +1104,9 @@ class ClaudeCodeSettingsAdapter:
                 bypass_mode=_bypass_mode(host_attributes.get("default_mode")),
             )
         )
-        return DiscoveryResult(
-            nodes=tuple(nodes), edges=tuple(edges), diagnostics=tuple(diagnostics)
+        return with_script_digests(
+            DiscoveryResult(
+                nodes=tuple(nodes), edges=tuple(edges), diagnostics=tuple(diagnostics)
+            ),
+            context,
         )

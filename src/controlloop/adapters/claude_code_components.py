@@ -46,6 +46,7 @@ from controlloop.adapters.claude_code import (
 )
 from controlloop.adapters.framework import DetectionResult, DiscoveryResult, ScanContext
 from controlloop.adapters.mcp import discover_mcp_config, inline_server_node
+from controlloop.adapters.script_digest import with_script_digests
 from controlloop.bounded_recursion import bounded_recursion
 
 _NAME = "claude-code-components"
@@ -524,10 +525,13 @@ class ClaudeCodeComponentsAdapter:
         unique: dict[str, Node] = {}
         for node in out.nodes:
             unique.setdefault(node.id, node)
-        return DiscoveryResult(
-            nodes=tuple(unique.values()),
-            edges=tuple(out.edges),
-            diagnostics=tuple(out.diagnostics),
+        return with_script_digests(
+            DiscoveryResult(
+                nodes=tuple(unique.values()),
+                edges=tuple(out.edges),
+                diagnostics=tuple(out.diagnostics),
+            ),
+            context,
         )
 
     def _plugin(

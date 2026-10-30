@@ -1575,6 +1575,63 @@ the tool when asked.
 harmless `git status`. The rule reports the change; approve a reviewed
 one once.
 
+<a id="hook-script-changed"></a>
+## Hook script changed
+
+**Outcome:** a hook, helper command, skill shell line, or plugin `bin/`
+directory whose command is unchanged, but whose script in the
+repository changed, is reported with the host, the hook event or
+setting, and the script's path.
+
+**Why this matters:** [agent hook command change](#agent-hook-command-change)
+reads the command a hook runs. A pull request can leave
+`.claude/settings.json` alone and edit `.github/setup.js`, the file a
+`SessionStart` hook runs as `node .github/setup.js`, and the hook's
+command is the same. The script runs with the hook's authority on every
+machine that opens the repository, so a change to it is a change to the
+hook.
+
+**Example:** a pull request edits `.claude/hooks/setup.sh` and leaves
+the hook that runs `bash .claude/hooks/setup.sh` untouched. The finding
+reads "The hook on event 'SessionStart' for host 'Claude Code' runs
+`.claude/hooks/setup.sh`, whose contents changed while the command did
+not." at `high`.
+
+| Change | Severity |
+| --- | --- |
+| Script digest changed, command unchanged (including a script that appears for a hook that already named it) | `high` |
+| A readable script becomes `unknown`: moved outside the repository, grown past the size bound, or missing | `medium` |
+| The command changed too | none here: [agent hook command change](#agent-hook-command-change) or [component shell execution](#component-shell-execution) reports it |
+| No baseline (first scan), a hook added or removed, `unknown` on both sides, or a baseline recorded before script digests | none |
+
+The adapters record two attributes on a hook or helper command whose
+command names a file committed in the repository: `script_path` and
+`script_digest`, the SHA-256 of the file's bytes. A command names a file
+when its first word is a path (`./scripts/check.sh`,
+`"$CLAUDE_PROJECT_DIR"/.claude/hooks/x.sh`, `${CLAUDE_PLUGIN_ROOT}/...`
+in a plugin), or the first word after `node`, `python`, `python3`,
+`bash`, `sh`, `zsh`, `ruby`, `perl`, `bun`, `tsx`, `uv run`, or `npx`
+with a local path. A plugin's `bin/` directory gets one digest over the
+sorted names and digests of its files. Only files the repository walk
+listed are opened, so a path outside the root, an escaping symlink, and
+a file over the walk's byte bound are never read; they record
+`script_digest: unknown`. No file content enters any output.
+
+**Change states and confidence:** `changed` (`high`, or `medium` when the script can no longer be read). Confidence is `high`: a digest either matches or it does not.
+
+**Approving or suppressing:** these findings are change-only, so a reviewed change stops producing one once it is in the baseline. To let a reviewed change through before then, add a `controlloop.yaml` approval whose `capability` names the component (`<file>#<key path>`, its name, or its node ID): the finding is kept at `info` with the approver's name, so it no longer blocks, and the [authority statement](authority-statement.md) says "Approval recorded." An expired approval does nothing. A time-limited [suppression](suppressions.md) naming the finding's `id` works too.
+
+**Remediation:** review the script change as agent code, or pin the
+script behind a permission rule.
+
+**False positives:** every edit to a hook's script is reported,
+including a formatting fix. That is deliberate: the rule cannot tell a
+harmless edit from a harmful one, because it never reads the script.
+A command that reaches its script another way (through a variable other
+than `CLAUDE_PROJECT_DIR` or `CLAUDE_PLUGIN_ROOT`, after a `cd`, or
+through a script that calls another script) records no digest, so a
+change to it is not seen.
+
 ## Known limitations
 
 - `controlloop scan` and `controlloop gate` both consume every rule

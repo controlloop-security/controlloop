@@ -63,9 +63,13 @@ point is a limit of the approach, not a bug waiting for a fix.
 ## What the files themselves leave open
 
 - **What a hook or command actually does.** ControlLoop records the
-  command a hook runs and reports when it is added or changed. It does not
-  read the script the command names, and a formatter hook and a credential
-  harvester look the same from the configuration.
+  command a hook runs and reports when it is added or changed. A script
+  committed in the repository that the command names is tracked by
+  digest, so a change to it is reported by
+  [hook script changed](policy-rules.md#hook-script-changed) even when
+  the configuration is untouched. Its behaviour stays unread: a formatter
+  script and a credential harvester look the same, and a script outside
+  the repository, or one another script calls, is not tracked.
 - **What a permission rule matches at runtime.** Rules are classified (a
   wildcard, a shell rule, a read-only tool), never expanded into the
   commands they would allow.
