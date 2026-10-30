@@ -26,6 +26,7 @@ Codex host.
 | `sandbox_mode` | Host attribute: `read-only`, `workspace-write`, `danger-full-access`. The last sets the bypass flag. |
 | `default_permissions` | Host attribute: `:read-only`, `:workspace`, `:danger-full-access`. The last sets the bypass flag. |
 | `sandbox_workspace_write.network_access` | Host attribute. Turning it on is reported by [agent sandbox weakened](../reference/policy-rules.md#agent-sandbox-weakened). |
+| `sandbox_workspace_write.writable_roots` | One `additional-directory` per entry, which the host may write. An absolute or home-relative path is recorded only as `<outside-repository>`, never the path itself. An entry outside the repository is reported by [workspace scope expansion](../reference/policy-rules.md#workspace-scope-expansion). Codex applies these roots only when `sandbox_mode` is `workspace-write`; ControlLoop reports what the file asks for either way. |
 | `projects.*.trust_level` | The set of trust levels, as one host attribute. |
 | `hooks` (inline or in `hooks.json`) | One hook per handler, as for Claude Code. Events: `PreToolUse`, `PermissionRequest`, `PostToolUse`, `PreCompact`, `PostCompact`, `SessionStart`, `SessionEnd`, `SubagentStart`, `SubagentStop`, `UserPromptSubmit`, `Stop`, `Interrupt`. |
 | `mcp_servers.*.http_headers_helper`, `model_providers.*.auth.command` | Helper commands: code execution. |
@@ -42,7 +43,4 @@ not valid TOML or JSON is `INCOMPLETE-UNPARSED-REGION`.
 ## What is not read
 
 `AGENTS.md` and other instruction files; `~/.codex/`; profile files
-outside the repository. `sandbox_workspace_write.writable_roots` is not
-recorded yet, so [workspace scope
-expansion](../reference/policy-rules.md#workspace-scope-expansion) does
-not cover a Codex writable root outside the repository.
+outside the repository.

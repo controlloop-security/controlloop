@@ -396,9 +396,11 @@ KNOWN_RULE_PACK_FINGERPRINTS: dict[str, str] = {
     # sandbox rule; agent-hook-command-change 1.1.0 hands skill shell
     # lines and plugin bin/ to the component rule.
     "0.8.0": "8f25e70c0cf82a2cb827dae58e554349274cfae73da60be7506e08175c160ef8",
-    # 0.9.0: hook script changed, 24 in total. The CrewAI, LangGraph, and
+    # 0.9.0: hook script changed, 24 in total. workspace-scope-expansion
+    # 1.1.0 covers Codex writable_roots, now recorded by the adapter. The
+    # CrewAI, LangGraph, and
     # OpenAI Agents SDK adapters now emit the dynamic registration
     # diagnostic, so unresolved-dynamic-registration's docstring drops its
     # "no adapter emits this yet" caveat (its behaviour is unchanged).
-    "0.9.0": "23d51bcbbea4cdc40f1904734855073bc9e025a68c3a98c45cb5f6e8c03e0ecc",
+    "0.9.0": "7118615ac37de69fbe4b3956df35a2b8cefdef444106dbf95bc17b9f6035d766",
 }

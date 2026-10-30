@@ -33,6 +33,12 @@ named, and one new rule.
 
 ### Changed
 
+- **Codex writable roots are covered by `policy.workspace-scope-expansion`
+  (1.1.0).** The Codex adapter now records each
+  `sandbox_workspace_write.writable_roots` entry as a directory the host
+  may write, an outside path only as `<outside-repository>`, so a root
+  outside the repository added `high`, one inside `low`, and an outside one
+  on a first scan `low`, as for Claude Code's `additionalDirectories`.
 - **Tool lists built at runtime are reported as findings.** The CrewAI,
   LangGraph, and OpenAI Agents SDK adapters emit
   `INCOMPLETE-DYNAMIC-REGISTRATION` for a comprehension, call, splat,

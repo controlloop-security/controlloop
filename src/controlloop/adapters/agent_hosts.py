@@ -356,6 +356,8 @@ class CodexConfigAdapter:
             host.attributes["sandbox_network_access"] = aa.authority_text(
                 workspace["network_access"]
             )
+        if isinstance(workspace, dict) and "writable_roots" in workspace:
+            _writable_roots(found, workspace["writable_roots"])
         projects = payload.get("projects")
         if isinstance(projects, dict):
             levels = sorted(
@@ -409,6 +411,36 @@ class CodexConfigAdapter:
                             "model_providers", str(name), "auth", "command"
                         ),
                     )
+
+
+def _writable_roots(found: ComponentDiscovery, roots: object) -> None:
+    """`sandbox_workspace_write.writable_roots`: directories the agent may
+    write besides the workspace, recorded as Claude Code's
+    `additionalDirectories` are. An absolute or home-relative path becomes
+    `<outside-repository>`; the path itself is never kept."""
+
+    if not isinstance(roots, list):
+        found.unparsed("sandbox_workspace_write.writable_roots is not a list")
+        return
+    for index, root in enumerate(found.bounded(roots, "writable roots")):
+        if not isinstance(root, str) or not root.strip():
+            found.unparsed("a writable root is not a path string")
+            continue
+        component_key = aa.key_path("sandbox_workspace_write", "writable_roots", index)
+        path = aa.repository_path_text(root)
+        node = aa.component_node(
+            node_type=NodeType.RESOURCE,
+            subtype="additional-directory",
+            namespace="codex.writable-root",
+            declaring_path=found.path,
+            component_key=component_key,
+            name=f"writable root {path}",
+            attributes={"path": path, "setting": "writable_roots"},
+            security_attributes=SecurityAttributes(),
+            evidence=found.evidence,
+        )
+        found.nodes.append(node)
+        found.link(node.id, EdgeType.WRITES, component_key)
 
 
 # --- Gemini CLI ----------------------------------------------------------------

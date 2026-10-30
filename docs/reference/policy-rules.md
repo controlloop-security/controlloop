@@ -1496,7 +1496,9 @@ workspace is reported, naming the host.
 
 **Why this matters:** Claude Code's `permissions.additionalDirectories`
 gives the agent read and write access to each listed directory, as freely
-as the repository itself. A directory outside the repository hands the
+as the repository itself, and Codex's
+`sandbox_workspace_write.writable_roots` lets its `workspace-write`
+sandbox write each listed directory. A directory outside the repository hands the
 agent files the repository's review never covers: other projects, shell
 profiles, credentials.
 
@@ -1515,8 +1517,11 @@ relative path that climbs out with `..`.
 | No baseline (first scan): an outside directory | `low` |
 | Removed, narrowed to inside, unchanged, or inside on a first scan | none |
 
-Codex's `sandbox_workspace_write.writable_roots` is not recorded by the
-Codex adapter yet, so this rule does not cover Codex.
+A Codex `writable_roots` entry is judged the same way: adding
+`writable_roots = ["~/.ssh"]` to `.codex/config.toml` reads "Codex can
+now read and write a directory outside the repository." at `high`.
+Before rule version 1.1.0 the Codex adapter did not record writable
+roots, so this rule did not cover Codex.
 
 **Change states and confidence:** `added` or `changed` (`high` for an outside directory, `low` for an inside one); `not-compared` on a scan with no baseline (`low`). Confidence is `high`.
 
