@@ -346,6 +346,62 @@ class TestRequestOrder:
         assert len(payload["commit_sha"]) == 40
 
 
+class TestBranch:
+    """The uploaded scan names its branch without `team_branch` set."""
+
+    def _uploaded(self, tmp_path: Path, monkeypatch: MonkeyPatch) -> dict[str, object]:
+        transport = _ScriptedTransport(
+            {
+                "/entitlement": _json(_ENTITLED),
+                "/effective-policy": _json(_POLICY),
+                "/active-exceptions": _json([]),
+                "/scans": _json(_ACCEPTED, status=202),
+            }
+        )
+        _run(tmp_path, monkeypatch, transport)
+        body = transport.calls[-1]["body"]
+        assert isinstance(body, bytes)
+        payload = json.loads(body.decode())
+        assert isinstance(payload, dict)
+        return payload
+
+    def test_the_ci_variable_names_the_branch(
+        self, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _team_repository(tmp_path)
+        monkeypatch.setenv("GITHUB_HEAD_REF", "feature/login")
+
+        assert self._uploaded(tmp_path, monkeypatch)["branch"] == "feature/login"
+
+    def test_the_checked_out_branch_names_it_outside_ci(
+        self, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _team_repository(tmp_path)
+        subprocess.run(
+            ["git", "checkout", "--quiet", "-b", "feature/login"],
+            cwd=tmp_path,
+            check=True,
+        )
+
+        assert self._uploaded(tmp_path, monkeypatch)["branch"] == "feature/login"
+
+    def test_a_detached_head_sends_no_branch(
+        self, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _team_repository(tmp_path)
+        subprocess.run(
+            ["git", "checkout", "--quiet", "--detach"], cwd=tmp_path, check=True
+        )
+
+        assert "branch" not in self._uploaded(tmp_path, monkeypatch)
+
+    def test_team_branch_wins(self, tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+        _team_repository(tmp_path, team_branch="release")
+        monkeypatch.setenv("GITHUB_HEAD_REF", "feature/login")
+
+        assert self._uploaded(tmp_path, monkeypatch)["branch"] == "release"
+
+
 class TestEvidence:
     def test_the_team_block_is_recorded(
         self, tmp_path: Path, monkeypatch: MonkeyPatch

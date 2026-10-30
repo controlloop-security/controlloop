@@ -12,6 +12,7 @@ Two properties carry most of the weight here:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,7 @@ from controlloop.team.config import (
     TOKEN_ENVIRONMENT_VARIABLE,
     TeamConfigError,
     TeamFailMode,
+    detect_branch,
     resolve_team_config,
 )
 
@@ -74,6 +76,103 @@ class TestTeamOff:
         )
 
         assert resolve_team_config(resolved, environ={}) is None
+
+
+def _git(branch: str | None) -> Callable[[], str | None]:
+    return lambda: branch
+
+
+class TestBranchDetection:
+    """`team_branch` wins; then the CI's variables; then git's checked-out
+    branch; and a detached `HEAD` sends no branch."""
+
+    @pytest.mark.parametrize(
+        ("variable", "value", "expected"),
+        [
+            ("GITHUB_HEAD_REF", "feature/login", "feature/login"),
+            ("GITHUB_REF_NAME", "main", "main"),
+            ("CI_COMMIT_REF_NAME", "feature/login", "feature/login"),
+            ("BITBUCKET_BRANCH", "feature/login", "feature/login"),
+            (
+                "SYSTEM_PULLREQUEST_SOURCEBRANCH",
+                "refs/heads/feature/login",
+                "feature/login",
+            ),
+            ("BUILD_SOURCEBRANCH", "refs/heads/feature/login", "feature/login"),
+        ],
+    )
+    def test_each_ci_variable_names_the_branch(
+        self, variable: str, value: str, expected: str
+    ) -> None:
+        assert detect_branch({variable: value}, git_branch=_git("other")) == expected
+
+    def test_a_pull_request_source_branch_beats_the_merge_ref(self) -> None:
+        environ = {"GITHUB_HEAD_REF": "feature/login", "GITHUB_REF_NAME": "42/merge"}
+
+        assert detect_branch(environ, git_branch=_git(None)) == "feature/login"
+
+    def test_an_empty_head_ref_on_a_push_falls_through(self) -> None:
+        environ = {"GITHUB_HEAD_REF": "", "GITHUB_REF_NAME": "main"}
+
+        assert detect_branch(environ, git_branch=_git(None)) == "main"
+
+    def test_an_azure_pull_request_ref_is_not_a_branch(self) -> None:
+        environ = {
+            "SYSTEM_PULLREQUEST_SOURCEBRANCH": "refs/heads/feature/login",
+            "BUILD_SOURCEBRANCH": "refs/pull/42/merge",
+        }
+
+        assert detect_branch(environ, git_branch=_git(None)) == "feature/login"
+
+    @pytest.mark.parametrize(
+        "environ",
+        [
+            {"GITHUB_REF_NAME": "v1.2.0", "GITHUB_REF_TYPE": "tag"},
+            {"CI_COMMIT_REF_NAME": "v1.2.0", "CI_COMMIT_TAG": "v1.2.0"},
+            {"BUILD_SOURCEBRANCH": "refs/tags/v1.2.0"},
+        ],
+    )
+    def test_a_tag_build_is_not_a_branch(self, environ: dict[str, str]) -> None:
+        assert detect_branch(environ, git_branch=_git(None)) is None
+
+    def test_without_ci_variables_git_names_the_branch(self) -> None:
+        assert detect_branch({}, git_branch=_git("feature/login")) == "feature/login"
+
+    def test_a_detached_head_sends_no_branch(self) -> None:
+        assert detect_branch({}, git_branch=_git(None)) is None
+
+    def test_a_name_longer_than_the_platform_stores_is_dropped(self) -> None:
+        assert (
+            detect_branch({"GITHUB_REF_NAME": "b" * 256}, git_branch=_git(None)) is None
+        )
+
+    def test_team_branch_wins_over_ci_and_git(self, tmp_path: Path) -> None:
+        config = resolve_team_config(
+            _enabled(tmp_path, team_branch="release"),
+            environ={TOKEN_ENVIRONMENT_VARIABLE: TOKEN, "GITHUB_REF_NAME": "main"},
+            git_branch=_git("feature/login"),
+        )
+
+        assert config is not None
+        assert config.branch == "release"
+
+    def test_an_unset_team_branch_uses_the_ci_variable(self, tmp_path: Path) -> None:
+        config = resolve_team_config(
+            _enabled(tmp_path),
+            environ={TOKEN_ENVIRONMENT_VARIABLE: TOKEN, "BITBUCKET_BRANCH": "main"},
+            git_branch=_git("feature/login"),
+        )
+
+        assert config is not None
+        assert config.branch == "main"
+
+    def test_team_off_never_asks_git(self, tmp_path: Path) -> None:
+        def _fail() -> str | None:
+            raise AssertionError("git was consulted with Team off")
+
+        resolved = resolved_config_with(tmp_path, {})
+
+        assert resolve_team_config(resolved, environ={}, git_branch=_fail) is None
 
 
 class TestResolvedConfiguration:
