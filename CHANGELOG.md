@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-30
+
+Team uploads name their branch, and CrewAI agents built in code are
+discovered. The rule pack is unchanged at `0.9.0`.
+
 ### Changed
 
 - **Team uploads name their branch without `team_branch`.** When
