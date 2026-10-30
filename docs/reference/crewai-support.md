@@ -136,7 +136,12 @@ with the LangGraph and OpenAI Agents SDK adapters rather than copied.
 - **Static resolution is not guaranteed.** How much of a real crew
   resolves depends entirely on how it is written. A project that builds
   its tool lists dynamically will produce mostly unknowns and mostly
-  `REVIEW REQUIRED`.
+  `REVIEW REQUIRED`. A tool list built at runtime (a comprehension, a
+  call, a splat, a conditional, a loop that appends, or
+  `agent.tools.append` after construction) is reported by
+  [`policy.unresolved-dynamic-registration`](policy-rules.md#unresolved-dynamic-registration)
+  with the file, line, and agent; a bare name the crew imports stays an
+  unresolved reference.
 - **A passing scan is not a safety claim.** It tells you what powers the
   crew has, and what changed since you last approved them.
 - **Tool capability still comes from your manifest.** Discovery learns

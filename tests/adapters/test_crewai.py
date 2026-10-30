@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from controlloop.acbom import EdgeType, NodeType
+from controlloop.acbom import Confidence, EdgeType, NodeType
 from controlloop.adapters import ALL_ADAPTERS, CrewAiAdapter, ScanContext, run_adapters
 from controlloop.adapters.framework import DiscoveryResult
 from controlloop.capability.blast_radius import compute_blast_radius
@@ -244,20 +244,123 @@ class TestToolResolution:
         [
             "self._pick()",
             "[t for t in self.all_tools]",
-            "TOOLS",
             "[SerperDevTool()] if flag else []",
             "[*base_tools]",
+            "[SerperDevTool(), *base_tools]",
         ],
+        ids=["call", "comprehension", "conditional", "splat", "splat-entry"],
     )
-    def test_every_non_literal_shape_is_reported(
+    def test_every_runtime_shape_is_a_dynamic_registration(
         self, tmp_path: Path, expression: str
     ) -> None:
-        """Each of these is a shape a real project writes, and
-        each must produce a diagnostic rather than an empty tool list."""
+        """Each of these is a shape a real project writes. None of them
+        can be enumerated statically, so each is a dynamic registration
+        rather than an unresolved reference."""
 
         crew = _DYNAMIC.replace("self._pick()", expression)
         result = _run(_project(tmp_path, crew=crew))
+        assert "INCOMPLETE-DYNAMIC-REGISTRATION" in _codes(result)
+        assert "INCOMPLETE-UNRESOLVED-REFERENCE" not in _codes(result)
+
+    def test_a_bare_name_stays_an_unresolved_reference(self, tmp_path: Path) -> None:
+        """A name the adapter did not follow is one step of resolution it
+        declines to take, not a runtime registration."""
+
+        crew = _DYNAMIC.replace("self._pick()", "TOOLS")
+        result = _run(_project(tmp_path, crew=crew))
         assert "INCOMPLETE-UNRESOLVED-REFERENCE" in _codes(result)
+        assert "INCOMPLETE-DYNAMIC-REGISTRATION" not in _codes(result)
+
+    def test_a_literal_list_is_neither(self, tmp_path: Path) -> None:
+        result = _run(_project(tmp_path, crew=_RESOLVABLE))
+        assert "INCOMPLETE-DYNAMIC-REGISTRATION" not in _codes(result)
+        assert "INCOMPLETE-UNRESOLVED-REFERENCE" not in _codes(result)
+
+    def test_a_list_a_loop_appends_to_is_dynamic(self, tmp_path: Path) -> None:
+        """`@tool`-decorated functions collected by a loop: the list the
+        agent receives exists only once the loop has run."""
+
+        crew = """
+from crewai import Agent
+from crewai.tools import tool
+
+
+@tool("Search")
+def search(query: str) -> str:
+    return query
+
+
+@tool("Fetch")
+def fetch(url: str) -> str:
+    return url
+
+
+TOOLS = []
+for candidate in (search, fetch):
+    TOOLS.append(candidate)
+
+
+class ResearchCrew:
+    def researcher(self):
+        return Agent(config=self.agents_config["researcher"], tools=TOOLS)
+"""
+        result = _run(_project(tmp_path, crew=crew))
+        dynamic = [
+            d for d in result.diagnostics if d.code == "INCOMPLETE-DYNAMIC-REGISTRATION"
+        ]
+        assert len(dynamic) == 1
+        assert "a loop appends to" in dynamic[0].message
+
+    def test_tools_appended_after_construction_are_dynamic(
+        self, tmp_path: Path
+    ) -> None:
+        crew = """
+from crewai import Agent
+from crewai_tools import SerperDevTool
+
+
+class ResearchCrew:
+    def researcher(self):
+        agent = Agent(config=self.agents_config["researcher"])
+        agent.tools.append(SerperDevTool())
+        return agent
+"""
+        result = _run(_project(tmp_path, crew=crew))
+        dynamic = [
+            d for d in result.diagnostics if d.code == "INCOMPLETE-DYNAMIC-REGISTRATION"
+        ]
+        assert len(dynamic) == 1
+        assert dynamic[0].evidence[0].line_start == 9
+        assert "after it is constructed" in dynamic[0].message
+
+    def test_a_dynamic_registration_is_linked_to_its_unknown_node(
+        self, tmp_path: Path
+    ) -> None:
+        """`policy.unresolved-dynamic-registration` attributes the
+        diagnostic to a node at `Confidence.UNKNOWN` sharing its
+        `(path, line_start)`, reached from the agent by `invokes`."""
+
+        result = _run(_project(tmp_path, crew=_DYNAMIC))
+        diagnostic = next(
+            d for d in result.diagnostics if d.code == "INCOMPLETE-DYNAMIC-REGISTRATION"
+        )
+        location = (diagnostic.evidence[0].path, diagnostic.evidence[0].line_start)
+        assert location == ("src/demo/crew.py", 7)
+        tool = next(n for n in result.nodes if n.type == NodeType.TOOL)
+        assert tool.confidence is Confidence.UNKNOWN
+        assert location in {(e.path, e.line_start) for e in tool.evidence}
+        assert any(
+            edge.type == EdgeType.INVOKES and edge.target == tool.id
+            for edge in result.edges
+        )
+
+    def test_an_unresolved_reference_node_is_not_marked_dynamic(
+        self, tmp_path: Path
+    ) -> None:
+        crew = _DYNAMIC.replace("self._pick()", "TOOLS")
+        result = _run(_project(tmp_path, crew=crew))
+        tool = next(n for n in result.nodes if n.type == NodeType.TOOL)
+        assert tool.confidence is Confidence.LOW
 
     def test_an_unresolved_tool_still_produces_a_node(self, tmp_path: Path) -> None:
         """Why an unresolved tool must still be a node: an omitted tool

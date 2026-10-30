@@ -473,11 +473,31 @@ branching on an environment variable) is exactly the case static
 analysis cannot fully enumerate — and rather than pretend the scan saw
 everything, this rule surfaces the gap honestly.
 
-**Example:** an agent's source registers tools in a loop over a remote
-config response. The relevant adapter emits an
-`INCOMPLETE-DYNAMIC-REGISTRATION` diagnostic at that location. This rule
-surfaces it as a policy-level finding rather than letting it sit only in
+**Example:** an OpenAI Agents SDK module declares
+`Agent(name="Support", tools=load_tools_from_config())`. The adapter
+emits an `INCOMPLETE-DYNAMIC-REGISTRATION` diagnostic at that line and
+keeps an `"unknown"` tool node, `unresolved-tools:Support`, linked to
+it by the same line. This rule reports a `medium` finding naming the
+file, the line, and the agent, rather than letting the gap sit only in
 the raw diagnostics array.
+
+The CrewAI, LangGraph, and OpenAI Agents SDK adapters emit the
+diagnostic when a tool list (CrewAI `tools=`, LangGraph `bind_tools`
+and `ToolNode`, OpenAI Agents `tools=` and `handoffs=`) is:
+
+| Shape | Example |
+| --- | --- |
+| A comprehension | `tools=[make(t) for t in config]` |
+| A call | `tools=load_tools()` |
+| A splat | `tools=[*base_tools]`, `tools=[search, *extra]` |
+| A conditional expression | `tools=[search] if online else []` |
+| A list the module builds | `tools=TOOLS` after `for f in found: TOOLS.append(f)` |
+| Added after construction | `agent.tools.append(...)`, `agent.tools.extend(...)` |
+
+A bare name the module does not build (`tools=TOOLS` imported from
+elsewhere) is still `INCOMPLETE-UNRESOLVED-REFERENCE`, which this rule
+does not report: it is a reference the adapter declined to follow, not
+a registration at runtime. A literal list produces neither.
 
 **Remediation:** there is no code change this rule itself asks for — it
 is disclosing an analysis limitation, not a policy violation. Reducing
@@ -492,14 +512,16 @@ statically and confidently elsewhere never fires here just because an
 unrelated dynamic-registration diagnostic exists somewhere else in the
 same document.
 
-- No adapter emits the `INCOMPLETE-DYNAMIC-REGISTRATION` diagnostic
-  from a real repository yet (`tests/acbom/test_completeness.py`
-  says so explicitly) -- discovering a real dynamic-registration
-  *pattern* in source code is adapter work, out of a rule's reach by
-  architecture (a rule reads only `RuleContext`, never raw repository
-  content). This rule's job is narrower and adapter-agnostic: given an
-  ACBOM that already contains such a diagnostic, from whichever adapter
-  eventually produces one, surface it as a policy-level finding.
+- Recognizing a dynamic-registration *pattern* in source code is
+  adapter work, out of a rule's reach by architecture (a rule reads
+  only `RuleContext`, never raw repository content). This rule's job is
+  narrower and adapter-agnostic: given an ACBOM that already contains
+  such a diagnostic, surface it as a policy-level finding.
+- A dynamic `handoffs=` list in the OpenAI Agents SDK produces the
+  diagnostic but no placeholder node, since a handoff target is an
+  agent and inventing one would be a made-up identity. It is reported
+  through `evaluate()`'s observations and the scan's diagnostics, not
+  as a `Finding`.
 - `evaluate()` reports one `RuleObservation` per matching diagnostic
   unconditionally. `findings()` additionally correlates a diagnostic to
   a real, already-discovered `TOOL` node at `Confidence.UNKNOWN` whose

@@ -72,6 +72,14 @@ from controlloop.adapters.framework_versions import (
     declared_version,
     require_supported,
 )
+from controlloop.adapters.python_registration import (
+    appended_agent_tools,
+    dynamic_element_shape,
+    dynamic_shape,
+    located,
+    mark_dynamic,
+    runtime_built_names,
+)
 from controlloop.bounded_recursion import bounded_recursion
 
 _NAME = "openai-agents"
@@ -117,6 +125,14 @@ def _unresolved(evidence: tuple[Evidence, ...], reason: str) -> Diagnostic:
         message=(
             f"OpenAI Agents capability could not be resolved statically: {reason}."
         ),
+        evidence=evidence,
+    )
+
+
+def _dynamic(evidence: tuple[Evidence, ...], reason: str) -> Diagnostic:
+    return incomplete_diagnostic(
+        code="INCOMPLETE-DYNAMIC-REGISTRATION",
+        message=f"OpenAI Agents wiring is registered at runtime: {reason}.",
         evidence=evidence,
     )
 
@@ -430,21 +446,30 @@ def _build_edge(
     )
 
 
-def _handoff_targets(scan: _ModuleScan, expression: ast.expr) -> tuple[list[str], int]:
-    """Agent names a `handoffs=[...]` list refers to, plus a count of
-    entries that could not be resolved.
+def _handoff_targets(
+    scan: _ModuleScan, expression: ast.expr
+) -> tuple[list[str], int, list[tuple[int, str]]]:
+    """Agent names a `handoffs=[...]` list refers to, a count of entries
+    that could not be resolved, and the `(line, shape)` of each entry
+    built at runtime.
 
     Accepts a bare name assigned from `Agent(...)`, a `handoff(agent)`
-    wrapper, and an inline `Agent(name="...")`. Anything else is
+    wrapper, and an inline `Agent(name="...")`. A splat, comprehension,
+    or conditional entry is a runtime registration. Anything else is
     unresolved and reported.
     """
 
     if not isinstance(expression, ast.List):
-        return [], -1
+        return [], -1, []
 
     names: list[str] = []
     unresolved = 0
+    dynamic: list[tuple[int, str]] = []
     for element in expression.elts:
+        shape = dynamic_element_shape(element)
+        if shape is not None:
+            dynamic.append((element.lineno, shape))
+            continue
         target = element
         if isinstance(target, ast.Call) and _callee(target) == "handoff":
             if not target.args:
@@ -466,7 +491,7 @@ def _handoff_targets(scan: _ModuleScan, expression: ast.expr) -> tuple[list[str]
                 names.append(literal)
         else:
             unresolved += 1
-    return names, unresolved
+    return names, unresolved, dynamic
 
 
 def _discover_module(
@@ -488,6 +513,7 @@ def _discover_module(
 
     scan = _ModuleScan()
     scan.visit(tree)
+    built_names = runtime_built_names(tree)
 
     nodes: dict[str, Node] = {}
     edges: list[Edge] = []
@@ -534,10 +560,44 @@ def _discover_module(
         if agent is None:
             continue
         _wire_handoffs(
-            scan, call, agent, agent_name, nodes, edges, diagnostics, evidence
+            scan,
+            call,
+            agent,
+            agent_name,
+            relative,
+            built_names,
+            nodes,
+            edges,
+            diagnostics,
+            evidence,
         )
         _wire_tools(
-            scan, call, agent, agent_name, relative, nodes, edges, diagnostics, evidence
+            scan,
+            call,
+            agent,
+            agent_name,
+            relative,
+            built_names,
+            nodes,
+            edges,
+            diagnostics,
+            evidence,
+        )
+
+    for variable, line in appended_agent_tools(tree):
+        appended_to = scan.agent_variables.get(variable)
+        agent = nodes.get(f"agent:{appended_to}") if appended_to else None
+        if agent is None or appended_to is None:
+            continue
+        _attach_dynamic(
+            agent,
+            appended_to,
+            relative,
+            line,
+            f"tools are added to {appended_to!r} after it is constructed",
+            nodes,
+            edges,
+            diagnostics,
         )
 
     _wire_as_tool(scan, tree, nodes, edges, diagnostics, evidence)
@@ -563,19 +623,37 @@ def _wire_handoffs(
     call: ast.Call,
     agent: Node,
     agent_name: str,
+    relative: str,
+    built_names: dict[str, str],
     nodes: dict[str, Node],
     edges: list[Edge],
     diagnostics: list[Diagnostic],
     evidence: tuple[Evidence, ...],
 ) -> None:
-    """`handoffs=[...]` transfers the conversation: `delegates-to`."""
+    """`handoffs=[...]` transfers the conversation: `delegates-to`.
+
+    A handoff list built at runtime is reported as a dynamic
+    registration with no placeholder node: a handoff target is an agent,
+    and inventing one would be a made-up identity. The diagnostic alone
+    still reaches `policy.unresolved-dynamic-registration`'s
+    observations.
+    """
 
     expression = _keyword(call, "handoffs")
     if expression is None:
         return
 
-    targets, unresolved = _handoff_targets(scan, expression)
+    targets, unresolved, dynamic = _handoff_targets(scan, expression)
     if unresolved < 0:
+        shape = dynamic_shape(expression, built_names)
+        if shape is not None:
+            diagnostics.append(
+                _dynamic(
+                    located(_NAME, relative, expression.lineno),
+                    f"the handoffs argument for {agent_name!r} is {shape}",
+                )
+            )
+            return
         diagnostics.append(
             _unresolved(
                 evidence,
@@ -583,6 +661,14 @@ def _wire_handoffs(
             )
         )
         return
+
+    for line, shape in dynamic:
+        diagnostics.append(
+            _dynamic(
+                located(_NAME, relative, line),
+                f"a handoff in {agent_name!r}'s list is {shape}",
+            )
+        )
 
     for _ in range(unresolved):
         diagnostics.append(
@@ -624,6 +710,7 @@ def _wire_tools(
     agent: Node,
     agent_name: str,
     relative: str,
+    built_names: dict[str, str],
     nodes: dict[str, Node],
     edges: list[Edge],
     diagnostics: list[Diagnostic],
@@ -634,12 +721,38 @@ def _wire_tools(
         return
 
     if not isinstance(expression, ast.List):
+        shape = dynamic_shape(expression, built_names)
+        if shape is not None:
+            _attach_dynamic(
+                agent,
+                agent_name,
+                relative,
+                expression.lineno,
+                f"the tools argument for {agent_name!r} is {shape}",
+                nodes,
+                edges,
+                diagnostics,
+            )
+            return
         _attach_unknown(
             agent, agent_name, relative, nodes, edges, diagnostics, evidence
         )
         return
 
     for element in expression.elts:
+        element_shape = dynamic_element_shape(element)
+        if element_shape is not None:
+            _attach_dynamic(
+                agent,
+                agent_name,
+                relative,
+                element.lineno,
+                f"a tool in {agent_name!r}'s list is {element_shape}",
+                nodes,
+                edges,
+                diagnostics,
+            )
+            continue
         symbol: str | None = None
         if isinstance(element, ast.Name):
             symbol = element.id
@@ -670,6 +783,29 @@ def _wire_tools(
             diagnostics.append(_malformed(evidence, "an edge could not be represented"))
 
 
+def _attach_dynamic(
+    agent: Node,
+    agent_name: str,
+    relative: str,
+    line: int,
+    reason: str,
+    nodes: dict[str, Node],
+    edges: list[Edge],
+    diagnostics: list[Diagnostic],
+) -> None:
+    """A runtime tool registration: the unknown node an unresolved
+    wiring gets, at `Confidence.UNKNOWN` and carrying the line the
+    `INCOMPLETE-DYNAMIC-REGISTRATION` diagnostic names, so
+    `policy.unresolved-dynamic-registration` can attribute it."""
+
+    location = located(_NAME, relative, line)
+    diagnostics.append(_dynamic(location, reason))
+    _place_unknown(agent, agent_name, relative, nodes, edges, diagnostics)
+    key = f"tool:unresolved-tools:{agent_name}"
+    if key in nodes:
+        nodes[key] = mark_dynamic(nodes[key], location)
+
+
 def _attach_unknown(
     agent: Node,
     agent_name: str,
@@ -694,6 +830,18 @@ def _attach_unknown(
             "declared function tool",
         )
     )
+    _place_unknown(agent, agent_name, relative, nodes, edges, diagnostics)
+
+
+def _place_unknown(
+    agent: Node,
+    agent_name: str,
+    relative: str,
+    nodes: dict[str, Node],
+    edges: list[Edge],
+    diagnostics: list[Diagnostic],
+) -> None:
+    evidence = _evidence(relative)
     name = f"unresolved-tools:{agent_name}"
     key = f"tool:{name}"
     try:

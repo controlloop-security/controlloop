@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from controlloop.acbom import EdgeType
+from controlloop.acbom import Confidence, EdgeType
 from controlloop.adapters import (
     ALL_ADAPTERS,
     LangGraphAdapter,
@@ -310,7 +310,71 @@ class TestToolBinding:
             "ToolNode([TavilySearchResults()])", "ToolNode(build_tools())"
         )
         result = _run(_project(tmp_path, module=module))
+        assert "INCOMPLETE-DYNAMIC-REGISTRATION" in _codes(result)
+
+    @pytest.mark.parametrize(
+        "binding",
+        [
+            "ToolNode(build_tools())",
+            "ToolNode([make(name) for name in NAMES])",
+            "ToolNode([TavilySearchResults()] if online else [])",
+            "ToolNode([*BASE_TOOLS])",
+            "model.bind_tools([TavilySearchResults(), *EXTRA])",
+        ],
+        ids=["call", "comprehension", "conditional", "splat", "bind-tools-splat"],
+    )
+    def test_every_runtime_shape_is_a_dynamic_registration(
+        self, tmp_path: Path, binding: str
+    ) -> None:
+        module = _MODULE.replace("ToolNode([TavilySearchResults()])", binding)
+        result = _run(_project(tmp_path, module=module))
+        assert "INCOMPLETE-DYNAMIC-REGISTRATION" in _codes(result)
+        assert "INCOMPLETE-UNRESOLVED-REFERENCE" not in _codes(result)
+
+    def test_a_list_appended_to_after_it_is_built_is_dynamic(
+        self, tmp_path: Path
+    ) -> None:
+        module = _MODULE.replace(
+            "builder = StateGraph(dict)\n",
+            "builder = StateGraph(dict)\n"
+            "TOOLS = [TavilySearchResults()]\n"
+            "TOOLS.append(ShellTool())\n",
+        ).replace("ToolNode([TavilySearchResults()])", "ToolNode(TOOLS)")
+        result = _run(_project(tmp_path, module=module))
+        dynamic = [
+            d for d in result.diagnostics if d.code == "INCOMPLETE-DYNAMIC-REGISTRATION"
+        ]
+        assert len(dynamic) == 1
+        assert "appended to after it is built" in dynamic[0].message
+
+    def test_a_bare_name_stays_an_unresolved_reference(self, tmp_path: Path) -> None:
+        module = _MODULE.replace(
+            "ToolNode([TavilySearchResults()])", "ToolNode(IMPORTED_TOOLS)"
+        )
+        result = _run(_project(tmp_path, module=module))
         assert "INCOMPLETE-UNRESOLVED-REFERENCE" in _codes(result)
+        assert "INCOMPLETE-DYNAMIC-REGISTRATION" not in _codes(result)
+
+    def test_a_literal_binding_is_neither(self, tmp_path: Path) -> None:
+        result = _run(_project(tmp_path))
+        assert "INCOMPLETE-DYNAMIC-REGISTRATION" not in _codes(result)
+        assert "INCOMPLETE-UNRESOLVED-REFERENCE" not in _codes(result)
+
+    def test_a_dynamic_binding_is_linked_to_its_unknown_node(
+        self, tmp_path: Path
+    ) -> None:
+        module = _MODULE.replace(
+            "ToolNode([TavilySearchResults()])", "ToolNode(build_tools())"
+        )
+        result = _run(_project(tmp_path, module=module))
+        diagnostic = next(
+            d for d in result.diagnostics if d.code == "INCOMPLETE-DYNAMIC-REGISTRATION"
+        )
+        location = (diagnostic.evidence[0].path, diagnostic.evidence[0].line_start)
+        assert location == ("agent.py", 8)
+        tool = next(n for n in result.nodes if n.subtype == "langgraph-tool")
+        assert tool.confidence is Confidence.UNKNOWN
+        assert location in {(e.path, e.line_start) for e in tool.evidence}
 
     def test_a_computed_binding_still_produces_a_node(self, tmp_path: Path) -> None:
         """An omitted binding leaves a graph that classifies to
