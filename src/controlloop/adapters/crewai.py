@@ -70,6 +70,14 @@ from controlloop.adapters.framework_versions import (
     declared_version,
     require_supported,
 )
+from controlloop.adapters.python_registration import (
+    appended_agent_tools,
+    dynamic_element_shape,
+    dynamic_shape,
+    located,
+    mark_dynamic,
+    runtime_built_names,
+)
 from controlloop.bounded_recursion import bounded_recursion
 
 _NAME = "crewai"
@@ -119,6 +127,14 @@ def _unresolved(evidence: tuple[Evidence, ...], reason: str) -> Diagnostic:
     return incomplete_diagnostic(
         code="INCOMPLETE-UNRESOLVED-REFERENCE",
         message=f"CrewAI capability could not be resolved statically: {reason}.",
+        evidence=evidence,
+    )
+
+
+def _dynamic(evidence: tuple[Evidence, ...], reason: str) -> Diagnostic:
+    return incomplete_diagnostic(
+        code="INCOMPLETE-DYNAMIC-REGISTRATION",
+        message=f"CrewAI tools are registered at runtime: {reason}.",
         evidence=evidence,
     )
 
@@ -368,6 +384,26 @@ def _tool_class_name(element: ast.expr) -> str | None:
     return None
 
 
+def _agent_config_key(node: ast.Call) -> str | None:
+    """The YAML key an `Agent(config=...)` construction reads, or `None`
+    when the call is not an `Agent` or its config is not a literal key."""
+
+    func = node.func
+    name = (
+        func.id
+        if isinstance(func, ast.Name)
+        else func.attr
+        if isinstance(func, ast.Attribute)
+        else None
+    )
+    if name != "Agent":
+        return None
+    for keyword in node.keywords:
+        if keyword.arg == "config":
+            return _config_key(keyword.value)
+    return None
+
+
 class _CrewVisitor(ast.NodeVisitor):
     """Collects `Agent(...)` constructions and their tool wiring.
 
@@ -378,7 +414,12 @@ class _CrewVisitor(ast.NodeVisitor):
     """
 
     def __init__(self) -> None:
-        self.wirings: list[tuple[str | None, list[ast.expr] | None]] = []
+        #: `(config key, literal tool entries or None, the tools argument)`
+        self.wirings: list[
+            tuple[str | None, list[ast.expr] | None, ast.expr | None]
+        ] = []
+        #: variable name -> the config key of the `Agent(...)` assigned to it
+        self.agent_variables: dict[str, str] = {}
         self.overrides_config_path = False
         self.hierarchical = False
 
@@ -392,21 +433,27 @@ class _CrewVisitor(ast.NodeVisitor):
             else None
         )
         if name == "Agent":
-            config_key: str | None = None
+            config_key = _agent_config_key(node)
             tools: list[ast.expr] | None = None
-            has_tools = False
+            argument: ast.expr | None = None
             for keyword in node.keywords:
-                if keyword.arg == "config":
-                    config_key = _config_key(keyword.value)
-                elif keyword.arg == "tools":
-                    has_tools = True
+                if keyword.arg == "tools":
+                    argument = keyword.value
                     if isinstance(keyword.value, ast.List):
                         tools = list(keyword.value.elts)
-            if has_tools or config_key is not None:
-                self.wirings.append((config_key, tools if has_tools else []))
+            if argument is not None or config_key is not None:
+                self.wirings.append(
+                    (config_key, tools if argument is not None else [], argument)
+                )
         self.generic_visit(node)
 
     def visit_Assign(self, node: ast.Assign) -> None:
+        if isinstance(node.value, ast.Call):
+            config_key = _agent_config_key(node.value)
+            if config_key is not None:
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        self.agent_variables[target.id] = config_key
         for target in node.targets:
             if isinstance(target, ast.Name) and target.id == _AGENTS_CONFIG_ATTRIBUTE:
                 self.overrides_config_path = True
@@ -467,7 +514,9 @@ def _discover_tools(
             )
         )
 
-    for config_key, tool_elements in visitor.wirings:
+    built_names = runtime_built_names(tree)
+
+    for config_key, tool_elements, argument in visitor.wirings:
         agent = agents.get(config_key) if config_key is not None else None
         if agent is None or config_key is None:
             diagnostics.append(
@@ -479,6 +528,19 @@ def _discover_tools(
             )
             continue
         if tool_elements is None:
+            shape = dynamic_shape(argument, built_names) if argument else None
+            if shape is not None and argument is not None:
+                _attach_dynamic(
+                    nodes,
+                    edges,
+                    diagnostics,
+                    relative_path,
+                    agent,
+                    config_key,
+                    argument.lineno,
+                    f"the tools argument for {config_key!r} is {shape}",
+                )
+                continue
             diagnostics.append(
                 _unresolved(
                     evidence,
@@ -489,6 +551,19 @@ def _discover_tools(
             continue
         for element in tool_elements:
             class_name = _tool_class_name(element)
+            element_shape = dynamic_element_shape(element)
+            if element_shape is not None:
+                _attach_dynamic(
+                    nodes,
+                    edges,
+                    diagnostics,
+                    relative_path,
+                    agent,
+                    config_key,
+                    element.lineno,
+                    f"a tool in {config_key!r}'s list is {element_shape}",
+                )
+                continue
             if class_name is None:
                 diagnostics.append(
                     _unresolved(
@@ -512,7 +587,48 @@ def _discover_tools(
                 resolved=True,
             )
 
+    for variable, line in appended_agent_tools(tree):
+        config_key = visitor.agent_variables.get(variable)
+        agent = agents.get(config_key) if config_key is not None else None
+        if agent is None or config_key is None:
+            continue
+        _attach_dynamic(
+            nodes,
+            edges,
+            diagnostics,
+            relative_path,
+            agent,
+            config_key,
+            line,
+            f"tools are added to {config_key!r} after it is constructed",
+        )
+
     return list(nodes.values()), edges, diagnostics
+
+
+def _attach_dynamic(
+    nodes: dict[str, Node],
+    edges: list[Edge],
+    diagnostics: list[Diagnostic],
+    relative_path: str,
+    agent: Node,
+    config_key: str,
+    line: int,
+    reason: str,
+) -> None:
+    """A runtime registration: the same unknown node an unresolved
+    wiring gets, at `Confidence.UNKNOWN` and carrying the line the
+    `INCOMPLETE-DYNAMIC-REGISTRATION` diagnostic names, so
+    `policy.unresolved-dynamic-registration` can attribute it."""
+
+    evidence = located(_NAME, relative_path, line)
+    diagnostics.append(_dynamic(evidence, reason))
+    _attach_unknown(
+        nodes, edges, relative_path, agent, config_key, _evidence(relative_path)
+    )
+    name = f"unresolved-tools:{config_key}"
+    if name in nodes:
+        nodes[name] = mark_dynamic(nodes[name], evidence)
 
 
 def _attach_unknown(

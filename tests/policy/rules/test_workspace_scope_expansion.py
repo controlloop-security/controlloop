@@ -107,3 +107,65 @@ def test_narrowing_to_an_inside_directory_is_silent(tmp_path: Path) -> None:
     _directories(head, "docs")
 
     assert workspace_findings(context(head, base)) == ()
+
+
+def _roots(root: Path, *paths: str) -> None:
+    listed = ", ".join(f'"{path}"' for path in paths)
+    write(
+        root,
+        ".codex/config.toml",
+        'sandbox_mode = "workspace-write"\n'
+        f"[sandbox_workspace_write]\nwritable_roots = [{listed}]\n",
+    )
+
+
+@pytest.mark.parametrize("path", [_HOME, "~/.ssh", "/", "../infra"])
+def test_a_codex_writable_root_outside_is_high(tmp_path: Path, path: str) -> None:
+    base, head = repos(tmp_path)
+    _roots(base)
+    _roots(head, path)
+
+    (finding,) = workspace_findings(context(head, base))
+
+    assert summary((finding,)) == [(FindingSeverity.HIGH, FindingChangeState.ADDED)]
+    assert finding.message == (
+        "Codex can now read and write a directory outside the repository."
+    )
+    assert "private-notes" not in finding.message
+
+
+def test_a_codex_writable_root_inside_is_low(tmp_path: Path) -> None:
+    base, head = repos(tmp_path)
+    _roots(base)
+    _roots(head, "build")
+
+    (finding,) = workspace_findings(context(head, base))
+
+    assert summary((finding,)) == [(FindingSeverity.LOW, FindingChangeState.ADDED)]
+
+
+def test_an_unchanged_codex_writable_root_is_silent(tmp_path: Path) -> None:
+    base, head = repos(tmp_path)
+    _roots(base, _HOME)
+    _roots(head, _HOME)
+
+    assert workspace_findings(context(head, base)) == ()
+
+
+def test_a_codex_writable_root_removed_is_silent(tmp_path: Path) -> None:
+    base, head = repos(tmp_path)
+    _roots(base, _HOME)
+    _roots(head)
+
+    assert workspace_findings(context(head, base)) == ()
+
+
+def test_a_codex_writable_root_outside_on_a_first_scan_is_low(tmp_path: Path) -> None:
+    _, head = repos(tmp_path)
+    _roots(head, _HOME)
+
+    (finding,) = workspace_findings(context(head))
+
+    assert summary((finding,)) == [
+        (FindingSeverity.LOW, FindingChangeState.NOT_COMPARED)
+    ]

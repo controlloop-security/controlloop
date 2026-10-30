@@ -5,10 +5,14 @@ from controlloop.adapters.agent_hosts import (
     DOCUMENTATION_SNAPSHOT as _AGENT_HOSTS_SNAPSHOT,
 )
 from controlloop.adapters.agent_hosts import (
+    ROO_MODES_DOCUMENTATION_SNAPSHOT as _ROO_MODES_SNAPSHOT,
+)
+from controlloop.adapters.agent_hosts import (
     CodexConfigAdapter,
     CursorConfigAdapter,
     GeminiSettingsAdapter,
     KiroConfigAdapter,
+    RooModesAdapter,
 )
 from controlloop.adapters.claude_code import (
     DOCUMENTATION_SNAPSHOT as _CLAUDE_CODE_SNAPSHOT,
@@ -52,6 +56,7 @@ ALL_ADAPTERS: tuple[type[DiscoveryAdapter], ...] = (
     GeminiSettingsAdapter,
     CursorConfigAdapter,
     KiroConfigAdapter,
+    RooModesAdapter,
 )
 
 #: The vendor documentation date each agent host adapter's recognized
@@ -62,6 +67,7 @@ AGENT_HOST_DOCUMENTATION_SNAPSHOTS: dict[str, str] = {
     "cursor": _AGENT_HOSTS_SNAPSHOT,
     "gemini-cli": _AGENT_HOSTS_SNAPSHOT,
     "kiro": _AGENT_HOSTS_SNAPSHOT,
+    "roo-code": _ROO_MODES_SNAPSHOT,
 }
 
 __all__ = [
@@ -87,6 +93,7 @@ __all__ = [
     "OasfAdapter",
     "OpenAiAgentsAdapter",
     "OpenApiAdapter",
+    "RooModesAdapter",
     "ScanContext",
     "adapter_sandbox",
     "run_adapters",

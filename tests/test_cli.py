@@ -59,7 +59,7 @@ def test_version_is_machine_stable() -> None:
         f"Supported OASF versions: {supported}\n"
         "Agent host key sets (documentation read on): claude-code 2026-10-17, "
         "codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, "
-        "kiro 2026-10-17\n"
+        "kiro 2026-10-17, roo-code 2026-10-29\n"
         f"Rule pack: {CURRENT_RULE_PACK.name} {CURRENT_RULE_PACK.version} "
         f"({len(CURRENT_RULE_PACK.rules)} rules)\n"
     )
@@ -70,15 +70,15 @@ def test_version_reports_the_real_populated_rule_pack() -> None:
     """A direct, hardcoded assertion -- not merely one derived from
     `CURRENT_RULE_PACK` itself, which would pass trivially even if
     `CURRENT_RULE_PACK` regressed back to zero rules, a bug this once had.
-    Pins the actual reported line to the real 23-rule, `0.8.0`
+    Pins the actual reported line to the real 24-rule, `0.9.0`
     state."""
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "Rule pack: controlloop-community 0.8.0 (23 rules)\n" in result.stdout
-    assert CURRENT_RULE_PACK.version == "0.8.0"
-    assert len(CURRENT_RULE_PACK.rules) == 23
-    assert len(CURRENT_RULE_PACK.metadata) == 23
+    assert "Rule pack: controlloop-community 0.9.0 (24 rules)\n" in result.stdout
+    assert CURRENT_RULE_PACK.version == "0.9.0"
+    assert len(CURRENT_RULE_PACK.rules) == 24
+    assert len(CURRENT_RULE_PACK.metadata) == 24
 
 
 def test_uninstalled_source_tree_has_safe_version(monkeypatch: MonkeyPatch) -> None:

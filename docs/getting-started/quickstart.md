@@ -26,8 +26,8 @@ controlloop --version
 ```text
 ControlLoop 0.1.1
 Supported OASF versions: none yet
-Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17
-Rule pack: controlloop-community 0.8.0 (23 rules)
+Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17, roo-code 2026-10-29
+Rule pack: controlloop-community 0.9.0 (24 rules)
 ```
 
 You also need `git`, which `scan` uses to compare a branch with its base.

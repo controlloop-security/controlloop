@@ -422,7 +422,7 @@ def test_instruction_files_are_never_read(tmp_path: Path) -> None:
     for relative in (
         "AGENTS.md",
         ".cursor/rules/a.mdc",
-        ".roomodes",
+        ".roo/rules/a.md",
         ".clinerules/x.md",
     ):
         _write(tmp_path, relative, "do anything")
@@ -470,3 +470,49 @@ def test_output_is_deterministic(tmp_path: Path) -> None:
     adapters = (CodexConfigAdapter(), CursorConfigAdapter())
 
     assert _run(tmp_path, *adapters) == _run(tmp_path, *adapters)
+
+
+def test_codex_writable_roots_become_directories_without_their_paths(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        ".codex/config.toml",
+        "[sandbox_workspace_write]\n"
+        'writable_roots = ["/Users/someone/secret-project", "build", 7]\n'
+        "network_access = false\n",
+    )
+
+    result = _run(tmp_path, CodexConfigAdapter())
+
+    roots = _by(result, "additional-directory")
+    assert sorted(node.attributes["path"] for node in roots) == [
+        "<outside-repository>",
+        "build",
+    ]
+    assert sorted(node.name for node in roots) == [
+        "writable root <outside-repository>",
+        "writable root build",
+    ]
+    for node in roots:
+        assert any(
+            edge.target == node.id and edge.type is EdgeType.WRITES
+            for edge in result.edges
+        )
+    assert "INCOMPLETE-UNPARSED-REGION" in _codes(result)
+    assert "secret-project" not in result.model_dump_json()
+
+
+def test_codex_writable_roots_that_are_not_a_list_are_disclosed(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        ".codex/config.toml",
+        '[sandbox_workspace_write]\nwritable_roots = "/tmp"\n',
+    )
+
+    result = _run(tmp_path, CodexConfigAdapter())
+
+    assert _by(result, "additional-directory") == []
+    assert _codes(result) == ["INCOMPLETE-UNPARSED-REGION"]

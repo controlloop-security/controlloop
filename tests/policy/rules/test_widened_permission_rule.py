@@ -21,6 +21,43 @@ def _allow(
     write(root, path, {"permissions": {"allow": rules, "deny": deny or []}})
 
 
+def _modes(root: Path, groups: list[object]) -> None:
+    write(root, ".roomodes", {"customModes": [{"slug": "ops", "groups": groups}]})
+
+
+def test_a_roo_mode_gaining_command_is_high(tmp_path: Path) -> None:
+    """A `.roomodes` tool group is judged like any other allow rule."""
+
+    base, head = repos(tmp_path)
+    _modes(base, ["read"])
+    _modes(head, ["read", "command"])
+
+    (finding,) = widened_permission_rule_findings(context(head, base))
+
+    assert finding.severity is FindingSeverity.HIGH
+    assert finding.change_state is FindingChangeState.ADDED
+    assert finding.message == "Allow rule 'command' for 'Roo Code' is a wildcard."
+
+
+def test_a_roo_edit_group_losing_its_file_regex_is_high(tmp_path: Path) -> None:
+    base, head = repos(tmp_path)
+    _modes(base, [["edit", {"fileRegex": "\\.md$"}]])
+    _modes(head, ["edit"])
+
+    (finding,) = widened_permission_rule_findings(context(head, base))
+
+    assert finding.severity is FindingSeverity.HIGH
+    assert "widened from 'edit(\\.md$)' to 'edit'" in finding.message
+
+
+def test_an_unchanged_roo_mode_is_silent(tmp_path: Path) -> None:
+    base, head = repos(tmp_path)
+    _modes(base, ["read", "command"])
+    _modes(head, ["read", "command"])
+
+    assert widened_permission_rule_findings(context(head, base)) == ()
+
+
 def test_the_rule_reads_agent_authority() -> None:
     (rule,) = [
         rule for rule in ALL_RULES if rule.id == "policy.widened-permission-rule"

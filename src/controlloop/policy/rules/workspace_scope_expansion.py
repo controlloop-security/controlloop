@@ -1,7 +1,9 @@
 """Rule: an agent host given read and write access outside the repository.
 
 Claude Code's `permissions.additionalDirectories` adds directories the
-agent may read and write as freely as the repository itself. An entry
+agent may read and write as freely as the repository itself, and Codex's
+`sandbox_workspace_write.writable_roots` adds directories its
+`workspace-write` sandbox lets it write. An entry
 for the home directory, the filesystem root, or any other directory
 outside the repository hands the agent files the repository's review
 never covers: other projects, shell profiles, credentials. The adapter
@@ -13,9 +15,6 @@ Severities: an outside directory added, or an entry changed to one,
 the host could not already reach, but it is recorded); an outside
 directory present on a first scan `low`; removal, narrowing, and an
 inside directory on a first scan silent.
-
-Codex's `sandbox_workspace_write.writable_roots` is not recorded by the
-adapter yet, so it is not read here.
 """
 
 from __future__ import annotations
@@ -26,7 +25,7 @@ from controlloop.policy.models import Rule, RuleContext, RuleObservation
 from controlloop.policy.rules import _authority as authority
 
 RULE_ID = "policy.workspace-scope-expansion"
-_RULE_VERSION = "1.0.0"
+_RULE_VERSION = "1.1.0"
 
 #: The adapter's marker for an absolute or home-relative path
 #: (`controlloop.adapters.agent_authority.OUTSIDE_REPOSITORY_PATH`).

@@ -174,6 +174,15 @@ from controlloop.policy.rules.hardcoded_secrets import (
 from controlloop.policy.rules.hardcoded_secrets import (
     findings as hardcoded_secrets_findings,
 )
+from controlloop.policy.rules.hook_script_changed import (
+    RULE as HOOK_SCRIPT_CHANGED_RULE,
+)
+from controlloop.policy.rules.hook_script_changed import (
+    RULE_ID as HOOK_SCRIPT_CHANGED_RULE_ID,
+)
+from controlloop.policy.rules.hook_script_changed import (
+    findings as hook_script_changed_findings,
+)
 from controlloop.policy.rules.mcp_server_identity_change import (
     RULE as MCP_SERVER_IDENTITY_CHANGE_RULE,
 )
@@ -314,6 +323,7 @@ ALL_RULES: tuple[Rule, ...] = (
     CREDENTIALED_REMOTE_MCP_SERVER_RULE,
     WORKSPACE_SCOPE_EXPANSION_RULE,
     COMPONENT_SHELL_EXECUTION_RULE,
+    HOOK_SCRIPT_CHANGED_RULE,
 )
 
 __all__ = [
@@ -338,6 +348,8 @@ __all__ = [
     "EXFILTRATION_TRIANGLE_RULE_ID",
     "HARDCODED_SECRETS_RULE",
     "HARDCODED_SECRETS_RULE_ID",
+    "HOOK_SCRIPT_CHANGED_RULE",
+    "HOOK_SCRIPT_CHANGED_RULE_ID",
     "MCP_SERVER_IDENTITY_CHANGE_RULE",
     "MCP_SERVER_IDENTITY_CHANGE_RULE_ID",
     "MISSING_ACTION_LOGGING_RULE",
@@ -375,6 +387,7 @@ __all__ = [
     "destructive_or_financial_action_findings",
     "exfiltration_triangle_findings",
     "hardcoded_secrets_findings",
+    "hook_script_changed_findings",
     "mcp_server_identity_change_findings",
     "missing_action_logging_findings",
     "overprivileged_agent_workflow_findings",

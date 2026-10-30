@@ -73,6 +73,13 @@ from controlloop.adapters.framework_versions import (
     declared_version,
     require_supported,
 )
+from controlloop.adapters.python_registration import (
+    dynamic_element_shape,
+    dynamic_shape,
+    located,
+    mark_dynamic,
+    runtime_built_names,
+)
 from controlloop.bounded_recursion import bounded_recursion
 
 _NAME = "langgraph"
@@ -118,6 +125,14 @@ def _unresolved(evidence: tuple[Evidence, ...], reason: str) -> Diagnostic:
     return incomplete_diagnostic(
         code="INCOMPLETE-UNRESOLVED-REFERENCE",
         message=f"LangGraph capability could not be resolved statically: {reason}.",
+        evidence=evidence,
+    )
+
+
+def _dynamic(evidence: tuple[Evidence, ...], reason: str) -> Diagnostic:
+    return incomplete_diagnostic(
+        code="INCOMPLETE-DYNAMIC-REGISTRATION",
+        message=f"LangGraph tools are registered at runtime: {reason}.",
         evidence=evidence,
     )
 
@@ -249,7 +264,9 @@ class _GraphVisitor(ast.NodeVisitor):
         self.edges: list[tuple[str, str]] = []
         self.tools: list[str] = []
         self.unresolved_routers = 0
-        self.unresolved_tool_bindings = 0
+        #: The argument of each `bind_tools`/`ToolNode` call that is not
+        #: a literal list of tool references.
+        self.unresolved_tool_bindings: list[ast.expr] = []
         self.dynamic_construction = False
 
     @staticmethod
@@ -327,7 +344,7 @@ class _GraphVisitor(ast.NodeVisitor):
         elif callee in {"bind_tools", "ToolNode"} and node.args:
             names = self._tool_names(node.args[0])
             if names is None:
-                self.unresolved_tool_bindings += 1
+                self.unresolved_tool_bindings.append(node.args[0])
             else:
                 self.tools.extend(names)
 
@@ -525,7 +542,12 @@ def _discover_graph_module(
             diagnostics.append(_malformed(evidence, "an edge could not be represented"))
 
     tool_nodes, tool_edges, tool_diagnostics = _attach_tools(
-        module_relative, graph_key, graph_node, visitor, evidence
+        module_relative,
+        graph_key,
+        graph_node,
+        visitor,
+        evidence,
+        runtime_built_names(tree),
     )
     nodes.update(tool_nodes)
     edges.extend(tool_edges)
@@ -551,12 +573,25 @@ def _discover_graph_module(
     return list(nodes.values()), edges, diagnostics
 
 
+def _binding_shape(expression: ast.expr, built_names: dict[str, str]) -> str | None:
+    """How a non-literal binding is built at runtime, or `None` when it
+    is a reference the adapter did not follow."""
+
+    if isinstance(expression, ast.List):
+        for element in expression.elts:
+            shape = dynamic_element_shape(element)
+            if shape is not None:
+                return shape
+    return dynamic_shape(expression, built_names)
+
+
 def _attach_tools(
     module_relative: str,
     graph_key: str,
     graph_node: Node,
     visitor: _GraphVisitor,
     evidence: tuple[Evidence, ...],
+    built_names: dict[str, str],
 ) -> tuple[dict[str, Node], list[Edge], list[Diagnostic]]:
     nodes: dict[str, Node] = {}
     edges: list[Edge] = []
@@ -581,33 +616,48 @@ def _attach_tools(
         except ValueError:
             diagnostics.append(_malformed(evidence, "a tool could not be represented"))
 
-    for index in range(visitor.unresolved_tool_bindings):
+    for index, binding in enumerate(visitor.unresolved_tool_bindings):
         name = f"unresolved-tools:{graph_key}"
         key = f"tool:{name}"
-        diagnostics.append(
-            _unresolved(
-                evidence,
-                f"a tool binding in graph {graph_key!r} is not a literal list, "
-                "so what it can reach is unknown",
-            )
-        )
-        if key in nodes:
-            continue
-        try:
-            tool = _tool_for(module_relative, graph_key, name, evidence, resolved=False)
-            nodes[key] = tool
-            edges.append(
-                _edge(
-                    graph_node,
-                    tool,
-                    EdgeType.INVOKES,
-                    f"langgraph:unresolved-tools:{index}",
+        shape = _binding_shape(binding, built_names)
+        location = located(_NAME, module_relative, binding.lineno)
+        if shape is None:
+            diagnostics.append(
+                _unresolved(
                     evidence,
-                    resolved=False,
+                    f"a tool binding in graph {graph_key!r} is not a literal list, "
+                    "so what it can reach is unknown",
                 )
             )
-        except ValueError:
-            diagnostics.append(_malformed(evidence, "a tool could not be represented"))
+        else:
+            diagnostics.append(
+                _dynamic(location, f"a tool binding in graph {graph_key!r} is {shape}")
+            )
+        if key not in nodes:
+            try:
+                tool = _tool_for(
+                    module_relative, graph_key, name, evidence, resolved=False
+                )
+                nodes[key] = tool
+                edges.append(
+                    _edge(
+                        graph_node,
+                        tool,
+                        EdgeType.INVOKES,
+                        f"langgraph:unresolved-tools:{index}",
+                        evidence,
+                        resolved=False,
+                    )
+                )
+            except ValueError:
+                diagnostics.append(
+                    _malformed(evidence, "a tool could not be represented")
+                )
+                continue
+        if shape is not None:
+            # Linked to the diagnostic by its line, so
+            # `policy.unresolved-dynamic-registration` can attribute it.
+            nodes[key] = mark_dynamic(nodes[key], location)
 
     return nodes, edges, diagnostics
 

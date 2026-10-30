@@ -13,7 +13,9 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from controlloop.acbom import EdgeType, NodeType
+import pytest
+
+from controlloop.acbom import Confidence, EdgeType, NodeType
 from controlloop.adapters import (
     ALL_ADAPTERS,
     OpenAiAgentsAdapter,
@@ -173,7 +175,29 @@ class TestHandoffs:
             'from agents import Agent\na = Agent(name="A", handoffs=build_handoffs())\n'
         )
         result = _run(_project(tmp_path, module=module))
+        assert "INCOMPLETE-DYNAMIC-REGISTRATION" in _codes(result)
+
+    def test_a_bare_handoffs_name_stays_an_unresolved_reference(
+        self, tmp_path: Path
+    ) -> None:
+        module = 'from agents import Agent\na = Agent(name="A", handoffs=TEAM)\n'
+        result = _run(_project(tmp_path, module=module))
         assert "INCOMPLETE-UNRESOLVED-REFERENCE" in _codes(result)
+        assert "INCOMPLETE-DYNAMIC-REGISTRATION" not in _codes(result)
+
+    def test_a_splatted_handoff_is_dynamic(self, tmp_path: Path) -> None:
+        """A handoff target is an agent, so a dynamic one gets the
+        diagnostic but no invented node."""
+
+        module = (
+            "from agents import Agent\n"
+            'b = Agent(name="B")\n'
+            'a = Agent(name="A", handoffs=[b, *OTHERS])\n'
+        )
+        result = _run(_project(tmp_path, module=module))
+        assert _codes(result) == ["INCOMPLETE-DYNAMIC-REGISTRATION"]
+        assert ("A", "B") in _pairs(result, EdgeType.DELEGATES_TO)
+        assert _names(result, NodeType.AGENT) == {"A", "B"}
 
 
 class TestVersionGovernance:
@@ -282,7 +306,86 @@ class TestWiring:
     def test_a_non_literal_tools_list_is_reported(self, tmp_path: Path) -> None:
         module = "from agents import Agent\na = Agent(name='A', tools=load())\n"
         result = _run(_project(tmp_path, module=module))
+        assert "INCOMPLETE-DYNAMIC-REGISTRATION" in _codes(result)
+
+    @pytest.mark.parametrize(
+        "expression",
+        [
+            "load()",
+            "[t for t in REGISTRY]",
+            "[lookup] if fast else []",
+            "[*BASE]",
+            "[lookup, *EXTRA]",
+        ],
+        ids=["call", "comprehension", "conditional", "splat", "splat-entry"],
+    )
+    def test_every_runtime_shape_is_a_dynamic_registration(
+        self, tmp_path: Path, expression: str
+    ) -> None:
+        module = (
+            "from agents import Agent, function_tool\n"
+            "@function_tool\n"
+            "def lookup(q: str) -> str:\n"
+            "    return q\n"
+            f"a = Agent(name='A', tools={expression})\n"
+        )
+        result = _run(_project(tmp_path, module=module))
+        assert "INCOMPLETE-DYNAMIC-REGISTRATION" in _codes(result)
+        assert not any(
+            "could not be resolved to a declared function tool" in d.message
+            for d in result.diagnostics
+        )
+
+    def test_a_list_a_loop_appends_to_is_dynamic(self, tmp_path: Path) -> None:
+        module = (
+            "from agents import Agent\n"
+            "tools = []\n"
+            "for name in NAMES:\n"
+            "    tools.append(make(name))\n"
+            "a = Agent(name='A', tools=tools)\n"
+        )
+        result = _run(_project(tmp_path, module=module))
+        assert _codes(result) == ["INCOMPLETE-DYNAMIC-REGISTRATION"]
+        assert "a loop appends to" in result.diagnostics[0].message
+
+    def test_tools_appended_after_construction_are_dynamic(
+        self, tmp_path: Path
+    ) -> None:
+        module = (
+            "from agents import Agent\n"
+            "a = Agent(name='A')\n"
+            "a.tools.extend(load_more())\n"
+        )
+        result = _run(_project(tmp_path, module=module))
+        assert _codes(result) == ["INCOMPLETE-DYNAMIC-REGISTRATION"]
+        diagnostic = result.diagnostics[0]
+        assert diagnostic.evidence[0].line_start == 3
+        assert "after it is constructed" in diagnostic.message
+
+    def test_a_bare_tools_name_stays_an_unresolved_reference(
+        self, tmp_path: Path
+    ) -> None:
+        module = "from agents import Agent\na = Agent(name='A', tools=IMPORTED)\n"
+        result = _run(_project(tmp_path, module=module))
         assert "INCOMPLETE-UNRESOLVED-REFERENCE" in _codes(result)
+        assert "INCOMPLETE-DYNAMIC-REGISTRATION" not in _codes(result)
+
+    def test_a_literal_tools_list_is_neither(self, tmp_path: Path) -> None:
+        result = _run(_project(tmp_path))
+        assert "INCOMPLETE-DYNAMIC-REGISTRATION" not in _codes(result)
+        assert "INCOMPLETE-UNRESOLVED-REFERENCE" not in _codes(result)
+
+    def test_a_dynamic_registration_is_linked_to_its_unknown_node(
+        self, tmp_path: Path
+    ) -> None:
+        module = "from agents import Agent\na = Agent(name='A', tools=load())\n"
+        result = _run(_project(tmp_path, module=module))
+        diagnostic = result.diagnostics[0]
+        location = (diagnostic.evidence[0].path, diagnostic.evidence[0].line_start)
+        assert location == ("desk.py", 2)
+        node = next(n for n in result.nodes if n.type == NodeType.TOOL)
+        assert node.confidence is Confidence.UNKNOWN
+        assert location in {(e.path, e.line_start) for e in node.evidence}
 
     def test_a_non_literal_tools_list_still_produces_a_node(
         self, tmp_path: Path

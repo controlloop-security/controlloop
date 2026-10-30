@@ -7,9 +7,12 @@ DIAGNOSTIC_REGISTRY/summarize_skips, at the ACBOM layer.
 
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
 from controlloop.acbom import (
     INCOMPLETE_DIAGNOSTIC_REGISTRY,
@@ -27,6 +30,7 @@ from controlloop.acbom import (
     incomplete_diagnostic,
     with_digest,
 )
+from controlloop.cli import app
 
 _CODE_PATTERN = re.compile(r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$")
 _PLACEHOLDER_DIGEST = f"sha256:{'0' * 64}"
@@ -179,32 +183,53 @@ class TestCompletenessSummary:
         ]
 
 
-def test_dynamically_registered_tool_fixture_produces_an_unknown() -> None:
-    """A fixture with a dynamically registered tool produces an
-    unknown rather than an empty result.
+_DYNAMIC_REGISTRATION_MODULE = """\
+from agents import Agent
 
-    No adapter exists yet to discover this from a real repository, so
-    this demonstrates the mechanism directly: a scan that encountered a
-    runtime tool registration it could not resolve statically must
-    represent that as an incomplete diagnostic, never as if nothing had
-    been seen at all.
+support_agent = Agent(name="Support", tools=load_tools_from_config())
+"""
+
+
+def test_dynamically_registered_tool_fixture_produces_a_finding(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A repository whose agent builds its tool list at runtime produces
+    an unknown and a `policy.unresolved-dynamic-registration` finding
+    naming the file and the agent, end to end through `scan`, rather
+    than only a raw diagnostic.
+
+    The OpenAI Agents SDK adapter reads the call in `tools=` as a
+    dynamic registration, keeps an `"unknown"` tool node at
+    `Confidence.UNKNOWN`, and links it to the diagnostic by line.
     """
-    dynamic_registration = incomplete_diagnostic(
-        code="INCOMPLETE-DYNAMIC-REGISTRATION",
-        message=(
-            "A tool is registered at runtime via a dynamic dispatch table "
-            "and cannot be resolved to a concrete node statically."
-        ),
-        evidence=(
-            Evidence(adapter="python-discovery", path="server.py", line_start=42),
-        ),
+
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "desk"\nversion = "0.1.0"\n'
+        'dependencies = ["openai-agents>=0.2.0"]\n',
+        encoding="utf-8",
     )
-    document = _document((dynamic_registration,))
+    (tmp_path / "desk.py").write_text(_DYNAMIC_REGISTRATION_MODULE, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
 
-    summary = completeness_summary(document)
+    result = CliRunner().invoke(app, ["scan", "--format", "json"])
 
-    assert summary != ()
-    assert summary[0].code == "INCOMPLETE-DYNAMIC-REGISTRATION"
+    report = json.loads(result.stdout)
+    assert "INCOMPLETE-DYNAMIC-REGISTRATION" in {
+        diagnostic["code"] for diagnostic in report["diagnostics"]
+    }
+    findings = [
+        finding
+        for finding in report["findings"]
+        if finding["rule_id"] == "policy.unresolved-dynamic-registration"
+    ]
+    assert len(findings) == 1
+    finding = findings[0]
+    assert finding["severity"] == "medium"
+    assert "unresolved-tools:Support" in finding["message"]
+    assert {"path": "desk.py", "line_start": 3} in [
+        {"path": item["path"], "line_start": item["line_start"]}
+        for item in finding["evidence"]
+    ]
 
 
 def test_completeness_state_changes_the_digest() -> None:

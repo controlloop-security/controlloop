@@ -6,19 +6,20 @@ diagnostic code) and the finding model. See this package's
 `missing_action_logging` module docstring for the shared two-layer
 `evaluate()`/`findings()` design these rules use.
 
-**No adapter emits `INCOMPLETE-DYNAMIC-REGISTRATION` from a real
-repository yet** -- `tests/acbom/test_completeness.py`'s own
-`test_dynamically_registered_tool_fixture_produces_an_unknown` says so
-explicitly: the diagnostic mechanism exists, but discovering a real
-dynamic-registration *pattern* in source code is adapter work, out of
-this rule's reach by architecture (a rule reads only `RuleContext` --
-an already-validated ACBOM, optional diff, optional manifest -- never
-raw repository content). This rule's actual job -- recognized dynamic
-registration patterns produce an unknown node and a finding naming the
-location -- is narrower and adapter-agnostic: given an ACBOM that
-already contains such a diagnostic (from whichever adapter eventually
-produces one), surface it as a policy-level finding rather than
-leaving it buried in `diagnostics`. Statically enumerable registration
+**The CrewAI, LangGraph, and OpenAI Agents SDK adapters emit
+`INCOMPLETE-DYNAMIC-REGISTRATION`** when a `tools=` (or `bind_tools`,
+`ToolNode`, `handoffs=`) argument is a comprehension, a call, a splat, a
+conditional expression, or a list the module builds with a loop or
+appends to, and when an agent's `tools` is appended to after
+construction (see `controlloop.adapters.python_registration`).
+Recognizing the pattern is adapter work, out of this rule's reach by
+architecture (a rule reads only `RuleContext` -- an already-validated
+ACBOM, optional diff, optional manifest -- never raw repository
+content). This rule's job is narrower and adapter-agnostic: given an
+ACBOM that already contains such a diagnostic, surface it as a
+policy-level finding rather than leaving it buried in `diagnostics`.
+`tests/acbom/test_completeness.py` asserts the finding end to end
+through `scan`. Statically enumerable registration
 produces no finding, because this rule never fires from a node's mere
 existence or low confidence alone -- only from the presence of the
 specific `INCOMPLETE-DYNAMIC-REGISTRATION` diagnostic code.

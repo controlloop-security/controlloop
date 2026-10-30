@@ -473,11 +473,31 @@ branching on an environment variable) is exactly the case static
 analysis cannot fully enumerate — and rather than pretend the scan saw
 everything, this rule surfaces the gap honestly.
 
-**Example:** an agent's source registers tools in a loop over a remote
-config response. The relevant adapter emits an
-`INCOMPLETE-DYNAMIC-REGISTRATION` diagnostic at that location. This rule
-surfaces it as a policy-level finding rather than letting it sit only in
+**Example:** an OpenAI Agents SDK module declares
+`Agent(name="Support", tools=load_tools_from_config())`. The adapter
+emits an `INCOMPLETE-DYNAMIC-REGISTRATION` diagnostic at that line and
+keeps an `"unknown"` tool node, `unresolved-tools:Support`, linked to
+it by the same line. This rule reports a `medium` finding naming the
+file, the line, and the agent, rather than letting the gap sit only in
 the raw diagnostics array.
+
+The CrewAI, LangGraph, and OpenAI Agents SDK adapters emit the
+diagnostic when a tool list (CrewAI `tools=`, LangGraph `bind_tools`
+and `ToolNode`, OpenAI Agents `tools=` and `handoffs=`) is:
+
+| Shape | Example |
+| --- | --- |
+| A comprehension | `tools=[make(t) for t in config]` |
+| A call | `tools=load_tools()` |
+| A splat | `tools=[*base_tools]`, `tools=[search, *extra]` |
+| A conditional expression | `tools=[search] if online else []` |
+| A list the module builds | `tools=TOOLS` after `for f in found: TOOLS.append(f)` |
+| Added after construction | `agent.tools.append(...)`, `agent.tools.extend(...)` |
+
+A bare name the module does not build (`tools=TOOLS` imported from
+elsewhere) is still `INCOMPLETE-UNRESOLVED-REFERENCE`, which this rule
+does not report: it is a reference the adapter declined to follow, not
+a registration at runtime. A literal list produces neither.
 
 **Remediation:** there is no code change this rule itself asks for — it
 is disclosing an analysis limitation, not a policy violation. Reducing
@@ -492,14 +512,16 @@ statically and confidently elsewhere never fires here just because an
 unrelated dynamic-registration diagnostic exists somewhere else in the
 same document.
 
-- No adapter emits the `INCOMPLETE-DYNAMIC-REGISTRATION` diagnostic
-  from a real repository yet (`tests/acbom/test_completeness.py`
-  says so explicitly) -- discovering a real dynamic-registration
-  *pattern* in source code is adapter work, out of a rule's reach by
-  architecture (a rule reads only `RuleContext`, never raw repository
-  content). This rule's job is narrower and adapter-agnostic: given an
-  ACBOM that already contains such a diagnostic, from whichever adapter
-  eventually produces one, surface it as a policy-level finding.
+- Recognizing a dynamic-registration *pattern* in source code is
+  adapter work, out of a rule's reach by architecture (a rule reads
+  only `RuleContext`, never raw repository content). This rule's job is
+  narrower and adapter-agnostic: given an ACBOM that already contains
+  such a diagnostic, surface it as a policy-level finding.
+- A dynamic `handoffs=` list in the OpenAI Agents SDK produces the
+  diagnostic but no placeholder node, since a handoff target is an
+  agent and inventing one would be a made-up identity. It is reported
+  through `evaluate()`'s observations and the scan's diagnostics, not
+  as a `Finding`.
 - `evaluate()` reports one `RuleObservation` per matching diagnostic
   unconditionally. `findings()` additionally correlates a diagnostic to
   a real, already-discovered `TOOL` node at `Confidence.UNKNOWN` whose
@@ -1071,6 +1093,11 @@ runs any script in a file the same pull request can edit.
 **Remediation:** narrow the rule to the commands or tools the agent
 needs.
 
+Roo Code `.roomodes` tool groups are allow rules the Roo Code host holds
+(see [Roo Code](../adapters/roo.md)): a mode that gains `command`,
+`browser`, or `mcp`, or an `edit` group that loses its `fileRegex`, is
+reported here.
+
 **False positives:** a skill's or subagent's own grants are reported by
 [component self-grant](#component-self-grant), not here.
 
@@ -1469,7 +1496,9 @@ workspace is reported, naming the host.
 
 **Why this matters:** Claude Code's `permissions.additionalDirectories`
 gives the agent read and write access to each listed directory, as freely
-as the repository itself. A directory outside the repository hands the
+as the repository itself, and Codex's
+`sandbox_workspace_write.writable_roots` lets its `workspace-write`
+sandbox write each listed directory. A directory outside the repository hands the
 agent files the repository's review never covers: other projects, shell
 profiles, credentials.
 
@@ -1488,8 +1517,11 @@ relative path that climbs out with `..`.
 | No baseline (first scan): an outside directory | `low` |
 | Removed, narrowed to inside, unchanged, or inside on a first scan | none |
 
-Codex's `sandbox_workspace_write.writable_roots` is not recorded by the
-Codex adapter yet, so this rule does not cover Codex.
+A Codex `writable_roots` entry is judged the same way: adding
+`writable_roots = ["~/.ssh"]` to `.codex/config.toml` reads "Codex can
+now read and write a directory outside the repository." at `high`.
+Before rule version 1.1.0 the Codex adapter did not record writable
+roots, so this rule did not cover Codex.
 
 **Change states and confidence:** `added` or `changed` (`high` for an outside directory, `low` for an inside one); `not-compared` on a scan with no baseline (`low`). Confidence is `high`.
 
@@ -1552,6 +1584,63 @@ the tool when asked.
 **False positives:** every new shell line is reported, including a
 harmless `git status`. The rule reports the change; approve a reviewed
 one once.
+
+<a id="hook-script-changed"></a>
+## Hook script changed
+
+**Outcome:** a hook, helper command, skill shell line, or plugin `bin/`
+directory whose command is unchanged, but whose script in the
+repository changed, is reported with the host, the hook event or
+setting, and the script's path.
+
+**Why this matters:** [agent hook command change](#agent-hook-command-change)
+reads the command a hook runs. A pull request can leave
+`.claude/settings.json` alone and edit `.github/setup.js`, the file a
+`SessionStart` hook runs as `node .github/setup.js`, and the hook's
+command is the same. The script runs with the hook's authority on every
+machine that opens the repository, so a change to it is a change to the
+hook.
+
+**Example:** a pull request edits `.claude/hooks/setup.sh` and leaves
+the hook that runs `bash .claude/hooks/setup.sh` untouched. The finding
+reads "The hook on event 'SessionStart' for host 'Claude Code' runs
+`.claude/hooks/setup.sh`, whose contents changed while the command did
+not." at `high`.
+
+| Change | Severity |
+| --- | --- |
+| Script digest changed, command unchanged (including a script that appears for a hook that already named it) | `high` |
+| A readable script becomes `unknown`: moved outside the repository, grown past the size bound, or missing | `medium` |
+| The command changed too | none here: [agent hook command change](#agent-hook-command-change) or [component shell execution](#component-shell-execution) reports it |
+| No baseline (first scan), a hook added or removed, `unknown` on both sides, or a baseline recorded before script digests | none |
+
+The adapters record two attributes on a hook or helper command whose
+command names a file committed in the repository: `script_path` and
+`script_digest`, the SHA-256 of the file's bytes. A command names a file
+when its first word is a path (`./scripts/check.sh`,
+`"$CLAUDE_PROJECT_DIR"/.claude/hooks/x.sh`, `${CLAUDE_PLUGIN_ROOT}/...`
+in a plugin), or the first word after `node`, `python`, `python3`,
+`bash`, `sh`, `zsh`, `ruby`, `perl`, `bun`, `tsx`, `uv run`, or `npx`
+with a local path. A plugin's `bin/` directory gets one digest over the
+sorted names and digests of its files. Only files the repository walk
+listed are opened, so a path outside the root, an escaping symlink, and
+a file over the walk's byte bound are never read; they record
+`script_digest: unknown`. No file content enters any output.
+
+**Change states and confidence:** `changed` (`high`, or `medium` when the script can no longer be read). Confidence is `high`: a digest either matches or it does not.
+
+**Approving or suppressing:** these findings are change-only, so a reviewed change stops producing one once it is in the baseline. To let a reviewed change through before then, add a `controlloop.yaml` approval whose `capability` names the component (`<file>#<key path>`, its name, or its node ID): the finding is kept at `info` with the approver's name, so it no longer blocks, and the [authority statement](authority-statement.md) says "Approval recorded." An expired approval does nothing. A time-limited [suppression](suppressions.md) naming the finding's `id` works too.
+
+**Remediation:** review the script change as agent code, or pin the
+script behind a permission rule.
+
+**False positives:** every edit to a hook's script is reported,
+including a formatting fix. That is deliberate: the rule cannot tell a
+harmless edit from a harmful one, because it never reads the script.
+A command that reaches its script another way (through a variable other
+than `CLAUDE_PROJECT_DIR` or `CLAUDE_PLUGIN_ROOT`, after a `cd`, or
+through a script that calls another script) records no digest, so a
+change to it is not seen.
 
 ## Known limitations
 

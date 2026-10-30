@@ -333,6 +333,13 @@ boundary this list summarizes:
   Dockerfile in `.cursor/environment.json` is recorded only as present.
   Gap: user-scope configuration (`~/.codex`, `~/.gemini`, `~/.cursor`,
   `~/.kiro`) and settings held in an editor's UI state are never read.
+- **`RooModesAdapter`** (Roo Code custom modes) -- reads `.roomodes` at
+  the repository root as YAML or JSON data. Privacy: a mode's `slug`,
+  `name`, and tool groups are recorded; `roleDefinition`,
+  `customInstructions`, `whenToUse`, and `description` are prompt text
+  and never read into anything. An `edit` group's `fileRegex` is recorded
+  as text, never evaluated. Gap: global modes (`custom_modes.yaml`) live
+  outside the repository and are never read.
 - **`AgentWorkflowAdapter`** (agent-running GitHub workflows) -- parses
   `.github/workflows/*.yml` with `yaml.safe_load`; a workflow is never run.
   Privacy: a secret is recorded by **name** from `${{ secrets.NAME }}`; an

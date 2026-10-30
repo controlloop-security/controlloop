@@ -1,4 +1,4 @@
-"""Codex, Gemini CLI, Cursor, and Kiro host configuration.
+"""Codex, Gemini CLI, Cursor, Kiro, and Roo Code host configuration.
 
 The same conventions as the Claude Code adapters, applied to the other
 major coding agents: one host node per repository, hook and helper
@@ -9,9 +9,10 @@ permission grants as rules. Nothing is executed.
 Each host's recognized keys are pinned to its vendor documentation as
 read on `DOCUMENTATION_SNAPSHOT`; an unrecognized top-level key is
 reported as `INCOMPLETE-UNRECOGNIZED-KEY`. Instruction files --
-`AGENTS.md`, `.cursor/rules`, `.roomodes`, Cline rules -- are not
-read. Roo Code and Cline grant authority through their MCP
-auto-approve lists, which `controlloop.adapters.mcp` already records.
+`AGENTS.md`, `.cursor/rules`, Cline rules -- are not read. Roo Code and
+Cline grant authority through their MCP auto-approve lists, which
+`controlloop.adapters.mcp` already records; Roo Code's `.roomodes` also
+grants tool groups to each custom mode, which `RooModesAdapter` reads.
 
 In the ordered scales below, a move to the right loosens. They are data here
 so the rule that compares them reads the same order this adapter documents.
@@ -19,10 +20,13 @@ so the rule that compares them reads the same order this adapter documents.
 
 from __future__ import annotations
 
+import json
 import re
 import tomllib
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from controlloop.acbom import (
     Diagnostic,
@@ -43,9 +47,13 @@ from controlloop.adapters.claude_code import (
     hook_node,
 )
 from controlloop.adapters.framework import DetectionResult, DiscoveryResult, ScanContext
+from controlloop.adapters.script_digest import with_script_digests
 from controlloop.bounded_recursion import bounded_recursion
 
 DOCUMENTATION_SNAPSHOT = "2026-10-17"
+#: Roo Code's custom modes documentation, read separately from the other
+#: hosts' key sets.
+ROO_MODES_DOCUMENTATION_SNAPSHOT = "2026-10-29"
 
 #: Codex `approval_policy`, strictest first. `untrusted` is retired and
 #: `on-failure` deprecated in the current documentation; both keep their
@@ -110,10 +118,15 @@ def _on_scale(value: object, scale: tuple[str, ...]) -> tuple[str, bool]:
 class _Host:
     """One host's accumulated discovery across its files."""
 
-    def __init__(self, key: str, display_name: str, adapter: str) -> None:
+    def __init__(
+        self, key: str, display_name: str, adapter: str, *, owned: bool = True
+    ) -> None:
         self.key = key
         self.display_name = display_name
         self.adapter = adapter
+        #: Whether this adapter owns the host node, or only refers to a
+        #: host another adapter owns (`aa.host_reference_node`).
+        self.owned = owned
         self.host_id = host_node_id(key)
         self.nodes: list[Node] = []
         self.edges: list[Edge] = []
@@ -152,6 +165,15 @@ class _Host:
     def result(self) -> DiscoveryResult:
         if not self.evidence:
             return DiscoveryResult(diagnostics=tuple(self.diagnostics))
+        if not self.owned:
+            reference = aa.host_reference_node(
+                host=self.key, display_name=self.display_name, evidence=self.evidence
+            )
+            return DiscoveryResult(
+                nodes=(*self.nodes, reference),
+                edges=tuple(self.edges),
+                diagnostics=tuple(self.diagnostics),
+            )
         host = aa.host_node(
             host=self.key,
             display_name=self.display_name,
@@ -284,7 +306,7 @@ class CodexConfigAdapter:
                     namespace="codex.hook",
                 )
                 host.take(found)
-        return host.result()
+        return with_script_digests(host.result(), context)
 
     def _config(
         self, host: _Host, found: ComponentDiscovery, payload: dict[str, Any]
@@ -334,6 +356,8 @@ class CodexConfigAdapter:
             host.attributes["sandbox_network_access"] = aa.authority_text(
                 workspace["network_access"]
             )
+        if isinstance(workspace, dict) and "writable_roots" in workspace:
+            _writable_roots(found, workspace["writable_roots"])
         projects = payload.get("projects")
         if isinstance(projects, dict):
             levels = sorted(
@@ -387,6 +411,36 @@ class CodexConfigAdapter:
                             "model_providers", str(name), "auth", "command"
                         ),
                     )
+
+
+def _writable_roots(found: ComponentDiscovery, roots: object) -> None:
+    """`sandbox_workspace_write.writable_roots`: directories the agent may
+    write besides the workspace, recorded as Claude Code's
+    `additionalDirectories` are. An absolute or home-relative path becomes
+    `<outside-repository>`; the path itself is never kept."""
+
+    if not isinstance(roots, list):
+        found.unparsed("sandbox_workspace_write.writable_roots is not a list")
+        return
+    for index, root in enumerate(found.bounded(roots, "writable roots")):
+        if not isinstance(root, str) or not root.strip():
+            found.unparsed("a writable root is not a path string")
+            continue
+        component_key = aa.key_path("sandbox_workspace_write", "writable_roots", index)
+        path = aa.repository_path_text(root)
+        node = aa.component_node(
+            node_type=NodeType.RESOURCE,
+            subtype="additional-directory",
+            namespace="codex.writable-root",
+            declaring_path=found.path,
+            component_key=component_key,
+            name=f"writable root {path}",
+            attributes={"path": path, "setting": "writable_roots"},
+            security_attributes=SecurityAttributes(),
+            evidence=found.evidence,
+        )
+        found.nodes.append(node)
+        found.link(node.id, EdgeType.WRITES, component_key)
 
 
 # --- Gemini CLI ----------------------------------------------------------------
@@ -446,7 +500,7 @@ class GeminiSettingsAdapter:
             if names:
                 host.attributes["env_names"] = aa.authority_text(",".join(names))
             host.evidence.extend(aa.evidence_for(self.name, _GEMINI_ENV))
-        return host.result()
+        return with_script_digests(host.result(), context)
 
     def _settings(
         self, host: _Host, found: ComponentDiscovery, payload: dict[str, Any]
@@ -588,7 +642,7 @@ class CursorConfigAdapter:
                 continue
             handler(host, found, payload)
             host.take(found)
-        return host.result()
+        return with_script_digests(host.result(), context)
 
     def _hooks(
         self, host: _Host, found: ComponentDiscovery, payload: dict[str, Any]
@@ -764,7 +818,7 @@ class KiroConfigAdapter:
                 else:
                     found.unparsed("hooks is not a list")
             host.take(found)
-        return host.result()
+        return with_script_digests(host.result(), context)
 
     def _hook(
         self, found: ComponentDiscovery, entry: dict[str, Any], component_key: str
@@ -883,3 +937,193 @@ class KiroConfigAdapter:
 
 #: The hosts these adapters own; the MCP adapter emits references to them.
 OWNED_HOSTS = frozenset({"codex", "gemini-cli", "cursor", "kiro"})
+
+
+# --- Roo Code ------------------------------------------------------------------
+
+_ROO_MODES = ".roomodes"
+_ROO_TOP_LEVEL_KEYS = frozenset({"customModes"})
+#: A `customModes[]` entry's keys. `source` is set by Roo itself.
+#: `roleDefinition`, `customInstructions`, `whenToUse`, and `description`
+#: are prompt text and are never read.
+_ROO_MODE_KEYS = frozenset(
+    {
+        "slug", "name", "description", "roleDefinition", "groups", "whenToUse",
+        "customInstructions", "source",
+    }
+)  # fmt: skip
+#: The tool groups a mode can be given. The documentation lists `read`,
+#: `edit`, `command`, and `mcp`; `browser` is still accepted by Roo and
+#: appears in existing files.
+_ROO_GROUPS = frozenset({"read", "edit", "browser", "command", "mcp"})
+#: Groups Roo does not scope to a command, server, or site: a mode given
+#: one may use all of it. `edit` is a wildcard only without a `fileRegex`.
+_ROO_UNSCOPED_GROUPS = frozenset({"browser", "command", "mcp"})
+_ROO_SLUG = re.compile(r"^[A-Za-z0-9-]+$")
+
+
+def _load_roo_modes(path: Path) -> dict[str, Any]:
+    """`.roomodes` as YAML, then JSON, the order Roo itself tries."""
+
+    if path.stat().st_size > aa.MAX_CONFIG_BYTES:
+        raise aa.ConfigLoadError("the file is larger than the configuration bound")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        raise aa.ConfigLoadError("the file could not be read as UTF-8") from None
+    payload: object = None
+    try:
+        with bounded_recursion(margin=500):
+            payload = yaml.safe_load(text)
+    except (yaml.YAMLError, RecursionError):
+        try:
+            with bounded_recursion(margin=500):
+                payload = json.loads(text)
+        except (json.JSONDecodeError, RecursionError):
+            raise aa.ConfigLoadError("the file is not valid YAML or JSON") from None
+    if not isinstance(payload, dict):
+        raise aa.ConfigLoadError("the top level is not a mapping")
+    return payload
+
+
+class RooModesAdapter:
+    """Roo Code custom modes: `.roomodes` at the repository root.
+
+    Each mode becomes a `subagent` under the Roo Code host, and each of
+    its tool groups a permission rule. The rule is held by the host,
+    since a project mode is part of what the host allows, and linked
+    from the mode it belongs to. The MCP adapter owns the Roo Code host
+    node; this adapter refers to it.
+    """
+
+    name = "roo-code"
+    supported_versions: tuple[str, ...] = (f"docs-{ROO_MODES_DOCUMENTATION_SNAPSHOT}",)
+
+    def detect(self, context: ScanContext) -> DetectionResult:
+        claimed = [p for p in _paths(context) if p == _ROO_MODES]
+        return DetectionResult(adapter=self.name, claimed_paths=tuple(claimed))
+
+    def discover(self, context: ScanContext) -> DiscoveryResult:
+        host = _Host("roo", "Roo Code", self.name, owned=False)
+        if _ROO_MODES not in set(_paths(context)):
+            return host.result()
+        found = host.file(_ROO_MODES)
+        try:
+            payload = _load_roo_modes(context.root.path / _ROO_MODES)
+        except aa.ConfigLoadError as error:
+            found.unparsed(str(error))
+            host.take(found, loaded=False)
+            return host.result()
+        for key in payload:
+            if key not in _ROO_TOP_LEVEL_KEYS:
+                found.unknown_keys.append(str(key))
+        modes = payload.get("customModes", [])
+        if not isinstance(modes, list):
+            found.unparsed("customModes is not a list")
+            host.take(found)
+            return host.result()
+        seen: set[str] = set()
+        for entry in found.bounded(modes, "custom modes"):
+            if not isinstance(entry, dict):
+                found.unparsed("a custom mode is not a mapping")
+                continue
+            slug = entry.get("slug")
+            if not isinstance(slug, str) or not _ROO_SLUG.fullmatch(slug):
+                found.unparsed("a custom mode has no valid slug")
+                continue
+            if slug in seen:
+                found.unparsed("two custom modes share a slug")
+                continue
+            seen.add(slug)
+            self._mode(found, slug, entry)
+        host.take(found)
+        return host.result()
+
+    def _mode(
+        self, found: ComponentDiscovery, slug: str, entry: dict[str, Any]
+    ) -> None:
+        mode_key = aa.key_path("customModes", slug)
+        for key in entry:
+            if key not in _ROO_MODE_KEYS:
+                found.unknown_keys.append(aa.key_path("customModes", slug, str(key)))
+        display = entry.get("name")
+        label = (
+            display.strip() if isinstance(display, str) and display.strip() else slug
+        )
+        groups = entry.get("groups")
+        if not isinstance(groups, list):
+            groups = []
+            if "groups" in entry:
+                found.unparsed("a custom mode's groups is not a list")
+        parsed: list[tuple[str, str | None]] = []
+        for group in found.bounded(groups, "tool groups"):
+            name: object = group
+            file_regex: object = None
+            if isinstance(group, list) and group:
+                name = group[0]
+                options = group[1] if len(group) > 1 else None
+                if isinstance(options, dict):
+                    file_regex = options.get("fileRegex")
+            if not isinstance(name, str) or name not in _ROO_GROUPS:
+                found.unknown_keys.append(
+                    aa.key_path("customModes", slug, "groups", str(name))
+                )
+                continue
+            if any(existing == name for existing, _ in parsed):
+                found.unparsed("a custom mode lists a tool group twice")
+                continue
+            parsed.append(
+                (
+                    name,
+                    file_regex
+                    if name == "edit" and isinstance(file_regex, str) and file_regex
+                    else None,
+                )
+            )
+        mode = aa.component_node(
+            node_type=NodeType.AGENT,
+            subtype="subagent",
+            namespace="roo-code.mode",
+            declaring_path=found.path,
+            component_key=mode_key,
+            name=f"mode {aa.authority_text(label)}",
+            attributes={
+                "slug": slug,
+                "groups": ",".join(name for name, _ in parsed) or "none",
+                "docs_snapshot": ROO_MODES_DOCUMENTATION_SNAPSHOT,
+            },
+            security_attributes=SecurityAttributes(),
+            evidence=found.evidence,
+        )
+        found.nodes.append(mode)
+        found.link(mode.id, EdgeType.DELEGATES_TO, mode_key)
+        for name, file_regex in parsed:
+            pattern = f"{name}({file_regex})" if file_regex is not None else name
+            component_key = aa.key_path("customModes", slug, "groups", name)
+            # A `fileRegex` is recorded as the pattern, never evaluated.
+            rule = aa.component_node(
+                node_type=NodeType.PERMISSION,
+                subtype="permission-rule",
+                namespace="roo-code.mode-group",
+                declaring_path=found.path,
+                component_key=component_key,
+                name=f"allow {aa.authority_text(pattern)} in mode {slug}",
+                attributes={
+                    "effect": "allow",
+                    "pattern": aa.authority_text(pattern),
+                    "tool": name,
+                    "mode": slug,
+                },
+                security_attributes=SecurityAttributes(
+                    wildcard=name in _ROO_UNSCOPED_GROUPS
+                    or (name == "edit" and file_regex is None),
+                    code_execution=True if name == "command" else None,
+                    external_communication=True if name == "browser" else None,
+                ),
+                evidence=found.evidence,
+            )
+            found.nodes.append(rule)
+            found.link(rule.id, EdgeType.PERMITTED_BY, component_key)
+            found.link(
+                rule.id, EdgeType.PERMITTED_BY, f"{component_key}:mode", source=mode.id
+            )

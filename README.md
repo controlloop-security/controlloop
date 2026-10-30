@@ -32,7 +32,7 @@ run a script on every session start.
 > (ACBOM): agents, tools, resources, identities, and permissions, with
 > evidence for every node and edge. The graph is **diffed** against the
 > baseline you approved, **classified** by a material capability taxonomy,
-> judged by **23 policy rules** and the **capability ceiling** you declared,
+> judged by **24 policy rules** and the **capability ceiling** you declared,
 > and the verdict is written to an **evidence artifact**. No model decides
 > anything; the same inputs always produce the same verdict. Secrets,
 > prompts, environment values, and file contents never reach the output.
@@ -58,7 +58,7 @@ run a script on every session start.
 - 🗣️ **A plain-language authority statement** for every change to an agent's configuration: *This change gives Claude Code the power to run `node .github/setup.js` on every session start.* [Authority statement](docs/reference/authority-statement.md).
 - 🔀 **A capability diff**, not a file diff: what became newly reachable against the baseline you approved, by class. [Capability diff](docs/reference/cli.md#diff).
 - 📏 **A capability ceiling** that blocks authority nobody anticipated, through routes no rule matches, and cannot be suppressed. [Capability ceiling](docs/reference/capability-ceiling.md).
-- 📚 **23 policy rules** with a plain message, a remediation, and a stable documentation link on every finding. [Policy rules](docs/reference/policy-rules.md).
+- 📚 **24 policy rules** with a plain message, a remediation, and a stable documentation link on every finding. [Policy rules](docs/reference/policy-rules.md).
 - 🧾 **An evidence artifact** on every gate run, including the failing ones, plus JSON and SARIF 2.1.0 output. [Evidence artifact format](docs/reference/evidence-artifact-format.md).
 
 ### How it behaves
@@ -105,8 +105,8 @@ uv run controlloop --version
 ```text
 ControlLoop 0.1.1
 Supported OASF versions: none yet
-Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17
-Rule pack: controlloop-community 0.8.0 (23 rules)
+Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17, roo-code 2026-10-29
+Rule pack: controlloop-community 0.9.0 (24 rules)
 ```
 
 ### Requirements
@@ -427,7 +427,7 @@ uv run controlloop rules
 ```
 
 ```text
-• RULE PACK  controlloop-community 0.8.0 (23 rules)
+• RULE PACK  controlloop-community 0.9.0 (24 rules)
 • FINGERPRINT  169a7ceb80ffac4ccdb2ab95bc7491cb296f8736ded076f666a3020d3f1a342e
 
 ✓ policy.undeclared-tools  [active, optional]
