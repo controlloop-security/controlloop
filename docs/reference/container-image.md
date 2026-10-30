@@ -11,11 +11,8 @@ created: 2026-10-23
 
 The release pipeline publishes a container image of the CLI to the GitHub
 Container Registry, `ghcr.io/controlloop-security/controlloop`, for every
-tagged release from the first one cut after this page was added. It runs
-`scan`, `gate`, `diff`, `bom`, `init` and `rules` with nothing installed on
-the host but a container runtime. Until that first release is tagged, no
-image exists under that name; this page describes the pipeline, not a
-download that is already there.
+tagged release. It runs `scan`, `gate`, `diff`, `bom`, `init` and `rules`
+with nothing installed on the host but a container runtime.
 
 ## Pull and run
 

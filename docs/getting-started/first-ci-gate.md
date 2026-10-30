@@ -155,8 +155,7 @@ controlloop gate . --default-branch main --evidence-path evidence.json
 ```
 
 Keep `evidence.json` as a job artifact. Or use the container image
-instead of an install (available from the first release after this page
-was written; see [Container image](../reference/container-image.md)):
+instead of an install (see [Container image](../reference/container-image.md)):
 
 ```bash
 docker run --rm --network none --user "$(id -u):$(id -g)" -v "$PWD:/work" \

@@ -16,6 +16,49 @@ declared. It never runs your code and never sends your source anywhere.
 
 Watch: [the gate in a minute](https://controlloop.ai/#video) · Read: [the example walkthrough](docs/guides/example-walkthrough.md)
 
+## Try it in 30 seconds
+
+No install and no account: with [uv](https://docs.astral.sh/uv/) on your
+machine, `uvx` runs the CLI straight from PyPI. Point it at the public
+[reference agent](https://github.com/controlloop-security/controlloop-reference-agent),
+on a branch where a pull request adds a Claude Code `SessionStart` hook:
+
+```bash
+git clone -b scenario/session-start-harvester-hook https://github.com/controlloop-security/controlloop-reference-agent
+cd controlloop-reference-agent
+uvx controlloop gate scenarios/storefront-agent-config
+```
+
+```text
+! WORST REACHABLE  code-execution: Claude Code can invoke PostToolUse command
+  hook (Edit|Write)
+
+✕ DEPLOYMENT BLOCKED
+
+Authority:
+  • This change gives Claude Code the power to run `node .github/setup.js` on
+    every session start (`.claude/settings.json`, hook `SessionStart`). No
+    approval is recorded.
+
+• GAINED  code-execution: Claude Code invokes SessionStart command hook
+
+✕ HIGH     policy.agent-hook-command-change: Added: Hook on event 'SessionStart'
+  for host 'Claude Code' runs `node .github/setup.js`.
+    at .claude/settings.json
+
+Suppressions: none declared
+
+Completeness enforcement: warn (default)
+Evidence: evidence.json
+```
+
+Exit code `1`. The gate compared the branch with `main`, the way CI
+compares a pull request with its base, and named the new power in one
+sentence. The reference agent has a branch for each kind of change: a
+widened `Bash(*)` allow rule, an MCP package that changed version, an
+agent workflow given `id-token: write`, and more. To gate your own pull
+requests, add the [GitHub Action](#run-it-as-a-github-action).
+
 # ControlLoop CLI
 
 An agent's real authority is spread across an agent card, an MCP config, an
@@ -38,11 +81,11 @@ run a script on every session start.
 > prompts, environment values, and file contents never reach the output.
 
 > **Development preview.** `init`, `bom`, `diff`, `scan`, `gate`, `rules`,
-> and `example` work and are covered by tests. Releases are published to
-> [PyPI](https://pypi.org/project/controlloop/). A container image on GHCR
-> and a Homebrew formula are published by the release pipeline from the
-> next tagged release; see [Container image](docs/reference/container-image.md)
-> and [Homebrew](docs/reference/homebrew.md).
+> and `example` work and are covered by tests. Every tagged release is
+> published to [PyPI](https://pypi.org/project/controlloop/), the
+> [Homebrew tap](docs/reference/homebrew.md), the
+> [container registry](docs/reference/container-image.md), and GitHub
+> Releases as [standalone binaries](docs/reference/standalone-binaries.md).
 
 ## Features
 
@@ -85,11 +128,26 @@ uv tool install controlloop
 controlloop --version
 ```
 
-`pipx install controlloop` works too. Without Python, the shell installer
-downloads and verifies the standalone binary for your machine:
+`pipx install controlloop` works too. To run it once without installing,
+use `uvx controlloop`. With [Homebrew](docs/reference/homebrew.md), on
+macOS (Apple Silicon) or Linux:
+
+```bash
+brew install controlloop-security/controlloop/controlloop
+```
+
+Without Python, the shell installer downloads and verifies the standalone
+binary for your machine:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/controlloop-security/controlloop/main/install.sh | bash
+```
+
+In a container, with no network:
+
+```bash
+docker run --rm --network none -v "$PWD:/work:ro" \
+  ghcr.io/controlloop-security/controlloop:0.6.0 scan /work
 ```
 
 Every install path, with its verification step, is in
@@ -103,7 +161,7 @@ uv run controlloop --version
 ```
 
 ```text
-ControlLoop 0.1.1
+ControlLoop 0.6.0
 Supported OASF versions: none yet
 Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17, roo-code 2026-10-29
 Rule pack: controlloop-community 0.9.0 (24 rules)
@@ -111,8 +169,9 @@ Rule pack: controlloop-community 0.9.0 (24 rules)
 
 ### Requirements
 
-- **Python 3.12**
-- [**uv**](https://docs.astral.sh/uv/)
+- **Python 3.12** for the PyPI package; [uv](https://docs.astral.sh/uv/)
+  installs it for you. Homebrew, the shell installer, and the container
+  need no Python.
 - **Git**, for the automatic merge-base baseline that `diff` and `gate` use
 - macOS or Linux. Windows is unsupported.
 
@@ -121,7 +180,7 @@ Rule pack: controlloop-community 0.9.0 (24 rules)
 Point it at a repository containing an agent:
 
 ```bash
-uv run controlloop scan /path/to/your/agent-repo
+controlloop scan /path/to/your/agent-repo
 ```
 
 Nothing to try it on? The public
@@ -130,7 +189,7 @@ is a realistic, deliberately imperfect agent built for exactly this:
 
 ```bash
 git clone https://github.com/controlloop-security/controlloop-reference-agent
-uv run controlloop scan controlloop-reference-agent/scenarios/order-support-agent
+controlloop scan controlloop-reference-agent/scenarios/order-support-agent
 ```
 
 ```text
@@ -156,7 +215,7 @@ uv run controlloop scan controlloop-reference-agent/scenarios/order-support-agen
 Suppressions: none declared
 ```
 
-Exit code `0`. New here? `uv run controlloop example` prints a six-step
+Exit code `0`. New here? `controlloop example` prints a six-step
 walkthrough that matches the [example walkthrough](docs/guides/example-walkthrough.md) guide.
 
 ### The commands
@@ -230,7 +289,7 @@ The common uses, each with the real command and its real output.
 ### Scan a repository
 
 ```bash
-uv run controlloop scan .
+controlloop scan .
 ```
 
 The report above: blast radius first, then the verdict, the material change
@@ -241,7 +300,7 @@ suppressions in force. How to read each line is in
 ### See what a pull request changed
 
 ```bash
-uv run controlloop diff . --baseline main
+controlloop diff . --baseline main
 ```
 
 ```text
@@ -264,7 +323,7 @@ if there is one, else the merge-base with your default branch.
 ### Gate in CI, with evidence
 
 ```bash
-uv run controlloop gate . --default-branch main \
+controlloop gate . --default-branch main \
   --evidence-path evidence.json --sarif-path controlloop.sarif
 ```
 
@@ -344,7 +403,7 @@ the first screenshot above. [Capability ceiling](docs/reference/capability-ceili
 ### Draft the manifest from the repository
 
 ```bash
-uv run controlloop init . --dry-run
+controlloop init . --dry-run
 ```
 
 ```text
@@ -373,8 +432,8 @@ overwrites an existing manifest.
 ### Build and validate the capability graph
 
 ```bash
-uv run controlloop bom . -o acbom.json
-uv run controlloop bom acbom.json --validate
+controlloop bom . -o acbom.json
+controlloop bom acbom.json --validate
 ```
 
 ```text
@@ -423,7 +482,7 @@ blast-radius statement as `runs[0].properties.controlloop.blastRadius`:
 ### See the rules
 
 ```bash
-uv run controlloop rules
+controlloop rules
 ```
 
 ```text
@@ -446,7 +505,7 @@ uv run controlloop rules
 - uses: actions/checkout@v7.0.1
   with:
     fetch-depth: 0          # gate needs real history for a baseline
-- uses: controlloop-security/controlloop@<ref>
+- uses: controlloop-security/controlloop@v0.6.0   # a release tag or commit SHA
   with:
     path: ${{ github.workspace }}
 ```

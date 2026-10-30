@@ -5,7 +5,7 @@ tags:
   - getting-started
   - installation
 created: 2026-08-14
-updated: 2026-10-23
+updated: 2026-10-30
 ---
 
 # Installation
@@ -47,6 +47,13 @@ With [pipx](https://pipx.pypa.io/):
 pipx install controlloop
 ```
 
+To run it once without installing anything, `uvx` fetches the package
+into a temporary environment:
+
+```bash
+uvx controlloop --version
+```
+
 Verify:
 
 ```bash
@@ -54,7 +61,7 @@ controlloop --version
 ```
 
 ```text
-ControlLoop 0.1.1
+ControlLoop 0.6.0
 Supported OASF versions: none yet
 Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17, roo-code 2026-10-29
 Rule pack: controlloop-community 0.9.0 (24 rules)
@@ -142,10 +149,9 @@ controlloop --version
 ```
 
 The formula installs the same standalone binary as the release, verified
-by checksum, on macOS (Apple Silicon) and Linux. It is written by the
-release pipeline for each tagged release, starting with the first release
-after 2026-10-23; before that release the tap has no formula and `brew`
-reports that it does not exist. Details in [Homebrew](../reference/homebrew.md).
+by checksum, on macOS (Apple Silicon) and Linux. The release pipeline
+writes it to the tap for every tagged release. Details in
+[Homebrew](../reference/homebrew.md).
 
 ## The container image
 
@@ -155,8 +161,8 @@ docker run --rm --network none -v "$PWD:/work:ro" \
 ```
 
 Verify by running it with `--version` in place of `scan /work`. The image
-is published for each tagged release starting with the first release
-after 2026-10-23, tagged by exact version only; the release notes record
+is published for every tagged release, tagged by exact version only
+(`0.6.0`, not `latest`); the release notes record
 its digest, and `gh attestation verify
 oci://ghcr.io/controlloop-security/controlloop:<version> --repo
 controlloop-security/controlloop` checks its provenance. What is in the
