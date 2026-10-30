@@ -29,14 +29,25 @@ unresolved tool cannot be silently absent from the blast-radius
 statement. It is reported as the worst thing in the graph precisely
 because nobody knows what it is.
 
+**Agents built in code count too.** A project with no
+`config/agents.yaml` builds `Agent(role=..., tools=[...])` in Python.
+Any module that imports `crewai` is read for those, and an `Agent(...)`
+with no YAML `config` becomes an agent of that module, so its tools --
+and a list built at runtime -- are reported exactly as a YAML agent's
+are.
+
 Identity material is the source path plus a document key -- the YAML
-key for an agent, the declared class name for a tool. Never a line
-number, never the source text, never the display name.
+key for a YAML agent; for an agent built in code, its `@agent` method,
+else the variable it is assigned to, else its literal `role`; the
+declared class name for a tool. Never a line number, never the source
+text, never the display name.
 """
 
 from __future__ import annotations
 
 import ast
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -95,6 +106,13 @@ _CREW_BASENAME = "crew.py"
 
 _PYPROJECT = "pyproject.toml"
 
+#: A cheap byte-level gate before parsing, as in the OpenAI Agents
+#: adapter: a module that imports CrewAI necessarily contains this.
+_IMPORT_MARKER = b"crewai"
+
+#: The decorator CrewAI's `CrewBase` classes put on agent factories.
+_AGENT_DECORATOR = "agent"
+
 #: The attribute a `@agent` method reads to pull its YAML entry:
 #: `Agent(config=self.agents_config['researcher'], ...)`.
 _AGENTS_CONFIG_ATTRIBUTE = "agents_config"
@@ -139,32 +157,66 @@ def _dynamic(evidence: tuple[Evidence, ...], reason: str) -> Diagnostic:
     )
 
 
+def _imports_crewai(path: Path) -> bool:
+    """Whether the module imports `crewai`, on real import syntax. The
+    byte gate only decides what is worth parsing."""
+
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        return False
+    if _IMPORT_MARKER not in raw:
+        return False
+    try:
+        with bounded_recursion(margin=500):
+            tree = ast.parse(raw.decode("utf-8"))
+    except (UnicodeDecodeError, SyntaxError, ValueError, RecursionError):
+        return False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(alias.name.split(".")[0] == _FRAMEWORK for alias in node.names):
+                return True
+        elif (
+            isinstance(node, ast.ImportFrom)
+            and node.module
+            and node.module.split(".")[0] == _FRAMEWORK
+        ):
+            return True
+    return False
+
+
 def _relative_paths(context: ScanContext) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """Return `(agents_config_paths, crew_module_paths)`."""
+    """Return `(agents_config_paths, module_paths)`.
+
+    The modules are every `crew.py` when an agents config exists, plus
+    every module that imports `crewai`. A stray `crew.py` in a
+    repository that is not a CrewAI project is not read -- that is the
+    false-positive the conformance suite's "similar negative" case
+    checks for.
+    """
 
     configs: set[str] = set()
     crews: set[str] = set()
+    modules: set[str] = set()
     for file in context.repository_files():
         relative = file.relative
         if relative in _AGENTS_CONFIG_PATHS or relative.endswith(
             tuple(f"/{name}" for name in _AGENTS_CONFIG_PATHS)
         ):
             configs.add(relative)
-        elif file.path.name == _CREW_BASENAME:
+            continue
+        if file.path.name == _CREW_BASENAME:
             crews.add(relative)
-    return tuple(sorted(configs)), tuple(sorted(crews))
+        if file.path.suffix == ".py" and _imports_crewai(file.path):
+            modules.add(relative)
+    if configs:
+        modules |= crews
+    return tuple(sorted(configs)), tuple(sorted(modules))
 
 
 def _claimed_paths(context: ScanContext) -> tuple[str, ...]:
-    """Only claim anything when an agents config exists. A stray
-    `crew.py` in a repository that is not a CrewAI project must not make
-    this adapter claim it -- that is the false-positive the conformance
-    suite's "similar negative" case checks for."""
-
-    configs, crews = _relative_paths(context)
-    if not configs:
-        return ()
-    return tuple(sorted(configs + crews))
+    configs, modules = _relative_paths(context)
+    return tuple(sorted(configs + modules))
 
 
 # --------------------------------------------------------------------
@@ -205,9 +257,15 @@ def _project_dependencies(context: ScanContext) -> tuple[str, ...]:
 
 
 def _agent_node(
-    relative_path: str, key: str, entry: dict[str, Any], evidence: tuple[Evidence, ...]
+    relative_path: str,
+    key: str,
+    entry: dict[str, Any],
+    evidence: tuple[Evidence, ...],
+    *,
+    document_key: str | None = None,
 ) -> Node:
-    """Named by `role`, identified by the YAML key.
+    """Named by `role`, identified by the YAML key, or for an agent built
+    in code by `document_key`.
 
     The split is deliberate: `role` is a display name a human edits, and
     a display label is never identity input.
@@ -219,7 +277,7 @@ def _agent_node(
         node_type=NodeType.AGENT,
         namespace=_NAMESPACE,
         semantic_identity=SemanticIdentity(
-            source_path=relative_path, in_document_key=key
+            source_path=relative_path, in_document_key=document_key or key
         ),
     )
     return Node(
@@ -404,6 +462,55 @@ def _agent_config_key(node: ast.Call) -> str | None:
     return None
 
 
+def _callee(node: ast.Call) -> str | None:
+    func = node.func
+    if isinstance(func, ast.Name):
+        return func.id
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    return None
+
+
+def _literal_keyword(node: ast.Call, name: str) -> object:
+    for keyword in node.keywords:
+        if keyword.arg == name and isinstance(keyword.value, ast.Constant):
+            return keyword.value.value
+    return None
+
+
+def _is_agent_decorator(decorator: ast.expr) -> bool:
+    if isinstance(decorator, ast.Call):
+        decorator = decorator.func
+    if isinstance(decorator, ast.Name):
+        return decorator.id == _AGENT_DECORATOR
+    if isinstance(decorator, ast.Attribute):
+        return decorator.attr == _AGENT_DECORATOR
+    return False
+
+
+@dataclass
+class _Wiring:
+    """One `Agent(...)` construction.
+
+    `config_key` is set for an agent read from YAML. An agent built in
+    code has `code_key`, or `None` when nothing literal names it.
+    """
+
+    config_key: str | None
+    #: no `config=` at all, so the agent is defined by this call
+    built_in_code: bool
+    code_key: str | None
+    role: str | None
+    delegates: bool
+    #: the literal tool entries, or `None` when the argument is not a list
+    tools: list[ast.expr] | None
+    argument: ast.expr | None
+
+    @property
+    def label(self) -> str | None:
+        return self.config_key if self.config_key is not None else self.code_key
+
+
 class _CrewVisitor(ast.NodeVisitor):
     """Collects `Agent(...)` constructions and their tool wiring.
 
@@ -414,26 +521,48 @@ class _CrewVisitor(ast.NodeVisitor):
     """
 
     def __init__(self) -> None:
-        #: `(config key, literal tool entries or None, the tools argument)`
-        self.wirings: list[
-            tuple[str | None, list[ast.expr] | None, ast.expr | None]
-        ] = []
-        #: variable name -> the config key of the `Agent(...)` assigned to it
+        self.wirings: list[_Wiring] = []
+        #: variable name -> the label of the `Agent(...)` assigned to it
         self.agent_variables: dict[str, str] = {}
         self.overrides_config_path = False
         self.hierarchical = False
+        self._agent_methods: list[str] = []
+        self._assigned: dict[int, str] = {}
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self._function(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self._function(node)
+
+    def _function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+        decorated = any(_is_agent_decorator(item) for item in node.decorator_list)
+        if decorated:
+            self._agent_methods.append(node.name)
+        self.generic_visit(node)
+        if decorated:
+            self._agent_methods.pop()
 
     def visit_Call(self, node: ast.Call) -> None:
-        func = node.func
-        name = (
-            func.id
-            if isinstance(func, ast.Name)
-            else func.attr
-            if isinstance(func, ast.Attribute)
-            else None
-        )
-        if name == "Agent":
+        if _callee(node) == "Agent":
             config_key = _agent_config_key(node)
+            literal_role = _literal_keyword(node, "role")
+            role = (
+                literal_role
+                if isinstance(literal_role, str) and literal_role.strip()
+                else None
+            )
+            # `config=` reads YAML, and a `**` splat may carry it.
+            built_in_code = not any(
+                keyword.arg in ("config", None) for keyword in node.keywords
+            )
+            code_key: str | None = None
+            if built_in_code:
+                code_key = (
+                    self._agent_methods[-1]
+                    if self._agent_methods
+                    else self._assigned.get(id(node), role)
+                )
             tools: list[ast.expr] | None = None
             argument: ast.expr | None = None
             for keyword in node.keywords:
@@ -441,19 +570,27 @@ class _CrewVisitor(ast.NodeVisitor):
                     argument = keyword.value
                     if isinstance(keyword.value, ast.List):
                         tools = list(keyword.value.elts)
-            if argument is not None or config_key is not None:
-                self.wirings.append(
-                    (config_key, tools if argument is not None else [], argument)
-                )
+            wiring = _Wiring(
+                config_key=config_key,
+                built_in_code=built_in_code,
+                code_key=code_key,
+                role=role,
+                delegates=_literal_keyword(node, "allow_delegation") is True,
+                tools=tools if argument is not None else [],
+                argument=argument,
+            )
+            if argument is not None or config_key is not None or built_in_code:
+                self.wirings.append(wiring)
+            variable = self._assigned.get(id(node))
+            if variable is not None and wiring.label is not None:
+                self.agent_variables[variable] = wiring.label
         self.generic_visit(node)
 
     def visit_Assign(self, node: ast.Assign) -> None:
-        if isinstance(node.value, ast.Call):
-            config_key = _agent_config_key(node.value)
-            if config_key is not None:
-                for target in node.targets:
-                    if isinstance(target, ast.Name):
-                        self.agent_variables[target.id] = config_key
+        if isinstance(node.value, ast.Call) and _callee(node.value) == "Agent":
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    self._assigned[id(node.value)] = target.id
         for target in node.targets:
             if isinstance(target, ast.Name) and target.id == _AGENTS_CONFIG_ATTRIBUTE:
                 self.overrides_config_path = True
@@ -515,15 +652,32 @@ def _discover_tools(
         )
 
     built_names = runtime_built_names(tree)
+    code_agents, agent_edges, agent_diagnostics = _code_agents(
+        relative_path, visitor.wirings
+    )
+    edges.extend(agent_edges)
+    diagnostics.extend(agent_diagnostics)
 
-    for config_key, tool_elements, argument in visitor.wirings:
-        agent = agents.get(config_key) if config_key is not None else None
+    for wiring in visitor.wirings:
+        config_key = wiring.label
+        tool_elements, argument = wiring.tools, wiring.argument
+        agent = (
+            agents.get(wiring.config_key)
+            if wiring.config_key is not None
+            else code_agents.get(wiring.code_key)
+            if wiring.code_key is not None
+            else None
+        )
         if agent is None or config_key is None:
             diagnostics.append(
                 _unresolved(
                     evidence,
-                    "an Agent construction could not be matched to a declared "
-                    "agent, so its tools are attributed to nothing",
+                    "an Agent built in code has no literal role, variable, "
+                    "or @agent method to name it, so its tools are attributed "
+                    "to nothing"
+                    if wiring.built_in_code
+                    else "an Agent construction could not be matched to a "
+                    "declared agent, so its tools are attributed to nothing",
                 )
             )
             continue
@@ -589,7 +743,11 @@ def _discover_tools(
 
     for variable, line in appended_agent_tools(tree):
         config_key = visitor.agent_variables.get(variable)
-        agent = agents.get(config_key) if config_key is not None else None
+        agent = (
+            agents.get(config_key) or code_agents.get(config_key)
+            if config_key is not None
+            else None
+        )
         if agent is None or config_key is None:
             continue
         _attach_dynamic(
@@ -603,7 +761,45 @@ def _discover_tools(
             f"tools are added to {config_key!r} after it is constructed",
         )
 
-    return list(nodes.values()), edges, diagnostics
+    return [*code_agents.values(), *nodes.values()], edges, diagnostics
+
+
+def _code_agents(
+    relative_path: str, wirings: list[_Wiring]
+) -> tuple[dict[str, Node], list[Edge], list[Diagnostic]]:
+    """The agents a module builds in code, with no YAML `config`.
+
+    Named by their literal `role`, identified by `code_key` -- the
+    `@agent` method, the variable, or the role -- within this module.
+    `allow_delegation=True` reaches every other agent the module builds,
+    as it does in YAML.
+    """
+
+    evidence = _evidence(relative_path)
+    agents: dict[str, Node] = {}
+    delegating: list[str] = []
+    diagnostics: list[Diagnostic] = []
+    for wiring in wirings:
+        key = wiring.code_key
+        if wiring.config_key is not None or key is None or key in agents:
+            continue
+        try:
+            agents[key] = _agent_node(
+                relative_path,
+                key,
+                {"role": wiring.role},
+                evidence,
+                document_key=f"agent:{key}",
+            )
+        except ValueError:
+            diagnostics.append(
+                _malformed(evidence, "an agent built in code could not be represented")
+            )
+            continue
+        if wiring.delegates:
+            delegating.append(key)
+    edges, edge_diagnostics = _delegation_edges(agents, tuple(delegating), evidence)
+    return agents, edges, diagnostics + edge_diagnostics
 
 
 def _attach_dynamic(
@@ -711,10 +907,10 @@ class CrewAiAdapter:
 
     def discover(self, context: ScanContext) -> DiscoveryResult:
         configs, crews = _relative_paths(context)
-        if not configs:
+        if not configs and not crews:
             return DiscoveryResult()
 
-        version_evidence = _evidence(configs[0])
+        version_evidence = _evidence((configs or crews)[0])
         try:
             require_supported(
                 _FRAMEWORK,

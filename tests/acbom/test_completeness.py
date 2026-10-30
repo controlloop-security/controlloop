@@ -232,6 +232,43 @@ def test_dynamically_registered_tool_fixture_produces_a_finding(
     ]
 
 
+_CREWAI_CODE_ONLY_MODULE = """\
+from crewai import Agent
+
+researcher = Agent(role="Researcher", goal="g", backstory="b", tools=load_tools())
+"""
+
+
+def test_a_crewai_agent_built_in_code_produces_the_finding(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The same finding for a CrewAI agent built in Python with no
+    `config/agents.yaml`, end to end through `scan`."""
+
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "crew"\nversion = "0.1.0"\n'
+        'dependencies = ["crewai>=0.86.0"]\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "crew_app.py").write_text(_CREWAI_CODE_ONLY_MODULE, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(app, ["scan", "--format", "json"])
+
+    report = json.loads(result.stdout)
+    findings = [
+        finding
+        for finding in report["findings"]
+        if finding["rule_id"] == "policy.unresolved-dynamic-registration"
+    ]
+    assert len(findings) == 1
+    assert "unresolved-tools:researcher" in findings[0]["message"]
+    assert {"path": "crew_app.py", "line_start": 3} in [
+        {"path": item["path"], "line_start": item["line_start"]}
+        for item in findings[0]["evidence"]
+    ]
+
+
 def test_completeness_state_changes_the_digest() -> None:
     """Completeness state is part of the canonical serialization
     and therefore of the digest."""

@@ -16,6 +16,18 @@ project uses [Semantic Versioning](https://semver.org/).
   them is set, the branch checked out in git is used. Tag builds and a
   detached `HEAD` send no branch. `team_branch` still wins when it is set.
 
+### Added
+
+- **CrewAI agents built in code.** A crew with no `config/agents.yaml`
+  is now discovered: any module that imports `crewai` is parsed, and each
+  `Agent(...)` with no `config=` becomes an agent named by its `role`.
+  Its identity is its `@agent` method, then its variable, then its role.
+  Its tools resolve as a YAML agent's do. A list built at runtime is an
+  `INCOMPLETE-DYNAMIC-REGISTRATION`, so
+  `policy.unresolved-dynamic-registration` now fires for these agents as
+  it does for the OpenAI Agents SDK. `allow_delegation=True` reaches the
+  module's other agents. The rule pack is unchanged.
+
 ## [0.5.0] - 2026-10-30
 
 Rule pack `0.9.0`: the adapter work behind three gaps the limits page

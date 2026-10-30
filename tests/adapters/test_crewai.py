@@ -431,6 +431,185 @@ class ResearchCrew:
 
 
 # --------------------------------------------------------------------
+# Agents built in code, with no config/agents.yaml
+# --------------------------------------------------------------------
+
+_CODE_STATIC = """
+from crewai import Agent, Crew
+from crewai_tools import FileWriterTool, SerperDevTool
+
+researcher = Agent(
+    role="Researcher",
+    goal="Find sources",
+    backstory="Careful",
+    tools=[SerperDevTool()],
+    allow_delegation=True,
+)
+writer = Agent(
+    role="Writer",
+    goal="Write it up",
+    backstory="Clear",
+    tools=[FileWriterTool()],
+)
+crew = Crew(agents=[researcher, writer])
+"""
+
+_CODE_DYNAMIC = """
+from crewai import Agent
+from crewai.tools import tool
+
+
+@tool("Search")
+def search(query: str) -> str:
+    return query
+
+
+TOOLS = []
+for candidate in (search,):
+    TOOLS.append(candidate)
+
+researcher = Agent(role="Researcher", goal="g", backstory="b", tools=TOOLS)
+"""
+
+_CODE_DECORATED = """
+from crewai import Agent
+from crewai.project import CrewBase, agent
+
+
+@CrewBase
+class ResearchCrew:
+    @agent
+    def researcher(self) -> Agent:
+        return Agent(role="Researcher", goal="g", backstory="b", tools=self._pick())
+"""
+
+
+def _code_project(tmp_path: Path, module: str, name: str = "crew_app.py") -> Path:
+    (tmp_path / "pyproject.toml").write_text(_PYPROJECT, encoding="utf-8")
+    (tmp_path / name).write_text(module, encoding="utf-8")
+    return tmp_path
+
+
+class TestAgentsBuiltInCode:
+    def test_each_agent_is_discovered_and_named_by_its_role(
+        self, tmp_path: Path
+    ) -> None:
+        result = _run(_code_project(tmp_path, _CODE_STATIC))
+        assert _names(result, NodeType.AGENT) == {"Researcher", "Writer"}
+
+    def test_static_tools_resolve_with_no_unknowns(self, tmp_path: Path) -> None:
+        result = _run(_code_project(tmp_path, _CODE_STATIC))
+        assert _names(result, NodeType.TOOL) == {"SerperDevTool", "FileWriterTool"}
+        invokes = [edge for edge in result.edges if edge.type == EdgeType.INVOKES]
+        assert len(invokes) == 2
+        assert not [code for code in _codes(result) if code.startswith("INCOMPLETE")]
+
+    def test_allow_delegation_reaches_the_other_agents(self, tmp_path: Path) -> None:
+        result = _run(_code_project(tmp_path, _CODE_STATIC))
+        delegations = [e for e in result.edges if e.type == EdgeType.DELEGATES_TO]
+        agents = {n.id: n.name for n in result.nodes if n.type == NodeType.AGENT}
+        assert [(agents[e.source], agents[e.target]) for e in delegations] == [
+            ("Researcher", "Writer")
+        ]
+
+    def test_identity_comes_from_the_variable_not_the_role(
+        self, tmp_path: Path
+    ) -> None:
+        first = _run(_code_project(tmp_path, _CODE_STATIC))
+        renamed = _run(
+            _code_project(tmp_path, _CODE_STATIC.replace('"Researcher"', '"Analyst"'))
+        )
+        before = {n.id for n in first.nodes if n.type == NodeType.AGENT}
+        after = {n.id for n in renamed.nodes if n.type == NodeType.AGENT}
+        assert before == after
+
+    def test_a_list_built_in_a_loop_is_a_dynamic_registration(
+        self, tmp_path: Path
+    ) -> None:
+        result = _run(_code_project(tmp_path, _CODE_DYNAMIC))
+        assert _names(result, NodeType.AGENT) == {"Researcher"}
+        diagnostic = next(
+            d for d in result.diagnostics if d.code == "INCOMPLETE-DYNAMIC-REGISTRATION"
+        )
+        location = (diagnostic.evidence[0].path, diagnostic.evidence[0].line_start)
+        assert location == ("crew_app.py", 15)
+        tool = next(n for n in result.nodes if n.type == NodeType.TOOL)
+        assert tool.confidence is Confidence.UNKNOWN
+        assert location in {(e.path, e.line_start) for e in tool.evidence}
+
+    def test_tools_appended_after_construction_are_dynamic(
+        self, tmp_path: Path
+    ) -> None:
+        module = _CODE_STATIC + "researcher.tools.append(extra_tool)\n"
+        result = _run(_code_project(tmp_path, module))
+        dynamic = [
+            d for d in result.diagnostics if d.code == "INCOMPLETE-DYNAMIC-REGISTRATION"
+        ]
+        assert len(dynamic) == 1
+        assert "'researcher'" in dynamic[0].message
+
+    def test_an_agent_method_without_yaml_is_an_agent(self, tmp_path: Path) -> None:
+        result = _run(_code_project(tmp_path, _CODE_DECORATED))
+        assert _names(result, NodeType.AGENT) == {"Researcher"}
+        assert "INCOMPLETE-DYNAMIC-REGISTRATION" in _codes(result)
+        assert "unresolved-tools:researcher" in _names(result, NodeType.TOOL)
+
+    def test_an_agent_nothing_names_is_reported(self, tmp_path: Path) -> None:
+        module = (
+            "from crewai import Agent, Crew\n"
+            "crew = Crew(agents=[Agent(goal=compute(), tools=[SerperDevTool()])])\n"
+        )
+        result = _run(_code_project(tmp_path, module))
+        assert _names(result, NodeType.AGENT) == set()
+        assert "INCOMPLETE-UNRESOLVED-REFERENCE" in _codes(result)
+
+    def test_a_splatted_config_is_not_an_agent_built_in_code(
+        self, tmp_path: Path
+    ) -> None:
+        crew = _RESOLVABLE.replace(
+            'config=self.agents_config["researcher"]',
+            '**self.agents_config["researcher"]',
+        )
+        result = _run(_project(tmp_path, crew=crew))
+        assert _names(result, NodeType.AGENT) == {
+            "Senior Research Analyst",
+            "Content Writer",
+        }
+
+    def test_a_yaml_project_is_unchanged(self, tmp_path: Path) -> None:
+        """A YAML agent's identity does not move now that code agents
+        exist."""
+
+        result = _run(_project(tmp_path, crew=_RESOLVABLE))
+        assert _names(result, NodeType.AGENT) == {
+            "Senior Research Analyst",
+            "Content Writer",
+        }
+        assert _names(result, NodeType.TOOL) == {"SerperDevTool", "FileWriterTool"}
+
+    def test_a_module_that_imports_crewai_is_claimed(self, tmp_path: Path) -> None:
+        root = _code_project(tmp_path, _CODE_STATIC)
+        detection = CrewAiAdapter().detect(ScanContext(root=RepositoryRoot(path=root)))
+        assert detection.claimed_paths == ("crew_app.py",)
+
+    def test_a_module_naming_crewai_only_in_a_string_is_not_claimed(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / "notes.py").write_text('NOTE = "see crewai"\n', encoding="utf-8")
+        detection = CrewAiAdapter().detect(
+            ScanContext(root=RepositoryRoot(path=tmp_path))
+        )
+        assert detection.claimed_paths == ()
+
+    def test_a_code_only_crew_is_deterministic(self, tmp_path: Path) -> None:
+        root = _code_project(tmp_path, _CODE_DYNAMIC)
+        first, second = _run(root), _run(root)
+        assert [n.id for n in first.nodes] == [n.id for n in second.nodes]
+        assert [e.id for e in first.edges] == [e.id for e in second.edges]
+        assert first.diagnostics == second.diagnostics
+
+
+# --------------------------------------------------------------------
 # Safety and determinism
 # --------------------------------------------------------------------
 
