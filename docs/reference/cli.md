@@ -36,11 +36,11 @@ because no operation was selected.
 
 ## Available subcommands
 
-`init`, `bom`, `diff`, `scan`, `gate`, `rules`, and `example` all exist and
-appear in `--help` with a one-line description, and all seven are
+`init`, `bom`, `diff`, `scan`, `gate`, `rules`, `example`, and `mcp` all
+exist and appear in `--help` with a one-line description, and all eight are
 implemented -- see [`init`](#init),
 [`bom`](#bom), [`diff`](#diff), [`scan`](#scan), [`gate`](#gate),
-[`rules`](#rules), and [`example`](#example) below.
+[`rules`](#rules), [`example`](#example), and [`mcp`](#mcp) below.
 
 One product command remains wholly absent from the CLI:
 
@@ -564,6 +564,20 @@ It exists mostly to defuse one specific trap: a first `scan` against a
 repository with no `tool_capabilities` prints `no material capability is
 reachable`, which reads like a clean bill of health and actually means
 nothing could be classified.
+
+## `mcp`
+
+`controlloop mcp [WORKSPACE]` runs the local, read-only MCP server over
+stdio, for an agent host to start. It serves `gate`, `diff`, `bom`, and
+`rules` as tools that return each command's JSON output. `WORKSPACE`
+defaults to the current directory, and no tool reads outside it. It opens
+no network connection, runs every tool with Team switched off, and writes
+no file in the workspace.
+
+It reads JSON-RPC from standard input until the host closes it, then exits
+`0`. It exits `2` if `WORKSPACE` is not an existing directory. Setup for
+each host, the tool arguments, and the result shape are in
+[The local MCP server](mcp-server.md).
 
 ## Exit codes
 

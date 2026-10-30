@@ -6,6 +6,18 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`controlloop mcp`, a local MCP server.** An agent host that speaks MCP
+  (Claude Code, Codex, Gemini CLI, Cursor, VS Code, Kiro, Windsurf, Roo
+  Code, Cline, Continue, opencode) can start it over stdio and call `gate`,
+  `diff`, `bom` and `rules` as tools. Each tool returns the command's own
+  JSON output. The server opens no network connection, runs every tool
+  with Team switched off, writes no file in the repository, and refuses
+  any path outside the workspace it was started with. It adds no
+  dependency. See
+  [The local MCP server](docs/reference/mcp-server.md).
+
 ## [0.6.2] - 2026-10-30
 
 The first release listed on GitHub Marketplace. It carries 0.6.1's fix,

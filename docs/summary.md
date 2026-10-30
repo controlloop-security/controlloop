@@ -39,6 +39,7 @@
 - [CycloneDX export format](reference/cyclonedx-export-format.md)
 - [The ControlLoop GitHub Action](reference/github-action.md)
 - [The pre-commit hook](reference/pre-commit-hook.md)
+- [The local MCP server](reference/mcp-server.md)
 - [Configuration loading and precedence](reference/configuration.md)
 - [`controlloop.yaml` manifest schema](reference/manifest-schema.md)
 - [Expiring repo-local suppressions](reference/suppressions.md)

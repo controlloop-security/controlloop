@@ -2,6 +2,7 @@
 
 import json
 import os
+import sys
 import textwrap
 from collections import Counter
 from collections.abc import Callable
@@ -2792,6 +2793,44 @@ def gate(
         sarif_path=sarif_path,
         exit_code=exit_code,
     )
+
+
+@app.command(
+    help="Serve bom, diff, gate and rules as read-only tools to an agent host "
+    "over a local stdio MCP connection."
+)
+def mcp(
+    workspace: Annotated[
+        Path | None,
+        typer.Argument(
+            help="Directory the tools may read, default the current "
+            "directory. Every tool's path argument must stay inside it."
+        ),
+    ] = None,
+) -> None:
+    """`controlloop mcp`: the local MCP server in `controlloop.mcp_server`.
+
+    Started by an agent host, not by a person: it reads JSON-RPC from
+    standard input until the host closes it. Opens no network
+    connection, writes no file in the workspace, and runs every tool with
+    Team forced off -- the hosted Team MCP server is a different surface.
+    """
+
+    from controlloop.mcp_server import Server
+
+    try:
+        server = Server(workspace if workspace is not None else Path.cwd())
+    except OSError:
+        _report("CLI-INVALID-INPUT", "the workspace must be an existing directory")
+        raise typer.Exit(code=ExitCode.INVALID_INPUT) from None
+    if sys.stdin.isatty():
+        typer.echo(
+            "controlloop mcp is an MCP server for agent hosts; it reads JSON-RPC "
+            "on standard input. See docs/reference/mcp-server.md. "
+            "Press Ctrl-D to stop.",
+            err=True,
+        )
+    raise typer.Exit(code=server.serve(sys.stdin.buffer, sys.stdout))
 
 
 def main() -> None:

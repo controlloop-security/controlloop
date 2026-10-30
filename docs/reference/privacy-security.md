@@ -504,7 +504,9 @@ never participates in producing it. Concretely:
   already holds to a user who could already read it in the dashboard,
   as that user, through the same views; no scanner, adapter, or rule is
   involved, and no repository content passes through it. The free CLI
-  serves no MCP and needs no network.
+  needs no network. Its own `controlloop mcp` server is local and
+  read-only: stdio only, Team switched off for every tool call, and no
+  file written (see [The local MCP server](mcp-server.md)).
 
 ## Explainable enforcement
 

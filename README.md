@@ -110,6 +110,7 @@ run a script on every session start.
 - 🧮 **Deterministic.** Same inputs, same pinned versions, same digest, same verdict. Unknown is ranked worse than known, never safer.
 - 🙈 **Nothing protected leaves.** Source, prompts, credentials, environment values, and customer data never appear in output, logs, errors, identity material, or artifacts.
 - ⚙️ **CI-native.** A [GitHub Action](docs/reference/github-action.md) and a [pre-commit hook](docs/reference/pre-commit-hook.md) run the same gate.
+- 🤖 **Callable from your agent.** `controlloop mcp` serves `gate`, `diff`, `bom` and `rules` as read-only tools to any MCP host over stdio, with no network and no writes. [The local MCP server](docs/reference/mcp-server.md).
 
 > **Note:** the agent hosts whose project configuration is read are Claude
 > Code, Codex, Gemini CLI, Cursor, and Kiro, each pinned to its
@@ -232,6 +233,23 @@ walkthrough that matches the [example walkthrough](docs/guides/example-walkthrou
 
 `scan` is what you run at your desk. `gate` is what you run in CI. Every
 command and flag is in the [CLI reference](docs/reference/cli.md).
+
+## Use it inside your agent
+
+The [ControlLoop plugins](https://github.com/controlloop-security/controlloop-plugins)
+let a coding agent run this CLI and explain its answer when you ask "what
+does this change let my agents do?" They run the gate locally, quote its
+verdict and authority statements, link each finding's documentation, and
+edit nothing. They ship no hooks and start nothing when a session opens.
+
+| Host | Install |
+| --- | --- |
+| Claude Code | `/plugin install controlloop --marketplace controlloop-security/controlloop-plugins`, then `/controlloop:review` |
+| Codex | `codex plugin marketplace add controlloop-security/controlloop-plugins`, then `codex plugin add controlloop@controlloop` |
+| Gemini CLI | `gemini extensions install https://github.com/controlloop-security/controlloop-plugins` |
+| Cursor | From the Cursor Marketplace, or import the repository as a team marketplace |
+| GitHub Copilot | `copilot plugin install controlloop@controlloop` after `copilot plugin marketplace add controlloop-security/controlloop-plugins`; in VS Code, **Chat: Install Plugin from Source** |
+| Any MCP host | [`controlloop mcp`](docs/reference/mcp-server.md): `gate`, `diff`, `bom` and `rules` as read-only local tools |
 
 ## Screenshots
 
@@ -591,6 +609,7 @@ Start with the [documentation index](docs/readme.md).
 - [Adapters](docs/adapters/readme.md): what each source contributes and where it stops
 - [Evidence artifact format](docs/reference/evidence-artifact-format.md)
 - [GitHub Action](docs/reference/github-action.md) and [pre-commit hook](docs/reference/pre-commit-hook.md)
+- [The local MCP server](docs/reference/mcp-server.md): `controlloop mcp` for agent hosts
 - [Configuration](docs/reference/configuration.md): every key and its precedence
 - [Privacy, security, and limitations](docs/reference/privacy-security.md)
 - [Your first Team gate](docs/guides/first-team-gate.md) and [What a Team gate sends](docs/reference/team-envelope.md)
