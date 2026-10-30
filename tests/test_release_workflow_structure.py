@@ -264,7 +264,7 @@ class TestVerifyWorkflowCrossPlatformMatrix:
         assert {(leg["os"], leg["label"]) for leg in legs} == {
             ("ubuntu-latest", "linux-x86_64"),
             ("ubuntu-24.04-arm", "linux-arm64"),
-            ("macos-15", "macos-arm64"),
+            ("macos-26", "macos-arm64"),
         }
 
     def test_fail_fast_is_disabled_so_every_leg_reports(self) -> None:
@@ -352,7 +352,7 @@ class TestReleaseWorkflowBinaryBuild:
         assert binary_legs == {
             ("ubuntu-latest", "linux-x86_64"),
             ("ubuntu-24.04-arm", "linux-arm64"),
-            ("macos-15", "macos-arm64"),
+            ("macos-26", "macos-arm64"),
         }
 
     def test_fail_fast_is_disabled(self) -> None:

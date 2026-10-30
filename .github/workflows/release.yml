@@ -185,7 +185,7 @@ jobs:
             label: linux-arm64
             platform: linux
             arch: arm64
-          - os: macos-15
+          - os: macos-26
             label: macos-arm64
             platform: macos
             arch: arm64
