@@ -12,7 +12,7 @@ updated: 2026-10-30
 # Action marketplace listing
 
 **The GitHub Action is listed on GitHub Marketplace** as
-[ControlLoop Security](https://github.com/marketplace/actions/controlloop-gate),
+[ControlLoop Security](https://github.com/marketplace/actions/controlloop-security),
 from release `v0.6.3`. It works from any workflow
 (`uses: controlloop-security/controlloop@v0.6.3`); the listing makes it
 discoverable from Marketplace search. This page
@@ -26,7 +26,7 @@ From GitHub's [publishing guide](https://docs.github.com/en/actions/how-tos/crea
 | --- | --- |
 | The repository is public | Yes |
 | One action metadata file, at the root | `action.yml` |
-| A unique `name` that matches no existing action, category, user, or organization | `ControlLoop Security`. Plain `ControlLoop` is refused: it matches the `controlloop` organization, which is not this project's. |
+| A unique `name` that matches no existing action, category, user, or organization | `ControlLoop Security`. Plain `ControlLoop` is refused: it matches the `controlloop` organization, which is not this project's. Renaming the Action moves the listing's address, and the old one stops resolving. |
 | A `description` shorter than 125 characters | 107 characters, held under the limit by `tests/test_action_metadata.py` |
 | The owning account accepts the GitHub Marketplace Developer Agreement | A maintainer does this once, in the publish form |
 | Two-factor authentication on the publishing account | Required when the release is published |
@@ -58,7 +58,7 @@ listing stays up until a maintainer removes it.
 5. Keep the existing tag and title, choose **Update release** (or
    **Publish release**), and complete the two-factor prompt.
 6. Check the listing at
-   `https://github.com/marketplace/actions/controlloop-gate`.
+   `https://github.com/marketplace/actions/controlloop-security`.
 
 Every later release that should appear on Marketplace needs the same
 checkbox when it is published.
