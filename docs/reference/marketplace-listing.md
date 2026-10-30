@@ -25,6 +25,7 @@ From GitHub's [publishing guide](https://docs.github.com/en/actions/how-tos/crea
 | The repository is public | Yes |
 | One action metadata file, at the root | `action.yml` |
 | A unique `name` that matches no existing action, category, user, or organization | `ControlLoop gate` |
+| A `description` shorter than 125 characters | 107 characters, held under the limit by `tests/test_action_metadata.py` |
 | The owning account accepts the GitHub Marketplace Developer Agreement | A maintainer does this once, in the publish form |
 | Two-factor authentication on the publishing account | Required when the release is published |
 

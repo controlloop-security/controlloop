@@ -6,6 +6,16 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Action's description fits GitHub Marketplace.** `action.yml`'s
+  `description` was about 630 characters, and Marketplace refuses one of
+  125 or more. It now reads "Block pull requests that widen what an AI
+  agent can do, from agent configs, MCP servers and framework code." The
+  `fetch-depth: 0` and pinning notes move to a comment in `action.yml`;
+  [The ControlLoop GitHub Action](docs/reference/github-action.md) already
+  documents both.
+
 ## [0.6.0] - 2026-10-30
 
 Team uploads name their branch, and CrewAI agents built in code are
