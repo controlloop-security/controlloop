@@ -6,6 +6,8 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-30
+
 Rule pack `0.9.0`: the adapter work behind three gaps the limits page
 named, and one new rule.
 
