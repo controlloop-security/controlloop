@@ -29,5 +29,5 @@ def test_the_description_is_short_enough_for_marketplace() -> None:
 
 def test_the_listing_has_a_name_and_branding() -> None:
     metadata = _metadata()
-    assert metadata["name"] == "ControlLoop gate"
+    assert metadata["name"] == "ControlLoop Security"
     assert metadata["branding"] == {"icon": "shield", "color": "blue"}

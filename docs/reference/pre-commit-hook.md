@@ -21,14 +21,14 @@ stays in verdict-parity with CI.
 against [pre-commit](https://pre-commit.com)'s own official manifest
 schema and was exercised end to end with `pre-commit try-repo` while this
 page was written. Pin `rev:` to a release tag (`v0.1.1` through
-`v0.6.2` exist) or a commit SHA.
+`v0.6.3` exist) or a commit SHA.
 
 ## Minimal usage
 
 ```yaml
 repos:
   - repo: https://github.com/controlloop-security/controlloop
-    rev: v0.6.2  # a release tag or commit SHA, never an unpinned/"latest" ref
+    rev: v0.6.3  # a release tag or commit SHA, never an unpinned/"latest" ref
     hooks:
       - id: controlloop-gate
 ```
