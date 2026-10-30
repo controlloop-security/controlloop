@@ -221,6 +221,7 @@ _MANDATORY_BY_RULE_ID: dict[str, bool] = {
     "policy.credentialed-remote-mcp-server": False,
     "policy.workspace-scope-expansion": False,
     "policy.component-shell-execution": False,
+    "policy.hook-script-changed": False,
 }
 
 #: One line per rule naming what it actually detects, surfaced by
@@ -322,6 +323,10 @@ _SUMMARY_BY_RULE_ID: dict[str, str] = {
         "A skill shell line or plugin bin/ directory added or changed, "
         "with the command it runs."
     ),
+    "policy.hook-script-changed": (
+        "A script in the repository that a hook or helper command runs "
+        "changed while the command did not."
+    ),
 }
 
 #: The rule pack this Community CLI ships today: every rule currently
@@ -334,7 +339,7 @@ _SUMMARY_BY_RULE_ID: dict[str, str] = {
 #: `KNOWN_RULE_PACK_FINGERPRINTS` below).
 CURRENT_RULE_PACK = RulePack(
     name="controlloop-community",
-    version="0.8.0",
+    version="0.9.0",
     rules=ALL_RULES,
     metadata=tuple(
         RuleMetadata(
@@ -391,4 +396,9 @@ KNOWN_RULE_PACK_FINGERPRINTS: dict[str, str] = {
     # sandbox rule; agent-hook-command-change 1.1.0 hands skill shell
     # lines and plugin bin/ to the component rule.
     "0.8.0": "8f25e70c0cf82a2cb827dae58e554349274cfae73da60be7506e08175c160ef8",
+    # 0.9.0: hook script changed, 24 in total. The CrewAI, LangGraph, and
+    # OpenAI Agents SDK adapters now emit the dynamic registration
+    # diagnostic, so unresolved-dynamic-registration's docstring drops its
+    # "no adapter emits this yet" caveat (its behaviour is unchanged).
+    "0.9.0": "23d51bcbbea4cdc40f1904734855073bc9e025a68c3a98c45cb5f6e8c03e0ecc",
 }

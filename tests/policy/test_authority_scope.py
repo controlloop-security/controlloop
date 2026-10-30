@@ -118,6 +118,8 @@ _E18_RULE_IDS = frozenset(
         "policy.credentialed-remote-mcp-server",
         "policy.workspace-scope-expansion",
         "policy.component-shell-execution",
+        # Rule pack 0.9.0's hook script rule.
+        "policy.hook-script-changed",
     }
 )
 

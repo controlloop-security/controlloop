@@ -114,7 +114,7 @@ $ uv run controlloop --version
 ControlLoop 0.1.0
 Supported OASF versions: none yet
 Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17, roo-code 2026-10-29
-Rule pack: controlloop-community 0.8.0 (23 rules)
+Rule pack: controlloop-community 0.9.0 (24 rules)
 ```
 
 ## A gate result records both versions
@@ -149,6 +149,7 @@ verdict on unchanged input" is that same guarantee applied to a pack's
 | `0.6.0` | 18 | The same rules; `policy.hardcoded-secrets` findings get one ID per occurrence. The fingerprint now covers each rule's whole module and the shared rule helpers, so a change to a rule's logic moves it; earlier pins used `evaluate` source only and can no longer be recomputed. |
 | `0.7.0` | 18 | The same rules; `policy.exfiltration-triangle` (1.1.0) reads a declared untrusted-input leg (`external_inputs` in `controlloop.yaml`) as confirmed and an inferred one (an A2A card's endpoint) as unknown, reported at `medium` with the other two legs present instead of silence. |
 | `0.8.0` | 23 | Adds five coding-agent rules read from attributes the adapters already record: `policy.agent-sandbox-weakened`, `policy.secret-exposed-to-untrusted-agent-run`, `policy.credentialed-remote-mcp-server`, `policy.workspace-scope-expansion`, and `policy.component-shell-execution`. `policy.permission-bypass-from-project` (1.1.0) hands Claude Code's `sandbox.enabled` to the sandbox rule, and `policy.agent-hook-command-change` (1.1.0) hands skill shell lines and plugin `bin/` to the component rule. |
+| `0.9.0` | 24 | Adds `policy.hook-script-changed`, which reads the `script_digest` the Claude Code, Codex, Gemini CLI, Cursor, and Kiro adapters now record for a hook's script. `policy.unresolved-dynamic-registration` is unchanged in behaviour; its docstring moves the fingerprint, since the CrewAI, LangGraph, and OpenAI Agents SDK adapters now emit the diagnostic it reads. |
 
 ## Known limitations
 

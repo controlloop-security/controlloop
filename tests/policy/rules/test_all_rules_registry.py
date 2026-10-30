@@ -79,6 +79,8 @@ _RULE_PACK_0_8_0_RULE_IDS = frozenset(
         "policy.component-shell-execution",
     }
 )
+#: Rule pack 0.9.0's hook script rule.
+_RULE_PACK_0_9_0_RULE_IDS = frozenset({"policy.hook-script-changed"})
 
 
 def _empty_document() -> ACBOMDocument:
@@ -119,6 +121,7 @@ class TestAllRulesRegistry:
             | _ISSUE_441_RULE_IDS
             | _ISSUE_451_RULE_IDS
             | _RULE_PACK_0_8_0_RULE_IDS
+            | _RULE_PACK_0_9_0_RULE_IDS
         )
 
     def test_every_rule_id_is_unique(self) -> None:

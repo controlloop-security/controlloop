@@ -269,6 +269,7 @@ _EXPECTED_MANDATORY_BY_RULE_ID: dict[str, bool] = {
     "policy.credentialed-remote-mcp-server": False,
     "policy.workspace-scope-expansion": False,
     "policy.component-shell-execution": False,
+    "policy.hook-script-changed": False,
 }
 
 
@@ -283,9 +284,10 @@ class TestCurrentRulePack:
 
         assert CURRENT_RULE_PACK.name == "controlloop-community"
         # Includes the agent-authority rules, the Team sanctioned-list
-        # rule, and 0.8.0's five coding-agent rules.
-        assert CURRENT_RULE_PACK.version == "0.8.0"
-        assert len(ALL_RULES) == 23
+        # rule, 0.8.0's five coding-agent rules, and 0.9.0's hook script
+        # rule.
+        assert CURRENT_RULE_PACK.version == "0.9.0"
+        assert len(ALL_RULES) == 24
         assert set(CURRENT_RULE_PACK.rules) == set(ALL_RULES)
         assert {rule.id for rule in CURRENT_RULE_PACK.rules} == {
             rule.id for rule in ALL_RULES

@@ -6,6 +6,46 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+Rule pack `0.9.0`: the adapter work behind three gaps the limits page
+named, and one new rule.
+
+### Added
+
+- **`policy.hook-script-changed`, 24 rules in total.** A hook, helper
+  command, skill shell line, or plugin `bin/` directory whose command
+  names a script committed in the repository now records `script_path`
+  and `script_digest` (SHA-256 of the file, never its content), from the
+  Claude Code, Codex, Gemini CLI, Cursor, and Kiro adapters. The new rule
+  reports the script changing while the command does not: `high`, or
+  `medium` when a readable script becomes `unknown`. A change to the
+  command too is left to `policy.agent-hook-command-change`, so one change
+  gives one finding; a first scan is silent. Not mandatory. A script
+  outside the repository records `unknown` and an informational
+  `SCRIPT-OUTSIDE-REPOSITORY` diagnostic, which does not mark the analysis
+  incomplete.
+- **Roo Code custom modes.** `RooModesAdapter` reads `.roomodes` (YAML or
+  JSON) at the repository root: each mode is a subagent under the Roo Code
+  host, and each tool group (`read`, `edit` with its `fileRegex`,
+  `browser`, `command`, `mcp`) an allow rule, so
+  `policy.widened-permission-rule` reports a mode that gains `command` or
+  an `edit` group that loses its `fileRegex`. Prompt text is never read.
+  `controlloop --version` lists `roo-code 2026-10-29`.
+
+### Changed
+
+- **Tool lists built at runtime are reported as findings.** The CrewAI,
+  LangGraph, and OpenAI Agents SDK adapters emit
+  `INCOMPLETE-DYNAMIC-REGISTRATION` for a comprehension, call, splat,
+  conditional, a list the module builds with a loop or appends to, and
+  `agent.tools.append`/`extend` after construction, and link it to the
+  unknown tool node by line. `policy.unresolved-dynamic-registration` now
+  reports a `medium` finding naming the file and the agent where it
+  previously could only fire on hand-built input. A bare name the adapter
+  did not follow is still `INCOMPLETE-UNRESOLVED-REFERENCE`.
+- Reports and gate results show `controlloop-community` `0.9.0` with a new
+  fingerprint. The ACBOM schema stays `1.2.0`: the new attributes use the
+  existing `attributes` map.
+
 ## [0.4.0] - 2026-10-29
 
 Rule pack `0.8.0`: five rules for coding-agent configuration the

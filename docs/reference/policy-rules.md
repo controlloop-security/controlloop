@@ -1093,6 +1093,11 @@ runs any script in a file the same pull request can edit.
 **Remediation:** narrow the rule to the commands or tools the agent
 needs.
 
+Roo Code `.roomodes` tool groups are allow rules the Roo Code host holds
+(see [Roo Code](../adapters/roo.md)): a mode that gains `command`,
+`browser`, or `mcp`, or an `edit` group that loses its `fileRegex`, is
+reported here.
+
 **False positives:** a skill's or subagent's own grants are reported by
 [component self-grant](#component-self-grant), not here.
 

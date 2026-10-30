@@ -112,6 +112,7 @@ from controlloop.policy.rules import (
     DESTRUCTIVE_OR_FINANCIAL_ACTION_RULE_ID,
     EXFILTRATION_TRIANGLE_RULE_ID,
     HARDCODED_SECRETS_RULE_ID,
+    HOOK_SCRIPT_CHANGED_RULE_ID,
     MCP_SERVER_IDENTITY_CHANGE_RULE_ID,
     MISSING_ACTION_LOGGING_RULE_ID,
     OVERPRIVILEGED_AGENT_WORKFLOW_RULE_ID,
@@ -135,6 +136,7 @@ from controlloop.policy.rules import (
     destructive_or_financial_action_findings,
     exfiltration_triangle_findings,
     hardcoded_secrets_findings,
+    hook_script_changed_findings,
     mcp_server_identity_change_findings,
     missing_action_logging_findings,
     overprivileged_agent_workflow_findings,
@@ -219,6 +221,7 @@ _RULE_FINDINGS_BY_ID: dict[str, Callable[[RuleContext], tuple[Finding, ...]]] = 
     CREDENTIALED_REMOTE_MCP_SERVER_RULE_ID: credentialed_remote_mcp_server_findings,
     WORKSPACE_SCOPE_EXPANSION_RULE_ID: workspace_scope_expansion_findings,
     COMPONENT_SHELL_EXECUTION_RULE_ID: component_shell_execution_findings,
+    HOOK_SCRIPT_CHANGED_RULE_ID: hook_script_changed_findings,
 }
 
 app = typer.Typer(
