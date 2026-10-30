@@ -6,6 +6,20 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-10-30
+
+The Action is listed on GitHub Marketplace as "ControlLoop Security". The
+CLI is unchanged.
+
+### Changed
+
+- **The Action's name is `ControlLoop Security`**, which is what
+  Marketplace shows, instead of `ControlLoop gate`. Plain `ControlLoop`
+  isn't available: Marketplace refuses a name that matches another
+  account, and the `controlloop` organization is not this project's.
+  Workflows reference the Action by repository and tag, so nothing that
+  uses it changes.
+
 ### Added
 
 - **`controlloop mcp`, a local MCP server.** An agent host that speaks MCP

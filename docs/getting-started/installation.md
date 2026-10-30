@@ -61,7 +61,7 @@ controlloop --version
 ```
 
 ```text
-ControlLoop 0.6.2
+ControlLoop 0.6.3
 Supported OASF versions: none yet
 Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17, roo-code 2026-10-29
 Rule pack: controlloop-community 0.9.0 (24 rules)
@@ -162,7 +162,7 @@ docker run --rm --network none -v "$PWD:/work:ro" \
 
 Verify by running it with `--version` in place of `scan /work`. The image
 is published for every tagged release, tagged by exact version only
-(`0.6.2`, not `latest`); the release notes record
+(`0.6.3`, not `latest`); the release notes record
 its digest, and `gh attestation verify
 oci://ghcr.io/controlloop-security/controlloop:<version> --repo
 controlloop-security/controlloop` checks its provenance. What is in the

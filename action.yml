@@ -12,7 +12,7 @@
 # `description` is what GitHub Marketplace lists, and Marketplace refuses
 # one of 125 characters or more; tests/test_action_metadata.py holds it
 # under that.
-name: ControlLoop gate
+name: ControlLoop Security
 description: >-
   Block pull requests that widen what an AI agent can do, from agent
   configs, MCP servers and framework code.

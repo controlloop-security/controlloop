@@ -12,9 +12,9 @@ updated: 2026-10-30
 # Action marketplace listing
 
 **The GitHub Action is listed on GitHub Marketplace** as
-[ControlLoop gate](https://github.com/marketplace/actions/controlloop-gate),
-from release `v0.6.2`. It works from any workflow
-(`uses: controlloop-security/controlloop@v0.6.2`); the listing makes it
+[ControlLoop Security](https://github.com/marketplace/actions/controlloop-gate),
+from release `v0.6.3`. It works from any workflow
+(`uses: controlloop-security/controlloop@v0.6.3`); the listing makes it
 discoverable from Marketplace search. This page
 records what is prepared and the steps a maintainer takes to publish it.
 
@@ -26,7 +26,7 @@ From GitHub's [publishing guide](https://docs.github.com/en/actions/how-tos/crea
 | --- | --- |
 | The repository is public | Yes |
 | One action metadata file, at the root | `action.yml` |
-| A unique `name` that matches no existing action, category, user, or organization | `ControlLoop gate` |
+| A unique `name` that matches no existing action, category, user, or organization | `ControlLoop Security`. Plain `ControlLoop` is refused: it matches the `controlloop` organization, which is not this project's. |
 | A `description` shorter than 125 characters | 107 characters, held under the limit by `tests/test_action_metadata.py` |
 | The owning account accepts the GitHub Marketplace Developer Agreement | A maintainer does this once, in the publish form |
 | Two-factor authentication on the publishing account | Required when the release is published |
@@ -45,7 +45,7 @@ releases for `controlloop-security/controlloop`. It is public, and the
 listing stays up until a maintainer removes it.
 
 1. Open the release to list, for example
-   `https://github.com/controlloop-security/controlloop/releases/tag/v0.6.2`,
+   `https://github.com/controlloop-security/controlloop/releases/tag/v0.6.3`,
    and choose **Edit** (for a new release, start from **Draft a new
    release**).
 2. Under **Release action**, check **Publish this Action to the GitHub
@@ -82,7 +82,7 @@ own. (A `vMAJOR` tag like `v1` has no dot, so it could never match this
 workflow's own `v*.*.*` trigger glob and re-trigger a release -- but the
 invariant is broader than self-triggering risk, so it is kept intact.)
 
-Release tags `v0.1.1` through `v0.6.2` exist (`v0.6.1` was tagged but
+Release tags `v0.1.1` through `v0.6.3` exist (`v0.6.1` was tagged but
 never published). No floating tag exists yet,
 and none is needed before 1.0: during `0.x` every minor release may
 change behavior, so consumers should pin an exact tag. From `v1.0.0` on,
