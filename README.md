@@ -110,6 +110,7 @@ run a script on every session start.
 - 🧮 **Deterministic.** Same inputs, same pinned versions, same digest, same verdict. Unknown is ranked worse than known, never safer.
 - 🙈 **Nothing protected leaves.** Source, prompts, credentials, environment values, and customer data never appear in output, logs, errors, identity material, or artifacts.
 - ⚙️ **CI-native.** A [GitHub Action](docs/reference/github-action.md) and a [pre-commit hook](docs/reference/pre-commit-hook.md) run the same gate.
+- 🤖 **Callable from your agent.** `controlloop mcp` serves `gate`, `diff`, `bom` and `rules` as read-only tools to any MCP host over stdio, with no network and no writes. [The local MCP server](docs/reference/mcp-server.md).
 
 > **Note:** the agent hosts whose project configuration is read are Claude
 > Code, Codex, Gemini CLI, Cursor, and Kiro, each pinned to its
@@ -591,6 +592,7 @@ Start with the [documentation index](docs/readme.md).
 - [Adapters](docs/adapters/readme.md): what each source contributes and where it stops
 - [Evidence artifact format](docs/reference/evidence-artifact-format.md)
 - [GitHub Action](docs/reference/github-action.md) and [pre-commit hook](docs/reference/pre-commit-hook.md)
+- [The local MCP server](docs/reference/mcp-server.md): `controlloop mcp` for agent hosts
 - [Configuration](docs/reference/configuration.md): every key and its precedence
 - [Privacy, security, and limitations](docs/reference/privacy-security.md)
 - [Your first Team gate](docs/guides/first-team-gate.md) and [What a Team gate sends](docs/reference/team-envelope.md)

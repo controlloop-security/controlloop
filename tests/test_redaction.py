@@ -1423,6 +1423,44 @@ class TestComprehensiveExfiltrationSweep:
             assert marker not in captured.out, f"example leaked the {category} marker"
             assert marker not in captured.err, f"example leaked the {category} marker"
 
+    def test_mcp_command_never_leaks_any_marker(
+        self,
+        monkeypatch: MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Privacy evidence: `controlloop mcp`, driven through `main()` over
+        stdin, calls every tool it serves against the marker repository. Each
+        tool's captured output passes the redaction boundary before it is
+        wrapped in a JSON-RPC reply, so no marker reaches stdout."""
+
+        markers = _write_comprehensive_exfiltration_fixture(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        requests = [
+            {"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {}},
+            *(
+                {
+                    "jsonrpc": "2.0",
+                    "id": index,
+                    "method": "tools/call",
+                    "params": {"name": name, "arguments": {}},
+                }
+                for index, name in enumerate(("bom", "diff", "gate", "rules"), 1)
+            ),
+        ]
+        stdin = "".join(json.dumps(request) + "\n" for request in requests)
+        monkeypatch.setattr("sys.stdin", io.TextIOWrapper(io.BytesIO(stdin.encode())))
+        monkeypatch.setattr("sys.argv", ["controlloop", "mcp"])
+
+        with pytest.raises(SystemExit):
+            cli_module.main()
+
+        captured = capsys.readouterr()
+        assert len(captured.out.splitlines()) == len(requests)
+        for category, marker in markers.items():
+            assert marker not in captured.out, f"mcp leaked the {category} marker"
+            assert marker not in captured.err, f"mcp leaked the {category} marker"
+
 
 class TestCanaryCoverageRegistry:
     """A structural, CI-failing check that
@@ -1434,7 +1472,7 @@ class TestCanaryCoverageRegistry:
     not silently."""
 
     _CANARY_COVERED_COMMANDS: frozenset[str] = frozenset(
-        {"init", "bom", "diff", "scan", "gate", "rules", "example"}
+        {"init", "bom", "diff", "scan", "gate", "rules", "example", "mcp"}
     )
     """Each name here has a real, dedicated end-to-end canary somewhere
     in this module: `init`/`bom`/`diff` via the comprehensive sweep's
