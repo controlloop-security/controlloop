@@ -147,7 +147,7 @@ In a container, with no network:
 
 ```bash
 docker run --rm --network none -v "$PWD:/work:ro" \
-  ghcr.io/controlloop-security/controlloop:0.6.0 scan /work
+  ghcr.io/controlloop-security/controlloop:0.6.2 scan /work
 ```
 
 Every install path, with its verification step, is in
@@ -161,7 +161,7 @@ uv run controlloop --version
 ```
 
 ```text
-ControlLoop 0.6.0
+ControlLoop 0.6.2
 Supported OASF versions: none yet
 Agent host key sets (documentation read on): claude-code 2026-10-17, codex 2026-10-17, cursor 2026-10-17, gemini-cli 2026-10-17, kiro 2026-10-17, roo-code 2026-10-29
 Rule pack: controlloop-community 0.9.0 (24 rules)
@@ -505,7 +505,7 @@ controlloop rules
 - uses: actions/checkout@v7.0.1
   with:
     fetch-depth: 0          # gate needs real history for a baseline
-- uses: controlloop-security/controlloop@v0.6.0   # a release tag or commit SHA
+- uses: controlloop-security/controlloop@v0.6.2   # a release tag or commit SHA
   with:
     path: ${{ github.workspace }}
 ```

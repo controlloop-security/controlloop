@@ -8,7 +8,8 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [0.6.2] - 2026-10-30
 
-The same CLI as 0.6.1, built on a different macOS runner image.
+The first release listed on GitHub Marketplace. It carries 0.6.1's fix,
+since 0.6.1 was never published; the CLI itself is unchanged since 0.6.0.
 
 ### Changed
 
@@ -20,8 +21,8 @@ The same CLI as 0.6.1, built on a different macOS runner image.
 
 ## [0.6.1] - 2026-10-30
 
-The Action's description fits GitHub Marketplace, so the Action can be
-listed. Nothing else changes.
+Tagged but never published: its release build could not get a macOS
+runner. 0.6.2 carries this fix.
 
 ### Fixed
 
