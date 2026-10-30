@@ -44,6 +44,28 @@ def test_a_same_name_package_version_change_is_high(tmp_path: Path) -> None:
     assert finding.affected_agent is not None
 
 
+def test_a_uvx_from_version_change_is_high(tmp_path: Path) -> None:
+    base, head = repos(tmp_path)
+    _server(base, ["--from", "postmark-mcp==1.0.15", "postmark-mcp"], "uvx")
+    _server(head, ["--from", "postmark-mcp==1.0.16", "postmark-mcp"], "uvx")
+
+    (finding,) = mcp_server_identity_change_findings(context(head, base))
+
+    assert finding.severity is FindingSeverity.HIGH
+    assert "package version from '1.0.15' to '1.0.16'" in finding.message
+
+
+def test_a_uvx_from_package_behind_the_same_command_is_high(tmp_path: Path) -> None:
+    base, head = repos(tmp_path)
+    _server(base, ["--from", "postmark-mcp==1.0.15", "postmark-mcp"], "uvx")
+    _server(head, ["--from", "postmark-mcpp==1.0.15", "postmark-mcp"], "uvx")
+
+    (finding,) = mcp_server_identity_change_findings(context(head, base))
+
+    assert finding.severity is FindingSeverity.HIGH
+    assert "package from 'postmark-mcp' to 'postmark-mcpp'" in finding.message
+
+
 def test_a_changed_command_is_high(tmp_path: Path) -> None:
     base, head = repos(tmp_path)
     _server(base, ["server.js"], command="node")

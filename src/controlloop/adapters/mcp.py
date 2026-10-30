@@ -106,11 +106,14 @@ _CLINE_LOCATION = _Location("cline", "Cline", "mcpServers")
 _NPM_LAUNCHERS = frozenset({"npx", "bunx"})
 _NPM_SUBCOMMAND_LAUNCHERS = frozenset({"pnpm", "yarn"})
 _PYPI_LAUNCHERS = frozenset({"uvx"})
+#: `uvx --from` and `pipx run --spec` name the requirement installed, which
+#: then supplies the command; their value is the package, not the command.
+_PYPI_SOURCE_FLAGS = frozenset({"--from", "--spec"})
 _CONTAINER_LAUNCHERS = frozenset({"docker", "podman"})
 #: Launcher flags that take a value, so the value is not the package.
 _FLAGS_WITH_VALUES = frozenset(
     {
-        "-p", "--package", "--from", "--with", "--python", "--index-url",
+        "-p", "--package", "--from", "--spec", "--with", "--python", "--index-url",
         "-e", "--env", "--env-file", "-v", "--volume", "--name", "--network",
         "-w", "--workdir", "-u", "--user", "--entrypoint", "--platform",
         "--mount", "-l", "--label", "--cidfile", "--registry",
@@ -289,9 +292,20 @@ def _load(path: Path, dialect: str) -> Any:
             raise
 
 
-def _redacted_args(args: list[str]) -> list[str]:
+def _redacted_args(args: list[str], package_spec: str | None = None) -> list[str]:
+    """Keep only the key of `KEY=value` arguments, except the launched
+    package's own requirement (`pkg==1.2`, `--from=pkg==1.2`), whose version
+    is already recorded as `package_version`."""
+
     redacted: list[str] = []
     for arg in args:
+        flag, equals, value = arg.partition("=")
+        if package_spec is not None and (
+            arg == package_spec
+            or (equals and flag in _PYPI_SOURCE_FLAGS and value == package_spec)
+        ):
+            redacted.append(aa.authority_text(arg))
+            continue
         match = _KEY_VALUE_ARG.match(arg)
         redacted.append(
             f"{match.group(1)}{aa.REDACTED_VALUE}" if match else aa.authority_text(arg)
@@ -311,6 +325,59 @@ def _first_positional(args: list[str]) -> str | None:
         if arg.startswith("-"):
             continue
         return arg
+    return None
+
+
+def _pypi_requirement(args: list[str]) -> str | None:
+    """The requirement uvx or pipx installs: the `--from`/`--spec` value
+    when one comes before the command, else the first positional."""
+
+    skip = False
+    for index, arg in enumerate(args):
+        if skip:
+            skip = False
+            continue
+        if arg in _PYPI_SOURCE_FLAGS:
+            return args[index + 1] if index + 1 < len(args) else None
+        flag, equals, value = arg.partition("=")
+        if equals and flag in _PYPI_SOURCE_FLAGS:
+            return value or None
+        if arg in _FLAGS_WITH_VALUES:
+            skip = True
+            continue
+        if arg.startswith("-"):
+            continue
+        return arg
+    return None
+
+
+def _pypi_identity(spec: str) -> tuple[str, str]:
+    """Split a requirement into `(package, version)`; a range, a bare name
+    or a VCS URL without a revision is `unpinned`."""
+
+    if "==" in spec:
+        name, version = spec.split("==", 1)
+        return name, version.lstrip("=") or "unpinned"
+    if "://" in spec:
+        # `git+https://host/repo@v1.2`; the `@` in `git@host` is not a pin.
+        name, at, revision = spec.rpartition("@")
+        if at and revision and "/" not in revision and "://" in name:
+            return name, revision
+        return spec, "unpinned"
+    name, at, version = spec.partition("@")
+    return (name, version) if at and version else (spec, "unpinned")
+
+
+def _package_spec(command: str | None, args: list[str]) -> str | None:
+    """The requirement text a PyPI launcher installs, as written."""
+
+    if command is None:
+        return None
+    launcher = command.rsplit("/", 1)[-1]
+    if launcher == "pipx" and args[:1] == ["run"]:
+        return _pypi_requirement(args[1:])
+    if launcher in _PYPI_LAUNCHERS:
+        return _pypi_requirement(args)
     return None
 
 
@@ -350,14 +417,10 @@ def _package_identity(
         name = f"{scope}/{name_part}" if scope else name_part
         return "npm", name, version if at and version else "unpinned"
     if launcher in _PYPI_LAUNCHERS:
-        spec = _first_positional(rest)
+        spec = _pypi_requirement(rest)
         if spec is None:
             return None
-        for separator in ("==", "@"):
-            if separator in spec:
-                name, version = spec.split(separator, 1)
-                return "pypi", name, version
-        return "pypi", spec, "unpinned"
+        return "pypi", *_pypi_identity(spec)
     return None
 
 
@@ -397,7 +460,7 @@ def _tools_digest(context: ScanContext, server: _Server) -> str:
 
 
 def _attributes(context: ScanContext, server: _Server) -> dict[str, str]:
-    args = _redacted_args(server.args)
+    args = _redacted_args(server.args, _package_spec(server.command, server.args))
     attributes: dict[str, str] = {
         "transport": "stdio" if server.command else "http",
         "declaration_digest": "",

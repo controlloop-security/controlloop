@@ -18,6 +18,20 @@ project uses [Semantic Versioning](https://semver.org/).
   dependency. See
   [The local MCP server](docs/reference/mcp-server.md).
 
+### Fixed
+
+- **`uvx --from` and `pipx run --spec` name the package that runs.** An
+  MCP server launched as `uvx --from pkg==1.2 tool` was recorded as
+  package `tool`, unpinned: the scan read the command name and skipped the
+  requirement. It now records the `--from` (or `--spec`) requirement, so
+  `--from other-pkg==1.0 tool` reports `other-pkg` at `1.0`, and a Git
+  source with a revision (`git+https://host/repo@v1.2`) counts as pinned.
+  The requirement also stays readable in the recorded arguments: `pkg==1.2`
+  was shown as `pkg=<redacted>`. Other `KEY=value` arguments are still
+  redacted. `policy.mcp-server-identity-change` now rates a version bump or
+  a different package behind the same `uvx --from` command `high`; it was
+  `medium`, as changed arguments.
+
 ## [0.6.2] - 2026-10-30
 
 The first release listed on GitHub Marketplace. It carries 0.6.1's fix,

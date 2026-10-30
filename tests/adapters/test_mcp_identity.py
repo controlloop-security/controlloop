@@ -66,8 +66,30 @@ def _server(tmp_path: Path, entry: Mapping[str, object], name: str = "s") -> Nod
         ("bunx", ["pkg@0.1.0"], "npm", "pkg", "0.1.0"),
         ("pnpm", ["dlx", "pkg@3.0.0"], "npm", "pkg", "3.0.0"),
         ("uvx", ["mcp-server-fetch==1.2.3"], "pypi", "mcp-server-fetch", "1.2.3"),
-        ("uvx", ["--from", "git+x", "tool"], "pypi", "tool", "unpinned"),
+        ("uvx", ["--from", "git+x", "tool"], "pypi", "git+x", "unpinned"),
+        ("uvx", ["--from", "srv==0.6.1", "srv", "mcp"], "pypi", "srv", "0.6.1"),
+        ("uvx", ["--from=srv==0.6.1", "srv"], "pypi", "srv", "0.6.1"),
+        ("uvx", ["--from", "other==1.0", "srv"], "pypi", "other", "1.0"),
+        ("uvx", ["--from", "srv>=1", "srv"], "pypi", "srv>=1", "unpinned"),
+        ("uvx", ["srv", "--from", "x==1"], "pypi", "srv", "unpinned"),
+        ("uvx", ["srv@0.6.1", "mcp"], "pypi", "srv", "0.6.1"),
+        ("uvx", ["srv===2.0"], "pypi", "srv", "2.0"),
+        (
+            "uvx",
+            ["--from", "git+https://github.com/acme/srv@v1.2", "srv"],
+            "pypi",
+            "git+https://github.com/acme/srv",
+            "v1.2",
+        ),
+        (
+            "uvx",
+            ["--from", "git+ssh://git@github.com/acme/srv", "srv"],
+            "pypi",
+            "git+ssh://git@github.com/acme/srv",
+            "unpinned",
+        ),
         ("pipx", ["run", "srv@4.0"], "pypi", "srv", "4.0"),
+        ("pipx", ["run", "--spec", "srv==4.0", "srv"], "pypi", "srv", "4.0"),
         (
             "docker",
             ["run", "-i", "--rm", "-e", "TOKEN", "ghcr.io/acme/mcp:1.4"],
@@ -140,6 +162,37 @@ def test_key_value_arguments_keep_only_the_key(tmp_path: Path) -> None:
     assert _SECRET_ARG not in args
     assert "--api-key=<redacted>" in args
     assert "REGION=<redacted>" in args
+
+
+@pytest.mark.parametrize(
+    ("args", "shown"),
+    [
+        (["srv==0.6.1", "mcp"], "srv==0.6.1 mcp"),
+        (["--from", "srv==0.6.1", "srv"], "--from srv==0.6.1 srv"),
+        (["--from=srv==0.6.1", "srv"], "--from=srv==0.6.1 srv"),
+    ],
+)
+def test_the_launched_requirement_is_not_redacted(
+    tmp_path: Path, args: list[str], shown: str
+) -> None:
+    node = _server(tmp_path, {"command": "uvx", "args": args})
+
+    assert node.attributes["args"] == shown
+
+
+def test_key_value_arguments_after_the_requirement_stay_redacted(
+    tmp_path: Path,
+) -> None:
+    node = _server(
+        tmp_path,
+        {
+            "command": "uvx",
+            "args": ["--from", "srv==1.0", "srv", f"TOKEN=={_SECRET_ARG}"],
+        },
+    )
+
+    assert _SECRET_ARG not in node.attributes["args"]
+    assert node.attributes["args"] == "--from srv==1.0 srv TOKEN=<redacted>"
 
 
 def test_the_declaration_digest_changes_with_the_declaration_only(
