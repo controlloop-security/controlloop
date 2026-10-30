@@ -234,6 +234,23 @@ walkthrough that matches the [example walkthrough](docs/guides/example-walkthrou
 `scan` is what you run at your desk. `gate` is what you run in CI. Every
 command and flag is in the [CLI reference](docs/reference/cli.md).
 
+## Use it inside your agent
+
+The [ControlLoop plugins](https://github.com/controlloop-security/controlloop-plugins)
+let a coding agent run this CLI and explain its answer when you ask "what
+does this change let my agents do?" They run the gate locally, quote its
+verdict and authority statements, link each finding's documentation, and
+edit nothing. They ship no hooks and start nothing when a session opens.
+
+| Host | Install |
+| --- | --- |
+| Claude Code | `/plugin install controlloop --marketplace controlloop-security/controlloop-plugins`, then `/controlloop:review` |
+| Codex | `codex plugin marketplace add controlloop-security/controlloop-plugins`, then `codex plugin add controlloop@controlloop` |
+| Gemini CLI | `gemini extensions install https://github.com/controlloop-security/controlloop-plugins` |
+| Cursor | From the Cursor Marketplace, or import the repository as a team marketplace |
+| GitHub Copilot | `copilot plugin install controlloop@controlloop` after `copilot plugin marketplace add controlloop-security/controlloop-plugins`; in VS Code, **Chat: Install Plugin from Source** |
+| Any MCP host | [`controlloop mcp`](docs/reference/mcp-server.md): `gate`, `diff`, `bom` and `rules` as read-only local tools |
+
 ## Screenshots
 
 Every block in this README is real output, recorded against the public

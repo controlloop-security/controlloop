@@ -10,7 +10,7 @@ Gemini CLI, Cursor, VS Code with GitHub Copilot, Kiro, Windsurf, Roo Code,
 Cline, Continue and opencode.
 
 > **Availability:** in the CLI's `main` branch; ships in the release after
-> 0.6.1. `controlloop --help` lists `mcp` when your installed version has
+> 0.6.2. `controlloop --help` lists `mcp` when your installed version has
 > it.
 
 ## What it will not do
