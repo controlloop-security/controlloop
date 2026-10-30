@@ -69,7 +69,7 @@ release pipeline already gates behind `verify`, `changelog-gate`, and
 | --- | --- | --- | --- |
 | Linux | x86_64 | `ubuntu-latest` | Yes |
 | Linux | arm64 | `ubuntu-24.04-arm` | Yes |
-| macOS | arm64 (Apple Silicon) | `macos-14` | Yes |
+| macOS | arm64 (Apple Silicon) | `macos-26` | Yes |
 | macOS | x86_64 (Intel) | -- | **No -- disclosed gap** |
 
 **macOS x86_64 (Intel) is a disclosed gap, not an oversight**, for the

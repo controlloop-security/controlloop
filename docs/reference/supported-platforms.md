@@ -26,7 +26,7 @@ runs on all three of these real GitHub-hosted runner legs, via
 | --- | --- | --- |
 | Linux | x86_64 | `ubuntu-latest` |
 | Linux | arm64 | `ubuntu-24.04-arm` |
-| macOS | arm64 (Apple Silicon) | `macos-14` |
+| macOS | arm64 (Apple Silicon) | `macos-26` |
 
 A failure on any one of these legs fails that leg's own check and blocks
 merge -- `fail-fast` is disabled so every leg reports independently rather

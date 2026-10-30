@@ -12,10 +12,11 @@ The same CLI as 0.6.1, built on a different macOS runner image.
 
 ### Changed
 
-- **The macOS arm64 checks and standalone binary run on `macos-14`.**
+- **The macOS arm64 checks and standalone binary run on `macos-26`.**
   GitHub's hosted `macos-15` arm64 runners were short of capacity, and
-  the 0.6.1 release could not get one. `macos-14` is also Apple Silicon,
-  so the binary's platform and architecture are unchanged.
+  the 0.6.1 release could not get one. `macos-26` is also Apple Silicon,
+  so the binary's platform and architecture are unchanged. (`macos-14` is
+  retired on 2 November 2026 and is in scheduled brownouts until then.)
 
 ## [0.6.1] - 2026-10-30
 
