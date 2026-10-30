@@ -1,15 +1,21 @@
+# Runs `controlloop gate` against a checked-out repository and fails the
+# check on a blocking verdict. Requires `fetch-depth: 0` in your own
+# `actions/checkout` step (or enough depth to include the merge-base with
+# your default/target branch) -- `gate` needs real git history to compute
+# an automatic baseline; the shallow default (`fetch-depth: 1`) fails with
+# a clear, actionable message rather than silently skipping the
+# comparison. Pin this action to a tagged release or commit SHA
+# (`uses: controlloop-security/controlloop@<ref>`); it installs the CLI
+# from that exact, immutable checkout's own locked dependencies -- never
+# from an unpinned or "latest" source. See docs/reference/github-action.md.
+#
+# `description` is what GitHub Marketplace lists, and Marketplace refuses
+# one of 125 characters or more; tests/test_action_metadata.py holds it
+# under that.
 name: ControlLoop gate
 description: >-
-  Run `controlloop gate` against a checked-out repository and fail the
-  check on a blocking verdict. Requires `fetch-depth: 0` in your own
-  `actions/checkout` step (or enough depth to include the merge-base with
-  your default/target branch) -- `gate` needs real git history to compute
-  an automatic baseline; the shallow default (`fetch-depth: 1`) will fail
-  with a clear, actionable message rather than silently skipping the
-  comparison. Pin this action to a tagged release or commit SHA
-  (`uses: controlloop-security/controlloop@<ref>`); it installs the CLI from
-  that exact, immutable checkout's own locked dependencies -- never from
-  an unpinned or "latest" source.
+  Block pull requests that widen what an AI agent can do, from agent
+  configs, MCP servers and framework code.
 author: ControlLoop
 branding:
   icon: shield
