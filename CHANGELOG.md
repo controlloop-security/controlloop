@@ -8,8 +8,8 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [0.6.3] - 2026-10-30
 
-The Action is listed on GitHub Marketplace as "ControlLoop Security". The
-CLI is unchanged.
+The Action is listed on GitHub Marketplace as "ControlLoop Security", and
+the CLI gains `controlloop mcp`, a local MCP server.
 
 ### Changed
 
