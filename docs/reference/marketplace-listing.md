@@ -6,62 +6,67 @@ tags:
   - releases
   - ci
 created: 2026-08-23
+updated: 2026-10-30
 ---
 
 # Action marketplace listing
 
-**The GitHub Action has never been published to the GitHub Marketplace.**
-This page describes what is prepared for that listing and what still
-requires a maintainer's manual action -- nothing here is a claim that
-ControlLoop is discoverable from the Marketplace today.
+**The GitHub Action is not listed on GitHub Marketplace yet.** It works
+today from any workflow (`uses: controlloop-security/controlloop@v0.6.0`);
+a listing only makes it discoverable from Marketplace search. This page
+records what is prepared and the steps a maintainer takes to publish it.
 
-The goal: the GitHub Action is discoverable and installable from the
-Marketplace.
+## What GitHub requires
 
-## What publishing to the Marketplace actually requires
+From GitHub's [publishing guide](https://docs.github.com/en/actions/how-tos/create-and-publish-actions/publish-in-github-marketplace):
 
-GitHub Marketplace publication happens through GitHub's own web UI, on
-the account that owns the repository, and is a public, effectively
-irreversible action once a listing goes live. Nothing in this repository
-performs that click -- the same category of action as registering the
-PyPI and GHCR names, which is also still pending. What follows is
-everything prepared for that action.
+| Requirement | State in this repository |
+| --- | --- |
+| The repository is public | Yes |
+| One action metadata file, at the root | `action.yml` |
+| A unique `name` that matches no existing action, category, user, or organization | `ControlLoop gate` |
+| The owning account accepts the GitHub Marketplace Developer Agreement | A maintainer does this once, in the publish form |
+| Two-factor authentication on the publishing account | Required when the release is published |
 
-## What is already prepared
+`action.yml` also declares `branding: {icon: shield, color: blue}`, the
+icon and color Marketplace shows on the listing and in workflow logs.
+The listing's body is this repository's `README.md`: it opens with the
+30-second demo and has a "Run it as a GitHub Action" section linking to
+[The ControlLoop GitHub Action](github-action.md), which lists every
+input, output, and the `fetch-depth: 0` requirement.
 
-`action.yml` (repository root) already declares:
+## Publish it
 
-- A real, accurate `description` naming the exact behavior (`controlloop
-  gate`), the `fetch-depth: 0` requirement, and the pinning
-  recommendation.
-- `branding: {icon: shield, color: blue}` -- the icon and color GitHub
-  renders for the listing and in workflow logs.
+Publishing happens in GitHub's web UI on an account that can manage
+releases for `controlloop-security/controlloop`. It is public, and the
+listing stays up until a maintainer removes it.
 
-**Category:** GitHub Marketplace's primary/secondary category selection
-happens in the publish UI itself, not in a repository file, so there is
-nothing to encode here. Recommended selection during the actual publish
-step: **Security** (primary), **Code quality** (secondary) -- matching
-ControlLoop's own positioning as a pre-deployment security product for
-agentic software.
+1. Open the release to list, for example
+   `https://github.com/controlloop-security/controlloop/releases/tag/v0.6.0`,
+   and choose **Edit** (for a new release, start from **Draft a new
+   release**).
+2. Under **Release action**, check **Publish this Action to the GitHub
+   Marketplace**. The first time, GitHub asks the account to accept the
+   Marketplace Developer Agreement; accept it, then return to the form.
+3. Wait for the metadata check to say **Everything looks good!**
+4. Choose the categories: **Security** as the primary, **Code quality** as
+   the secondary. These match ControlLoop's position as a pre-deployment
+   security check for agentic software.
+5. Keep the existing tag and title, choose **Update release** (or
+   **Publish release**), and complete the two-factor prompt.
+6. Check the listing at
+   `https://github.com/marketplace/actions/controlloop-gate`.
 
-## Linked documentation
-
-The listing's long-form body is GitHub Marketplace's own rendering of
-this repository's root `README.md`, which now includes a real "GitHub
-Action" section with a minimal usage snippet and a link to [The
-ControlLoop GitHub Action](github-action.md) -- every input, output, and
-the `fetch-depth: 0` requirement in full. Both pages exist and are
-accurate as of this page's writing.
+Every later release that should appear on Marketplace needs the same
+checkbox when it is published.
 
 ## Major-version tag maintenance
 
 **Policy:** consumers should pin to either an exact `vX.Y.Z` tag or a
-commit SHA for full reproducibility (this repository's own existing
-recommendation, unchanged), or to a floating `vMAJOR` tag (for example
-`v1`) to automatically receive every non-breaking update within that
-major version -- the standard convention every published GitHub Action's
-own consumers already expect (`actions/checkout@v4`,
-`astral-sh/setup-uv@v10`).
+commit SHA for full reproducibility, or to a floating `vMAJOR` tag (for
+example `v1`) to receive every non-breaking update within that major
+version -- the convention Marketplace users expect
+(`actions/checkout@v4`, `astral-sh/setup-uv@v10`).
 
 **Deliberately a manual step performed by a maintainer, not automated
 in `release.yml`.** This repository's release workflow carries a
@@ -69,42 +74,20 @@ standing, tested invariant: no workflow in this repository ever pushes a
 tag itself
 (`TestReleaseWorkflowScopeBoundary::test_never_pushes_a_tag_or_calls_uv_publish`
 in `tests/test_release_workflow_structure.py`) -- a deliberate
-safety boundary against any workflow ever creating or moving tags on its
-own, considered and preserved rather than narrowed for this step. (For
-the record: a `vMAJOR` tag like `v1` has no dot, so it could never match
-this workflow's own `v*.*.*` trigger glob and re-trigger a release --
-but the invariant is broader than only self-triggering risk, so it is
-kept intact rather than reinterpreted.)
+safety boundary against any workflow creating or moving tags on its
+own. (A `vMAJOR` tag like `v1` has no dot, so it could never match this
+workflow's own `v*.*.*` trigger glob and re-trigger a release -- but the
+invariant is broader than self-triggering risk, so it is kept intact.)
 
-After tagging a real release, a maintainer moves the
-corresponding `vMAJOR` tag themselves:
+Release tags `v0.1.1` through `v0.6.0` exist. No floating tag exists yet,
+and none is needed before 1.0: during `0.x` every minor release may
+change behavior, so consumers should pin an exact tag. From `v1.0.0` on,
+after tagging a release, a maintainer moves the major tag themselves:
 
 ```
 git tag -f v1 v1.2.3
 git push origin v1 --force
 ```
-
-No tag has ever been pushed to this repository, so no `vMAJOR` tag exists
-yet, and this command has never been run for real.
-
-## Accuracy
-
-Root `README.md`'s "Repository status" section was once stale -- it claimed
-repository scanning, adapters, diffs, policies, gates, and CI integration
-were "not implemented," which was false (all implemented; only Team-tier
-features and OASF wire-format version support remain unimplemented). It was
-corrected because that exact file is what a Marketplace listing renders as
-its body; a listing built from the prior text would have contradicted itself
-(an Action published for CI gating, described by a README claiming CI
-integration doesn't exist).
-
-## What this does not do
-
-- **Does not publish anything.** No listing exists; this page prepares
-  for one.
-- **No PyPI, GHCR, or Homebrew listing** -- separate, not-yet-implemented
-  distribution channels, blocked on registering the `controlloop` name
-  on each.
 
 ## Next steps
 

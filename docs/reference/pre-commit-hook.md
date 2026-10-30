@@ -20,17 +20,15 @@ stays in verdict-parity with CI.
 **Status: implemented, real-tested.** `.pre-commit-hooks.yaml` validates
 against [pre-commit](https://pre-commit.com)'s own official manifest
 schema and was exercised end to end with `pre-commit try-repo` while this
-page was written. No tagged release of this repository exists yet at
-authoring time -- the usage example below shows the real `rev:` pinning
-pattern a consumer will use once one does; it is not itself a claim that
-`v0.1.0` (or any other tag) currently exists.
+page was written. Pin `rev:` to a release tag (`v0.1.1` through
+`v0.6.0` exist) or a commit SHA.
 
 ## Minimal usage
 
 ```yaml
 repos:
   - repo: https://github.com/controlloop-security/controlloop
-    rev: <pinned tag or commit SHA>  # never an unpinned/"latest" ref
+    rev: v0.6.0  # a release tag or commit SHA, never an unpinned/"latest" ref
     hooks:
       - id: controlloop-gate
 ```
@@ -111,7 +109,6 @@ blocking verdict, and asserts they are byte-identical -- not merely
 
 ## Known limitations
 
-- No tagged release exists yet to pin `rev:` to -- see "Status" above.
 - `language: script` requires `uv` already on the developer's own
   `PATH`; nothing installs it for them.
 - The hook always runs (`always_run: true`, `pass_filenames: false`) --

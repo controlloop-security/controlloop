@@ -12,9 +12,7 @@ created: 2026-10-23
 The tap `controlloop-security/controlloop` (repository
 [`controlloop-security/homebrew-controlloop`](https://github.com/controlloop-security/homebrew-controlloop))
 carries one formula, `controlloop`, written by the release pipeline for
-every tagged release from the first one cut after this page was added.
-Until that release is tagged, the tap has no formula and the install
-command below reports that it does not exist.
+every tagged release.
 
 ```bash
 brew install controlloop-security/controlloop/controlloop
