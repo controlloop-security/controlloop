@@ -28,6 +28,7 @@ from controlloop.adapters import (
     DevcontainerAdapter,
     DiscoveryAdapter,
     DiscoveryResult,
+    EditorStartupAdapter,
     GeminiSettingsAdapter,
     IamPolicyAdapter,
     KiroConfigAdapter,
@@ -319,6 +320,7 @@ PRIVACY_REQUIRED_ADAPTERS = frozenset(
         "roo-code",
         "devcontainer",
         "pre-commit",
+        "editor-startup",
     }
 )
 
@@ -1459,6 +1461,106 @@ PRE_COMMIT_FIXTURE = _host_fixture(
     write_privacy=_pre_commit_write_privacy,
 )
 
+# --- Environment: editor startup files and JetBrains required plugins -------
+# Claimed by location. A startup file is never parsed, so it cannot be
+# malformed; the malformed and version-drift cases use the one parsed
+# file, `.idea/externalDependencies.xml`, whose `<project version>` is
+# the IntelliJ project format version (4). The near miss is a startup
+# file below the root, which no editor sources on open.
+
+_EXTERNAL_DEPENDENCIES = ".idea/externalDependencies.xml"
+
+
+def _external_dependencies(plugins: str, version: str = "4") -> str:
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        f'<project version="{version}">\n'
+        '  <component name="ExternalDependencies">\n'
+        f"{plugins}"
+        "  </component>\n"
+        "</project>\n"
+    )
+
+
+def _editor_write_positive(tmp_path: Path) -> None:
+    _write_text(tmp_path, ".nvim.lua", "vim.opt.tabstop = 4\n")
+
+
+def _editor_assert_positive(result: DiscoveryResult) -> None:
+    assert sorted(node.subtype or "" for node in result.nodes) == [
+        "helper-command",
+        "host",
+    ]
+    assert result.diagnostics == ()
+
+
+def _editor_write_similar_negative(tmp_path: Path) -> None:
+    _write_text(tmp_path, "config/.nvim.lua", "vim.opt.tabstop = 4\n")
+
+
+def _editor_write_malformed(tmp_path: Path) -> None:
+    _write_text(tmp_path, _EXTERNAL_DEPENDENCIES, "<project><component name=")
+
+
+def _editor_write_boundary(tmp_path: Path) -> None:
+    _write_text(
+        tmp_path,
+        _EXTERNAL_DEPENDENCIES,
+        _external_dependencies(
+            "".join(
+                f'    <plugin id="com.acme.p{i}" min-version="1.0" '
+                'max-version="1.0" />\n'
+                for i in range(_BOUNDARY_ENTRY_COUNT)
+            )
+        ),
+    )
+
+
+def _editor_assert_boundary(result: DiscoveryResult) -> None:
+    plugins = [node for node in result.nodes if node.subtype == "plugin"]
+    assert len(plugins) == _BOUNDARY_ENTRY_COUNT
+    assert result.diagnostics == ()
+
+
+def _editor_write_version(version: str) -> Callable[[Path], None]:
+    def write(tmp_path: Path) -> None:
+        _write_text(
+            tmp_path,
+            _EXTERNAL_DEPENDENCIES,
+            _external_dependencies('    <plugin id="com.acme.p" />\n', version),
+        )
+
+    return write
+
+
+def _editor_write_privacy(tmp_path: Path) -> tuple[str, ...]:
+    _write_text(
+        tmp_path,
+        ".nvim.lua",
+        f'vim.env.DEPLOY_TOKEN = "{_ENV_VALUE}"\nvim.fn.system("{_BEARER_COMMAND}")\n',
+    )
+    _write_text(
+        tmp_path,
+        ".dir-locals.el",
+        f'((nil . ((eval . (setenv "API_TOKEN" "{_CREDENTIAL}")))))\n',
+    )
+    return (_CREDENTIAL, _ENV_VALUE)
+
+
+EDITOR_STARTUP_FIXTURE = ConformanceFixture(
+    adapter_name="editor-startup",
+    make_adapter=EditorStartupAdapter,
+    write_positive=_editor_write_positive,
+    assert_positive=_editor_assert_positive,
+    write_similar_negative=_editor_write_similar_negative,
+    write_malformed=_editor_write_malformed,
+    write_boundary=_editor_write_boundary,
+    assert_boundary=_editor_assert_boundary,
+    write_version_drift=_editor_write_version("5"),
+    write_older_version_drift=_editor_write_version("3"),
+    write_privacy=_editor_write_privacy,
+)
+
 ALL_FIXTURES: tuple[ConformanceFixture, ...] = (
     MCP_FIXTURE,
     OPENAPI_FIXTURE,
@@ -1478,4 +1580,5 @@ ALL_FIXTURES: tuple[ConformanceFixture, ...] = (
     ROO_FIXTURE,
     DEVCONTAINER_FIXTURE,
     PRE_COMMIT_FIXTURE,
+    EDITOR_STARTUP_FIXTURE,
 )

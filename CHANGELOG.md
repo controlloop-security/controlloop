@@ -27,6 +27,14 @@ project uses [Semantic Versioning](https://semver.org/).
   commands that `policy.agent-hook-command-change` and the script digest
   track. Nothing is cloned, installed, or run, and no rule changed. See
   [pre-commit](docs/adapters/pre-commit.md).
+- **Editor startup files and JetBrains required plugins are read.**
+  `.nvim.lua`, `.nvimrc`, `.exrc`, `.lvimrc`, `.dir-locals.el`, and
+  `.dir-locals-2.el` at the repository root are recorded by path and
+  SHA-256, never parsed, so `policy.agent-hook-command-change` reports a
+  new one and `policy.hook-script-changed` a changed one. Each plugin in
+  `.idea/externalDependencies.xml` is a component pinned only when its
+  minimum and maximum versions match. No rule changed. See
+  [Editor startup files and JetBrains required plugins](docs/adapters/editor-startup.md).
 
 ## [0.6.3] - 2026-10-30
 

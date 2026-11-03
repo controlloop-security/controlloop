@@ -166,7 +166,10 @@ def _normalize(word: str, declaring_path: str) -> str | None:
     return normalized
 
 
-def _file_digest(file: RepositoryFile) -> str:
+def file_digest(file: RepositoryFile) -> str:
+    """`sha256:<hex>` of the file's bytes, or `unknown` past the walker's
+    per-file bound or when it cannot be read."""
+
     try:
         if file.path.stat().st_size > TraversalBounds().max_file_size_bytes:
             return UNKNOWN
@@ -179,7 +182,7 @@ def _directory_digest(files: Mapping[str, RepositoryFile], directory: str) -> st
     entries: list[str] = []
     for relative in sorted(files):
         if relative.startswith(directory):
-            digest = _file_digest(files[relative])
+            digest = file_digest(files[relative])
             if digest == UNKNOWN:
                 return UNKNOWN
             entries.append(f"{relative[len(directory) :]} {digest}")
@@ -229,7 +232,7 @@ def _tracked(
         return node.model_copy(update={"attributes": attributes}), _outside(node)
     file = files.get(relative)
     attributes["script_path"] = aa.authority_text(relative)
-    attributes["script_digest"] = _file_digest(file) if file is not None else UNKNOWN
+    attributes["script_digest"] = file_digest(file) if file is not None else UNKNOWN
     return node.model_copy(update={"attributes": attributes}), None
 
 
@@ -255,4 +258,4 @@ def with_script_digests(
     )
 
 
-__all__ = ["UNKNOWN", "script_reference", "with_script_digests"]
+__all__ = ["UNKNOWN", "file_digest", "script_reference", "with_script_digests"]

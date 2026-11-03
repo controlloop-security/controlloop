@@ -34,6 +34,7 @@
   - [Agent-running workflows](adapters/agent-workflows.md)
   - [Dev containers and VS Code extensions](adapters/devcontainer.md)
   - [pre-commit](adapters/pre-commit.md)
+  - [Editor startup files and JetBrains required plugins](adapters/editor-startup.md)
 
 ## Reference and help
 

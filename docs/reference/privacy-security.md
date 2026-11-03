@@ -357,6 +357,14 @@ boundary this list summarizes:
   pass through the same redaction as a hook command. Gap: what a hook
   repository publishes and does once installed is outside this
   repository; other hook managers are not read.
+- **`EditorStartupAdapter`** (editor startup files and JetBrains
+  required plugins) -- records `.nvim.lua`, `.nvimrc`, `.exrc`,
+  `.lvimrc`, `.dir-locals.el`, and `.dir-locals-2.el` at the repository
+  root by path and SHA-256 only; they are never parsed or evaluated, and
+  their content never reaches any output. Parses
+  `.idea/externalDependencies.xml` with a document type declaration
+  refused before parsing, so no entity is expanded or fetched. Gap:
+  user-level editor configuration is never read.
 - **`AgentWorkflowAdapter`** (agent-running GitHub workflows) -- parses
   `.github/workflows/*.yml` with `yaml.safe_load`; a workflow is never run.
   Privacy: a secret is recorded by **name** from `${{ secrets.NAME }}`; an
