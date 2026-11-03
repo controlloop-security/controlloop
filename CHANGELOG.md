@@ -18,6 +18,15 @@ project uses [Semantic Versioning](https://semver.org/).
   script digest track, with `initializeCommand` marked as running on the
   host. Nothing is installed, pulled, or resolved, and no rule changed.
   See [Dev containers and VS Code extensions](docs/adapters/devcontainer.md).
+- **pre-commit configuration is read.** `.pre-commit-config.yaml` at the
+  repository root. Each hook repository is a component pinned only by a
+  full commit SHA in `rev`, and each `additional_dependencies` entry is
+  its own component pinned only by an exact version, so
+  `policy.unpinned-agent-component` reports one that is added, moved to
+  a tag, or unversioned, and names the dependency. Local hooks are helper
+  commands that `policy.agent-hook-command-change` and the script digest
+  track. Nothing is cloned, installed, or run, and no rule changed. See
+  [pre-commit](docs/adapters/pre-commit.md).
 
 ## [0.6.3] - 2026-10-30
 

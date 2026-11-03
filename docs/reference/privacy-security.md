@@ -350,6 +350,13 @@ boundary this list summarizes:
   `containerEnv`, `remoteEnv`, and mounts are never read. Gap: the image,
   Dockerfile, and Compose file are not opened (a Compose path is recorded
   as a path), and tasks that run on folder open are not read.
+- **`PreCommitAdapter`** (pre-commit) -- parses `.pre-commit-config.yaml`
+  at the repository root with `yaml.safe_load`; no hook repository is
+  cloned and no dependency installed. Privacy: a repository URL is
+  recorded without its scheme or credentials; a hook's `entry` and `args`
+  pass through the same redaction as a hook command. Gap: what a hook
+  repository publishes and does once installed is outside this
+  repository; other hook managers are not read.
 - **`AgentWorkflowAdapter`** (agent-running GitHub workflows) -- parses
   `.github/workflows/*.yml` with `yaml.safe_load`; a workflow is never run.
   Privacy: a secret is recorded by **name** from `${{ secrets.NAME }}`; an

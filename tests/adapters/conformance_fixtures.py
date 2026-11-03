@@ -36,6 +36,7 @@ from controlloop.adapters import (
     OasfAdapter,
     OpenAiAgentsAdapter,
     OpenApiAdapter,
+    PreCommitAdapter,
     RooModesAdapter,
     ScanContext,
     run_adapters,
@@ -317,6 +318,7 @@ PRIVACY_REQUIRED_ADAPTERS = frozenset(
         "kiro",
         "roo-code",
         "devcontainer",
+        "pre-commit",
     }
 )
 
@@ -1406,6 +1408,57 @@ DEVCONTAINER_FIXTURE = _host_fixture(
     write_privacy=_devcontainer_write_privacy,
 )
 
+# --- Environment: pre-commit -------------------------------------------------
+# Claimed by location; `.pre-commit-hooks.yaml`, the file a hook repository
+# publishes its hooks in, is the near miss. The privacy case plants a
+# credential in a local hook's entry and args and in a repository URL.
+
+_PRE_COMMIT = ".pre-commit-config.yaml"
+
+
+def _pre_commit_repos(count: int) -> str:
+    return "repos:\n" + "".join(
+        f"  - repo: https://github.com/acme/hooks-{i}\n"
+        f"    rev: {'a' * 40}\n"
+        "    hooks:\n"
+        "      - id: check\n"
+        for i in range(count)
+    )
+
+
+def _pre_commit_write_privacy(tmp_path: Path) -> tuple[str, ...]:
+    _write_text(
+        tmp_path,
+        _PRE_COMMIT,
+        "repos:\n"
+        f"  - repo: https://deploy:{_HEADER_VALUE}@git.example.test/hooks\n"
+        f"    rev: {'b' * 40}\n"
+        "    hooks:\n"
+        "      - id: check\n"
+        "  - repo: local\n"
+        "    hooks:\n"
+        "      - id: upload\n"
+        "        name: upload\n"
+        f'        entry: "{_BEARER_COMMAND}"\n'
+        "        language: system\n"
+        f"        args: ['--token={_CREDENTIAL}']\n",
+    )
+    return (_CREDENTIAL, _HEADER_VALUE)
+
+
+PRE_COMMIT_FIXTURE = _host_fixture(
+    name="pre-commit",
+    adapter=PreCommitAdapter,
+    path=_PRE_COMMIT,
+    positive=_pre_commit_repos(1),
+    near_miss=".pre-commit-hooks.yaml",
+    malformed="repos: [unclosed\n",
+    boundary=_pre_commit_repos,
+    boundary_subtype="plugin",
+    positive_subtypes=["host", "plugin"],
+    write_privacy=_pre_commit_write_privacy,
+)
+
 ALL_FIXTURES: tuple[ConformanceFixture, ...] = (
     MCP_FIXTURE,
     OPENAPI_FIXTURE,
@@ -1424,4 +1477,5 @@ ALL_FIXTURES: tuple[ConformanceFixture, ...] = (
     KIRO_FIXTURE,
     ROO_FIXTURE,
     DEVCONTAINER_FIXTURE,
+    PRE_COMMIT_FIXTURE,
 )

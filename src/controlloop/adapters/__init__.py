@@ -33,6 +33,7 @@ from controlloop.adapters.mcp import McpServerAdapter
 from controlloop.adapters.oasf import SUPPORTED_OASF_VERSIONS, OasfAdapter
 from controlloop.adapters.openai_agents import OpenAiAgentsAdapter
 from controlloop.adapters.openapi import OpenApiAdapter
+from controlloop.adapters.pre_commit import PreCommitAdapter
 from controlloop.adapters.runner import run_adapters
 from controlloop.adapters.sandbox import AdapterSandboxViolationError, adapter_sandbox
 from controlloop.adapters.workflows import AgentWorkflowAdapter
@@ -59,6 +60,7 @@ ALL_ADAPTERS: tuple[type[DiscoveryAdapter], ...] = (
     KiroConfigAdapter,
     RooModesAdapter,
     DevcontainerAdapter,
+    PreCommitAdapter,
 )
 
 #: The vendor documentation date each agent host adapter's recognized
@@ -96,6 +98,7 @@ __all__ = [
     "OasfAdapter",
     "OpenAiAgentsAdapter",
     "OpenApiAdapter",
+    "PreCommitAdapter",
     "RooModesAdapter",
     "ScanContext",
     "adapter_sandbox",
