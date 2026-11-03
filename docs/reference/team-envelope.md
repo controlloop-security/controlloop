@@ -181,8 +181,20 @@ prohibited-content checks as the rest of the envelope:
 - **Components.** Each agent authority component and MCP server is sent
   with the same type, name, attributes, and flags the gate judges the
   sanctioned list by. A hook is named by its event, such as
-  `SessionStart`. The only attributes sent are `package`, `version`,
-  `digest`, `command` (where recorded), and `host_id`. Every value was
+  `SessionStart`. The attributes sent are `package`, `version`,
+  `digest`, `command` (where recorded), `event` for a helper command
+  (`project-open`, `postCreateCommand`, a pre-commit stage), and
+  `host_id`. An editor extension, devcontainer feature, pre-commit hook
+  repository, or pre-commit dependency is a `plugin` named by its id or
+  reference, with its `source_type` and the attributes its adapter
+  recorded (`extension_id`, `plugin_id`, `min_version`, `max_version`,
+  `feature`, `ref`, `origin`, `registry`, `repository`, `hook_ids`,
+  `dependency`, `recommended_only`). Its `package` is that id or
+  reference, its `version` its exact `MAJOR.MINOR.PATCH` version with one
+  leading `v` dropped, and its `digest` a `sha256:` reference. The
+  platform files the first three kinds under `editor_extension`,
+  `devcontainer_feature`, and `pre_commit_hook`, and the gate judges them
+  under the same types; a dependency stays `plugin`. Every value was
   already redacted and bounded by the adapter that recorded it, so a
   token in a command arrives as `<redacted>`. A value over 512 characters
   is left out rather than cut, so it meets no constraint, locally or on

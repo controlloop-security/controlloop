@@ -35,6 +35,16 @@ project uses [Semantic Versioning](https://semver.org/).
   `.idea/externalDependencies.xml` is a component pinned only when its
   minimum and maximum versions match. No rule changed. See
   [Editor startup files and JetBrains required plugins](docs/adapters/editor-startup.md).
+- **Team receives these components.** On a Team gate, each editor
+  extension, devcontainer feature, pre-commit hook repository, and
+  pre-commit dependency is sent as a `plugin` named by its id or
+  reference, with its `source_type`, the attributes its adapter
+  recorded, and the `package`, `version`, and `digest` an approved
+  component can constrain; a helper command also sends its `event`. The
+  gate judges the first three kinds as `editor_extension`,
+  `devcontainer_feature`, and `pre_commit_hook`, the types the platform
+  files them under, so an organization approval matches locally as it
+  does on the platform. See [Team envelope](docs/reference/team-envelope.md).
 
 ## [0.6.3] - 2026-10-30
 

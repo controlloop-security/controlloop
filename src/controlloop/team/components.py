@@ -17,11 +17,26 @@ the one place that mapping is written.
 | `plugin`, `marketplace`, `skill`, `subagent` | the same | its own name |
 | `workflow-runtime` | `workflow_runtime` | `<workflow> / <job>` |
 
-Attributes the approved-component constraints read: `package` and `version` (an MCP
-server's package and version), `digest` (an MCP server's declaration
-digest), and `command` (a hook's or helper's command). Flags: `pinned`,
-`code_execution`, `bypass_mode`, `wildcard`, and `untrusted_input`, each
-`True`, `False`, or `None` when the scanner could not tell.
+A `plugin` the environment adapters record (an editor extension, a
+devcontainer feature, a pre-commit hook repository or dependency) keeps
+type `plugin` in the envelope and carries its `source_type`; the
+platform files it under `editor_extension`, `devcontainer_feature`, or
+`pre_commit_hook` at ingestion (`ENVIRONMENT_COMPONENT_TYPES`), and
+`judge_delta` judges it under that same type. Its name is its id or
+reference (`ms-python.python`, `ghcr.io/devcontainers/features/node`,
+`github.com/psf/black`), which does not change with its version.
+
+Attributes the approved-component constraints read: `package` and
+`version` (an MCP server's package and version, or an environment
+component's id or reference and its exact `MAJOR.MINOR.PATCH` version
+with one leading `v` dropped), `digest` (an MCP server's declaration
+digest, or an environment component's `sha256:` reference), and
+`command` (a hook's or helper's command). A helper command also carries
+its `event` (`project-open`, `postCreateCommand`, a pre-commit stage),
+and an environment component the attributes its adapter recorded.
+Flags: `pinned`, `code_execution`, `bypass_mode`, `wildcard`, and
+`untrusted_input`, each `True`, `False`, or `None` when the scanner
+could not tell.
 
 An attribute value longer than the envelope accepts (512 characters) is
 dropped rather than cut: a cut command would match a pattern the full
@@ -37,7 +52,13 @@ from dataclasses import dataclass
 from controlloop.acbom.models import ACBOMDocument, Node
 from controlloop.capability.agent_authority import component_label
 from controlloop.diff.authority import AuthorityDelta, AuthorityEntry
-from controlloop.team.sanction import ApprovedEntry, Component, Judgment, judge
+from controlloop.team.sanction import (
+    ApprovedEntry,
+    Component,
+    Judgment,
+    judge,
+    parse_version,
+)
 
 COMPONENT_TYPE_BY_SUBTYPE = {
     "host": "host",
@@ -58,9 +79,78 @@ MAX_ATTRIBUTE_LENGTH = 512
 
 _FLAG_NAMES = ("pinned", "code_execution", "bypass_mode", "wildcard", "untrusted_input")
 
+#: The component type the platform files an environment `plugin` under,
+#: by its `source_type`. Any other `source_type`, including
+#: `pre-commit-dependency`, stays `plugin`.
+ENVIRONMENT_COMPONENT_TYPES = {
+    "editor-extension": "editor_extension",
+    "devcontainer-feature": "devcontainer_feature",
+    "pre-commit-hook": "pre_commit_hook",
+}
+#: Every `source_type` the environment adapters record.
+_ENVIRONMENT_SOURCE_TYPES = frozenset(
+    {*ENVIRONMENT_COMPONENT_TYPES, "pre-commit-dependency"}
+)
+#: What those adapters record, sent as recorded.
+_ENVIRONMENT_ATTRIBUTES = (
+    "source_type",
+    "extension_id",
+    "plugin_id",
+    "min_version",
+    "max_version",
+    "feature",
+    "ref",
+    "origin",
+    "registry",
+    "repository",
+    "hook_ids",
+    "dependency",
+    "recommended_only",
+)
+#: The attribute that names an environment component, in this order.
+_ENVIRONMENT_PACKAGE = ("extension_id", "plugin_id", "feature", "repository")
+
+
+def _environment_kind(node: Node) -> str | None:
+    if node.subtype != "plugin":
+        return None
+    source_type = node.attributes.get("source_type")
+    return source_type if source_type in _ENVIRONMENT_SOURCE_TYPES else None
+
+
+def _environment_package(node: Node) -> str | None:
+    if _environment_kind(node) not in ENVIRONMENT_COMPONENT_TYPES:
+        return None
+    for key in _ENVIRONMENT_PACKAGE:
+        value = node.attributes.get(key)
+        if value:
+            return value
+    return None
+
+
+def _environment_constraints(node: Node) -> dict[str, str]:
+    """`package`, `version`, and `digest` for an environment component the
+    platform files under its own type."""
+
+    package = _environment_package(node)
+    if package is None:
+        return {}
+    out = {"package": package}
+    ref = node.attributes.get("ref", "")
+    if ref.startswith("sha256:"):
+        out["digest"] = ref
+    else:
+        version = ref[1:] if ref.startswith("v") else ref
+        if parse_version(version) is not None:
+            out["version"] = version
+    return out
+
 
 def _name(node: Node, component_type: str) -> str:
     attributes = node.attributes
+    package = _environment_package(node)
+    if package is not None:
+        return package
     if component_type == "hook":
         return attributes.get("event") or node.name
     if component_type == "helper_command":
@@ -86,6 +176,19 @@ def _attributes(node: Node, component_type: str) -> dict[str, str]:
         command = attributes.get("command")
         if command:
             out["command"] = command
+    if component_type == "helper_command":
+        event = attributes.get("event")
+        if event:
+            out["event"] = event
+    if _environment_kind(node) is not None:
+        for key in (*_ENVIRONMENT_ATTRIBUTES, "package", "version", "digest"):
+            value = attributes.get(key)
+            if value:
+                out[key] = value
+        # A value already recorded wins over one derived from `ref`, as on
+        # the platform.
+        for key, value in _environment_constraints(node).items():
+            out.setdefault(key, value)
     return {
         key: value for key, value in out.items() if len(value) <= MAX_ATTRIBUTE_LENGTH
     }
@@ -111,6 +214,26 @@ def component_for(node: Node) -> Component | None:
         name=_name(node, component_type),
         attributes=_attributes(node, component_type),
         flags=_flags(node),
+    )
+
+
+def judged_component(node: Node) -> Component | None:
+    """`component_for(node)` under the type the platform judges it by: an
+    environment `plugin` under its `ENVIRONMENT_COMPONENT_TYPES` type, so
+    an organization approval of type `editor_extension` matches here as
+    it does on the platform."""
+
+    component = component_for(node)
+    if component is None:
+        return None
+    platform_type = ENVIRONMENT_COMPONENT_TYPES.get(_environment_kind(node) or "")
+    if platform_type is None:
+        return component
+    return Component(
+        type=platform_type,
+        name=component.name,
+        attributes=component.attributes,
+        flags=component.flags,
     )
 
 
@@ -144,7 +267,7 @@ def judge_delta(
         node = by_id.get(entry.node_id)
         if node is None:
             continue
-        component = component_for(node)
+        component = judged_component(node)
         if component is None:
             continue
         judged.append(
@@ -160,8 +283,10 @@ def judge_delta(
 
 __all__ = [
     "COMPONENT_TYPE_BY_SUBTYPE",
+    "ENVIRONMENT_COMPONENT_TYPES",
     "MAX_ATTRIBUTE_LENGTH",
     "DeltaJudgment",
     "component_for",
     "judge_delta",
+    "judged_component",
 ]
