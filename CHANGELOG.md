@@ -6,6 +6,19 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Dev containers and VS Code extensions are read.** `devcontainer.json`
+  (in `.devcontainer/`, one folder below it, or `.devcontainer.json`),
+  `.vscode/extensions.json`, and `*.code-workspace` files. Each editor
+  extension and devcontainer feature is a component that is pinned only
+  by an exact version or a digest, so `policy.unpinned-agent-component`
+  reports one that is added, changed, or unpinned; each lifecycle command
+  is a helper command that `policy.agent-hook-command-change` and the
+  script digest track, with `initializeCommand` marked as running on the
+  host. Nothing is installed, pulled, or resolved, and no rule changed.
+  See [Dev containers and VS Code extensions](docs/adapters/devcontainer.md).
+
 ## [0.6.3] - 2026-10-30
 
 The Action is listed on GitHub Marketplace as "ControlLoop Security", and

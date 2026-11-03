@@ -25,6 +25,7 @@ from controlloop.adapters import (
     CodexConfigAdapter,
     CrewAiAdapter,
     CursorConfigAdapter,
+    DevcontainerAdapter,
     DiscoveryAdapter,
     DiscoveryResult,
     GeminiSettingsAdapter,
@@ -315,6 +316,7 @@ PRIVACY_REQUIRED_ADAPTERS = frozenset(
         "cursor",
         "kiro",
         "roo-code",
+        "devcontainer",
     }
 )
 
@@ -1363,6 +1365,47 @@ ROO_FIXTURE = _host_fixture(
     write_privacy=_roo_write_privacy,
 )
 
+# --- Environment: dev containers and VS Code recommendations ---------------
+# Claimed by location; none of these files carries a version field. The
+# privacy case plants a credential in a lifecycle command and values in
+# the environment maps, which the adapter never reads.
+
+_DEVCONTAINER = ".devcontainer/devcontainer.json"
+
+
+def _devcontainer_extensions(extensions: list[str]) -> str:
+    return json.dumps({"customizations": {"vscode": {"extensions": extensions}}})
+
+
+def _devcontainer_write_privacy(tmp_path: Path) -> tuple[str, ...]:
+    _write_json(
+        tmp_path,
+        _DEVCONTAINER,
+        {
+            "containerEnv": {"DEPLOY_TOKEN": _ENV_VALUE},
+            "remoteEnv": {"API_HEADER": _HEADER_VALUE},
+            "postCreateCommand": _BEARER_COMMAND,
+            "initializeCommand": ["sh", "-c", f"login --token={_CREDENTIAL}"],
+        },
+    )
+    return (_CREDENTIAL, _ENV_VALUE, _HEADER_VALUE)
+
+
+DEVCONTAINER_FIXTURE = _host_fixture(
+    name="devcontainer",
+    adapter=DevcontainerAdapter,
+    path=_DEVCONTAINER,
+    positive=_devcontainer_extensions(["ms-python.python@2024.2.1"]),
+    near_miss=".devcontainer/README.md",
+    malformed="{ not valid json at all !!! ",
+    boundary=lambda count: _devcontainer_extensions(
+        [f"acme.extension-{i}@1.0.{i}" for i in range(count)]
+    ),
+    boundary_subtype="plugin",
+    positive_subtypes=["host", "plugin"],
+    write_privacy=_devcontainer_write_privacy,
+)
+
 ALL_FIXTURES: tuple[ConformanceFixture, ...] = (
     MCP_FIXTURE,
     OPENAPI_FIXTURE,
@@ -1380,4 +1423,5 @@ ALL_FIXTURES: tuple[ConformanceFixture, ...] = (
     CURSOR_FIXTURE,
     KIRO_FIXTURE,
     ROO_FIXTURE,
+    DEVCONTAINER_FIXTURE,
 )

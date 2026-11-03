@@ -20,6 +20,7 @@ from controlloop.adapters.claude_code import (
 from controlloop.adapters.claude_code import ClaudeCodeSettingsAdapter
 from controlloop.adapters.claude_code_components import ClaudeCodeComponentsAdapter
 from controlloop.adapters.crewai import CrewAiAdapter
+from controlloop.adapters.devcontainer import DevcontainerAdapter
 from controlloop.adapters.framework import (
     DetectionResult,
     DiscoveryAdapter,
@@ -57,6 +58,7 @@ ALL_ADAPTERS: tuple[type[DiscoveryAdapter], ...] = (
     CursorConfigAdapter,
     KiroConfigAdapter,
     RooModesAdapter,
+    DevcontainerAdapter,
 )
 
 #: The vendor documentation date each agent host adapter's recognized
@@ -83,6 +85,7 @@ __all__ = [
     "CrewAiAdapter",
     "CursorConfigAdapter",
     "DetectionResult",
+    "DevcontainerAdapter",
     "DiscoveryAdapter",
     "DiscoveryResult",
     "GeminiSettingsAdapter",

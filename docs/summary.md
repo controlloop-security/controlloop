@@ -32,6 +32,7 @@
   - [Roo Code](adapters/roo.md)
   - [Cline](adapters/cline.md)
   - [Agent-running workflows](adapters/agent-workflows.md)
+  - [Dev containers and VS Code extensions](adapters/devcontainer.md)
 
 ## Reference and help
 
