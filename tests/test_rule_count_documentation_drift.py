@@ -43,6 +43,14 @@ _IN_THE_PACK = re.compile(
     + r")\s+in\s+the\s+pack\b",
     re.IGNORECASE,
 )
+#: "[Policy rules](docs/reference/policy-rules.md): all 18" -- the README's
+#: documentation list, which said 18 while the pack had 24.
+_RULES_LINK = re.compile(
+    r"\bpolicy rules\b[^:\n]*:\s*all\s+(?P<count>\d+|"
+    + "|".join(_NUMBER_WORDS)
+    + r")\b",
+    re.IGNORECASE,
+)
 _VERSION_LINE = re.compile(
     r"Rule pack: controlloop-community (?P<version>\S+) \((?P<count>\d+) rules\)"
 )
@@ -60,7 +68,7 @@ def _assert_counts(text: str, label: str) -> None:
     for line in text.splitlines():
         if any(marker in line.lower() for marker in _HISTORICAL_MARKERS):
             continue
-        for pattern in (_CURRENT_COUNT, _IN_THE_PACK):
+        for pattern in (_CURRENT_COUNT, _IN_THE_PACK, _RULES_LINK):
             for match in pattern.finditer(line):
                 raw = match.group("count").lower()
                 stated = _NUMBER_WORDS.get(raw) or int(raw)
@@ -102,4 +110,7 @@ def test_the_guard_binds() -> None:
     assert _CURRENT_COUNT.search("consume all ten rules via ALL_RULES")
     assert _IN_THE_PACK.search("there are ten in the pack, run it")
     assert _CURRENT_COUNT.search("carries all 14 registered rules")
+    assert _RULES_LINK.search(
+        "- [Policy rules](docs/reference/policy-rules.md): all 18, with real output"
+    )
     assert _VERSION_LINE.search("Rule pack: controlloop-community 0.2.0 (10 rules)")

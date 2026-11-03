@@ -601,7 +601,7 @@ Start with the [documentation index](docs/readme.md).
 - [Example walkthrough](docs/guides/example-walkthrough.md): six steps with the real output of each
 - [CLI reference](docs/reference/cli.md): every command and flag
 - [Terminal report format](docs/reference/terminal-report-format.md): how to read each line
-- [Policy rules](docs/reference/policy-rules.md): all 18, with real output
+- [Policy rules](docs/reference/policy-rules.md): all 24, each with an example and its remediation
 - [Capability ceiling](docs/reference/capability-ceiling.md)
 - [Manifest schema](docs/reference/manifest-schema.md): `controlloop.yaml`
 - [Material capability taxonomy](docs/reference/material-capability-taxonomy.md)
