@@ -66,9 +66,12 @@ OpenAPI spec, an IAM policy, and, for most agents, the framework code itself:
 a CrewAI crew, a LangGraph graph, an OpenAI Agents SDK handoff chain. The same
 goes for the coding agents that work on your repository. Claude Code, Codex,
 Gemini CLI, Cursor, Kiro, Roo Code, and Cline are configured by committed
-files, and so are the workflows that run an agent in CI. No single file tells
-you that one pull request just gave an agent the ability to move money, or to
-run a script on every session start.
+files, and so are the workflows that run an agent in CI. So is the
+repository's own development environment: a dev container feature, a
+pre-commit hook, or an editor startup file runs code the moment someone opens
+the repository or commits to it. No single file tells you that one pull
+request just gave an agent the ability to move money, or to run a script on
+every session start.
 
 > **How it works.** ControlLoop walks the repository and reads only committed
 > files. Adapters turn them into an **Agent Capability Bill of Materials**
@@ -94,6 +97,7 @@ run a script on every session start.
 - 🗂️ **A2A agent cards**, **MCP server declarations** for eleven agent hosts, **OpenAPI** documents, and **AWS IAM** policies in JSON or Terraform. See [the adapter table](docs/adapters/readme.md).
 - 🧩 **Framework code**, parsed and never imported: [CrewAI](docs/adapters/readme.md), [LangGraph](docs/adapters/readme.md), and the [OpenAI Agents SDK](docs/adapters/readme.md). A tool it cannot resolve is reported as the worst reachable capability, never dropped.
 - 🤖 **Coding agents' own configuration**: [Claude Code](docs/adapters/claude-code.md) settings, hooks, skills, subagents, plugins and marketplaces; [Codex](docs/adapters/codex.md); [Gemini CLI](docs/adapters/gemini-cli.md); [Cursor](docs/adapters/cursor.md); [Kiro](docs/adapters/kiro.md); [Roo Code](docs/adapters/roo.md) and [Cline](docs/adapters/cline.md) through their MCP configuration; and the [GitHub workflows that run an agent](docs/adapters/agent-workflows.md).
+- 🧰 **Clone-time protection**: what runs when a repository is opened or committed to. [Dev container](docs/adapters/devcontainer.md) features, extensions and lifecycle commands, and VS Code extension recommendations; [pre-commit](docs/adapters/pre-commit.md) hook repositories, their dependencies, and local hooks; [editor startup files](docs/adapters/editor-startup.md) (`.nvim.lua`, `.exrc`, `.dir-locals.el`) and JetBrains required plugins. Recorded as written: nothing is installed, pulled, or run. [Examples](#clone-time-protection).
 
 ### What it tells you
 
@@ -253,8 +257,10 @@ edit nothing. They ship no hooks and start nothing when a session opens.
 
 ## Screenshots
 
-Every block in this README is real output, recorded against the public
-reference agent with the version above. Nothing is staged.
+Every block in this README is real output, recorded with the version above
+against the public reference agent or, for the
+[Clone-time protection](#clone-time-protection) examples, a two-commit
+repository holding only the file shown. Nothing is staged.
 
 **A pull request adds a tool the agent's ceiling prohibits.** The blast radius
 got worse, the ceiling breach blocks, and the evidence artifact is written:
@@ -374,6 +380,148 @@ recorded.
 ```
 
 *From `scenario/mcp-package-drift`, where `catalog-docs` moves from 1.4.2 to 1.5.0 under the same name.* The limits of what the scanner can and cannot see are in [Agent authority limits](docs/reference/agent-authority-limits.md).
+
+### Clone-time protection
+
+A repository's development environment runs code on the machine of
+whoever works in it: a dev container installs its features and runs its
+lifecycle commands when the container is built, pre-commit runs its hooks on
+every commit, and an editor can run a project startup file when the folder
+is opened. ControlLoop
+reads those files, records each entry as written, and reports a new or
+changed one, and one with no exact version or digest pin, through the same
+rules as a coding agent's configuration. Each example below is a branch
+that changes one file against `main`, gated with
+`controlloop gate . --default-branch main`.
+
+A dev container gains a feature on a floating tag and a `postCreateCommand`:
+
+```jsonc
+"features": {
+  "ghcr.io/acme-tools/features/setup:latest": {}
+},
+"postCreateCommand": "bash .devcontainer/setup.sh"
+```
+
+```text
+! WORST REACHABLE  unclassified: Dev Containers can invoke devcontainer feature
+  ghcr.io/acme-tools/features/setup
+
+✕ DEPLOYMENT BLOCKED
+
+Authority:
+  • This change gives Dev Containers the power to install plugin `devcontainer
+    feature ghcr.io/acme-tools/features/setup`, unpinned
+    (`.devcontainer/devcontainer.json`, plugin `devcontainer feature
+    ghcr.io/acme-tools/features/setup`). No approval is recorded.
+  • This change gives Dev Containers the power to run `bash
+    .devcontainer/setup.sh` through the `postCreateCommand` setting
+    (`.devcontainer/devcontainer.json`, setting `postCreateCommand`). No
+    approval is recorded.
+
+• GAINED  code-execution: Dev Containers invokes postCreateCommand command
+• GAINED  unclassified: Dev Containers invokes devcontainer feature
+  ghcr.io/acme-tools/features/setup
+
+! MEDIUM   policy.unpinned-agent-component: Added: Devcontainer feature
+  ghcr.io/acme-tools/features/setup (devcontainer-feature) has no commit or
+  digest pin.
+    at .devcontainer/devcontainer.json
+
+✕ HIGH     policy.agent-hook-command-change: Added: Setting 'postCreateCommand'
+  for host 'Dev Containers' runs `bash .devcontainer/setup.sh`.
+    at .devcontainer/devcontainer.json
+
+Suppressions: none declared
+
+Completeness enforcement: warn (default)
+Evidence: evidence.json
+```
+
+A pre-commit hook repository moves from a commit SHA to a tag
+(`rev: 25.1.0`). An unpinned component is a medium finding, reported but not
+blocking:
+
+```text
+! WORST REACHABLE  unclassified: pre-commit can invoke pre-commit hook
+  repository github.com/psf/black
+
+✓ PASSED
+
+Authority:
+  • This change gives pre-commit the power to install plugin `pre-commit hook
+    repository github.com/psf/black`, unpinned, whose source changed
+    (`.pre-commit-config.yaml`, plugin `pre-commit hook repository
+    github.com/psf/black`). No approval is recorded.
+
+• no material capability change
+
+! MEDIUM   policy.unpinned-agent-component: Pre-commit hook repository
+  github.com/psf/black changed its ref, pinned. Pre-commit hook repository
+  github.com/psf/black (pre-commit-hook) has no commit or digest pin.
+    at .pre-commit-config.yaml
+
+Suppressions: none declared
+
+Completeness enforcement: warn (default)
+Evidence: evidence.json
+```
+
+A Neovim project startup file is added. The file is recorded by path and
+SHA-256 and never parsed, so a later change to its content is reported by
+`policy.hook-script-changed`:
+
+```text
+! WORST REACHABLE  code-execution: Neovim can invoke .nvim.lua command
+
+✕ DEPLOYMENT BLOCKED
+
+Authority:
+  • This change gives Neovim the power to run `.nvim.lua` through the
+    `.nvim.lua` setting (`.nvim.lua`, setting `.nvim.lua`). No approval is
+    recorded.
+
+• GAINED  code-execution: Neovim invokes .nvim.lua command
+
+✕ HIGH     policy.agent-hook-command-change: Added: Setting '.nvim.lua' for host
+  'Neovim' runs `.nvim.lua`.
+    at .nvim.lua
+
+Suppressions: none declared
+
+Completeness enforcement: warn (default)
+Evidence: evidence.json
+```
+
+A JetBrains project requires a plugin with a minimum version and no maximum
+(`.idea/externalDependencies.xml`):
+
+```text
+• no material capability is reachable
+
+✓ PASSED
+
+Authority:
+  • This change gives JetBrains IDEs the power to install plugin `editor plugin
+    com.acme.ide-helper`, unpinned (`.idea/externalDependencies.xml`, plugin
+    `editor plugin com.acme.ide-helper`). No approval is recorded.
+
+• no material capability change
+
+! MEDIUM   policy.unpinned-agent-component: Added: Editor plugin
+  com.acme.ide-helper (editor-extension) has no commit or digest pin.
+    at .idea/externalDependencies.xml
+
+Suppressions: none declared
+
+Completeness enforcement: warn (default)
+Evidence: evidence.json
+```
+
+What each file contributes, and where each adapter stops, is in
+[Dev containers and VS Code extensions](docs/adapters/devcontainer.md),
+[pre-commit](docs/adapters/pre-commit.md), and
+[Editor startup files and JetBrains required plugins](docs/adapters/editor-startup.md).
 
 ### Tell ControlLoop what your tools do
 

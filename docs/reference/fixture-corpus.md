@@ -111,6 +111,36 @@ bounding, crash/malformed-response handling) for
 | Malformed | `test_remote_ref_is_never_fetched_and_produces_an_unknown`, `test_cyclic_local_ref_is_detected_and_does_not_hang` |
 | Version drift | `test_swagger_2_is_rejected_not_misparsed` (this file); the shared suite also carries a genuine `openapi: "4.2.0"` drift fixture (`_openapi_write_version_drift`) |
 
+**Dev containers and VS Code extensions** (`tests/adapters/test_devcontainer.py`)
+
+| Category | Test(s) |
+| --- | --- |
+| Positive | `test_only_an_exact_version_pins_an_extension`, `test_only_a_digest_or_exact_tag_pins_a_feature`, `test_string_array_and_object_forms`, `test_extensions_json_recommendations_have_no_pin_and_are_not_invoked`, `test_workspace_file_recommendations` |
+| Negative | `test_a_nested_config_is_read_and_a_deeper_one_is_not`, `test_an_image_only_file_is_silent`; the shared suite's negative fixture puts the same JSON in `.devcontainer/README.md` |
+| Malformed | `test_a_malformed_file_is_a_diagnostic`, `test_an_unexpected_shape_is_a_diagnostic_not_a_guess` |
+| Version drift | Not present — **disclosed exemption**: `devcontainer.json`, `.vscode/extensions.json`, and `*.code-workspace` carry no in-document version field to drift |
+| Existing rules | `TestExistingRulesReportTheseEntries`: unpinned extensions and floating features, a dropped pin, a recommendation, a changed or added lifecycle command, and a changed script behind one |
+
+**pre-commit** (`tests/adapters/test_pre_commit.py`)
+
+| Category | Test(s) |
+| --- | --- |
+| Positive | `test_only_a_full_commit_sha_pins_a_repository`, `test_hook_ids_are_recorded_and_meta_is_ignored`, `test_each_dependency_is_its_own_component`, `test_a_local_hook_is_a_helper_command`, `test_the_older_bare_list_form_is_read` |
+| Negative | The shared suite's negative fixture is `.pre-commit-hooks.yaml`, the file a hook repository publishes its hooks in; `repo: meta` is ignored in `test_hook_ids_are_recorded_and_meta_is_ignored` |
+| Malformed | `test_a_malformed_file_is_a_diagnostic`, `test_an_unexpected_shape_is_a_diagnostic`, `test_yaml_aliases_cannot_multiply_nodes_without_bound` |
+| Version drift | Not present — **disclosed exemption**: `.pre-commit-config.yaml` has no in-document version field (`minimum_pre_commit_version` names the tool, not the file format) |
+| Existing rules | `TestExistingRulesReportTheseEntries`: a tag against a SHA pin, a moved SHA, an unversioned dependency named in the finding, and a changed local hook or its script |
+
+**Editor startup files and JetBrains required plugins** (`tests/adapters/test_editor_startup.py`)
+
+| Category | Test(s) |
+| --- | --- |
+| Positive | `test_each_file_is_a_project_open_command_with_its_digest`, `test_exact_range_and_unbounded_plugins` |
+| Negative | `test_only_the_root_is_read`, `test_an_idea_folder_without_the_file_is_silent` |
+| Malformed | `test_unreadable_xml_is_a_diagnostic`, `test_utf16_is_refused_before_parsing`; `test_the_file_content_is_never_recorded` holds the privacy contract for startup files |
+| Version drift | Covered via the shared suite: `externalDependencies.xml` with `<project version="5">` and `version="3"` produces a diagnostic, not a misparse |
+| Existing rules | `TestExistingRulesReportTheseEntries`: an added startup file at high, a changed one by digest, required plugins by pin state, and a widened version bound |
+
 ## Node and edge type coverage
 
 All 8 `NodeType` values (`agent`,
