@@ -6,6 +6,12 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-03
+
+The same CLI as 0.7.0, released again so its container image is
+published. The 0.7.0 image was never pushed: the release's vulnerability
+scan could not download its scanner.
+
 ### Fixed
 
 - **The container image release no longer depends on `get.trivy.dev`.**
