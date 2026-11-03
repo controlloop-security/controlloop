@@ -98,8 +98,10 @@ publishing a release is always a deliberate, human act.
 10. **Publish the container image** -- only after stage 7, builds the
     image from the repository's `Dockerfile`, runs
     `scripts/container-smoke.sh` against it (non-root, no build toolchain,
-    a real scan with networking disabled), scans it with Trivy -- a
-    critical vulnerability fails the job and nothing is pushed -- then
+    a real scan with networking disabled), scans it with Trivy (a pinned
+    version from Trivy's GitHub release, checked against a recorded
+    SHA-256) -- a critical vulnerability fails the job and nothing is
+    pushed -- then
     builds the `linux/amd64` and `linux/arm64` image, pushes it to
     `ghcr.io/controlloop-security/controlloop` tagged with the exact
     version, and attests the pushed digest with the same keyless

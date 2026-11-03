@@ -95,7 +95,9 @@ and changelog gate passed:
 
 1. Build the `linux/amd64` image and run `scripts/container-smoke.sh`
    against it.
-2. Scan it for known vulnerabilities with Trivy. A critical vulnerability
+2. Scan it for known vulnerabilities with Trivy, installed from Trivy's
+   GitHub release at a pinned version and checked against a SHA-256
+   recorded in the workflow. A critical vulnerability
    with an available fix fails the job, and nothing is pushed; the remedy
    is to bump the base image digest in the `Dockerfile`. A critical
    vulnerability the distribution has no fix for (the base image carries

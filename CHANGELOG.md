@@ -6,6 +6,15 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The container image release no longer depends on `get.trivy.dev`.**
+  The vulnerability scan's own installer downloads Trivy from that host,
+  which stopped resolving during the 0.7.0 release, so the 0.7.0 image
+  was never pushed. The release now installs Trivy 0.70.0 from its
+  GitHub release, checked against a SHA-256 recorded in the workflow,
+  and the scan is unchanged.
+
 ## [0.7.0] - 2026-11-03
 
 The gate reads the files that install tools and run commands when a

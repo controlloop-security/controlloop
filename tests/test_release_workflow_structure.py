@@ -642,6 +642,34 @@ class TestPublishContainerJob:
         assert trivy["exit-code"] == "1"
         assert trivy["severity"] == "CRITICAL"
 
+    def test_installs_a_pinned_trivy_from_github_before_scanning(self) -> None:
+        """The scanner action's own installer downloads through
+        get.trivy.dev, which stopped resolving during the 0.7.0 release.
+        Trivy comes from its GitHub release instead, checked against a
+        recorded SHA-256, and the action is told not to install it."""
+        jobs = _load(_RELEASE_WORKFLOW)["jobs"]
+        steps = jobs["publish-container"]["steps"]
+        install = next(
+            i
+            for i, step in enumerate(steps)
+            if step.get("name") == "Install Trivy from its GitHub release"
+        )
+        scan = next(
+            i
+            for i, step in enumerate(steps)
+            if str(step.get("uses", "")).startswith("aquasecurity/trivy-action@")
+        )
+
+        assert install < scan
+        assert steps[scan]["with"]["skip-setup-trivy"] is True
+        env = steps[install]["env"]
+        assert re.fullmatch(r"\d+\.\d+\.\d+", env["TRIVY_VERSION"])
+        assert re.fullmatch(r"[0-9a-f]{64}", env["TRIVY_SHA256"])
+        script = steps[install]["run"]
+        assert "https://github.com/aquasecurity/trivy/releases/download/" in script
+        assert "sha256sum -c -" in script
+        assert "get.trivy.dev" not in str(jobs["publish-container"]["steps"])
+
     def test_pushes_only_an_exact_version_tag_for_both_architectures(self) -> None:
         jobs = _load(_RELEASE_WORKFLOW)["jobs"]
         push = next(

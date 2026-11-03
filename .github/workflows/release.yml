@@ -544,6 +544,26 @@ jobs:
       - name: Smoke-test the candidate image
         run: scripts/container-smoke.sh controlloop:candidate
 
+      - name: Install Trivy from its GitHub release
+        # The scanner action's own installer downloads Trivy through
+        # get.trivy.dev, which stopped resolving during the 0.7.0 release
+        # and failed this job twice. The same version comes from Trivy's
+        # GitHub release instead, checked against the SHA-256 recorded
+        # here, so this job downloads nothing outside GitHub to get it.
+        env:
+          TRIVY_VERSION: "0.70.0"
+          TRIVY_SHA256: 8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9
+        run: |
+          set -euo pipefail
+          archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${archive}"
+          echo "${TRIVY_SHA256}  $RUNNER_TEMP/$archive" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/trivy-bin"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/trivy-bin" trivy
+          echo "$RUNNER_TEMP/trivy-bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/trivy-bin/trivy" --version
+
       - name: Scan the candidate image for known vulnerabilities
         # A critical vulnerability with an available fix fails this step,
         # and the push below never runs: the fix is to bump the base
@@ -558,6 +578,8 @@ jobs:
           exit-code: "1"
           severity: CRITICAL
           ignore-unfixed: true
+          # Trivy is already on PATH from the step above.
+          skip-setup-trivy: true
 
       - name: Sign in to GHCR with the workflow's own token
         uses: docker/login-action@v4.7.0
