@@ -10,8 +10,16 @@ name: Verify
 # `uv run pytest` here is sufficient -- no separate "offline" job is needed.
 #
 # The `cli` job below runs across a real cross-platform build matrix:
-# Linux x86_64, Linux arm64, and macOS arm64 -- every combination
-# available on GitHub's standard, free-tier hosted runner fleet. macOS x86_64 (Intel) is a disclosed gap, not an oversight:
+# Linux x86_64 and Linux arm64 on GitHub's free-tier hosted runners, and
+# macOS arm64 on the maintainers' self-hosted runner (label
+# `controlloop-macos`: an Apple Silicon macOS virtual machine), because
+# GitHub's hosted macOS arm64 runners were repeatedly out of capacity. A
+# pull request from a fork is routed to GitHub's hosted `macos-26`
+# instead. That routing is in this file, which a fork's pull request can
+# change, so the repository also requires a maintainer's approval before
+# a workflow runs for an outside contributor.
+#
+# macOS x86_64 (Intel) is a disclosed gap, not an oversight:
 # every current GitHub-hosted macOS x86_64 image label is now `-large`/
 # `-intel` only (checked directly against actions/runner-images on
 # 2026-08-21), meaning free-tier macOS runners are Apple Silicon (arm64)
@@ -43,7 +51,8 @@ jobs:
             label: linux-x86_64
           - os: ubuntu-24.04-arm
             label: linux-arm64
-          - os: macos-26
+          # The self-hosted runner, except for a fork's pull request.
+          - os: ${{ github.event.pull_request.head.repo.fork && 'macos-26' || 'controlloop-macos' }}
             label: macos-arm64
     # A real, documented time budget. Recent
     # real runs completed in 30-67s wall clock on ubuntu-latest (see

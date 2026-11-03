@@ -29,6 +29,14 @@ _RELEASE_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "release.yml"
 _CI_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 _VERIFY_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "verify.yml"
 
+#: The macOS arm64 leg's runner: the maintainers' self-hosted runner,
+#: except for a pull request from a fork, which is routed to GitHub's
+#: hosted `macos-26`.
+_MACOS_RUNNER = (
+    "${{ github.event.pull_request.head.repo.fork"
+    " && 'macos-26' || 'controlloop-macos' }}"
+)
+
 #: Credentials this pipeline must never store: a Docker Hub login, a
 #: long-lived registry token, a personal token for GHCR. GHCR is reached
 #: with the workflow's own `github.token`; the Homebrew tap with the one
@@ -264,8 +272,19 @@ class TestVerifyWorkflowCrossPlatformMatrix:
         assert {(leg["os"], leg["label"]) for leg in legs} == {
             ("ubuntu-latest", "linux-x86_64"),
             ("ubuntu-24.04-arm", "linux-arm64"),
-            ("macos-26", "macos-arm64"),
+            (_MACOS_RUNNER, "macos-arm64"),
         }
+
+    def test_a_fork_pull_request_is_routed_off_the_self_hosted_runner(
+        self,
+    ) -> None:
+        """`controlloop-macos` runs on a maintainer's machine, so only
+        the repository's own branches and tags are routed to it."""
+        job = _load(_VERIFY_WORKFLOW)["jobs"]["cli"]
+        runners = [leg["os"] for leg in job["strategy"]["matrix"]["include"]]
+        self_hosted = [os for os in runners if "controlloop-macos" in os]
+
+        assert self_hosted == [_MACOS_RUNNER]
 
     def test_fail_fast_is_disabled_so_every_leg_reports(self) -> None:
         job = _load(_VERIFY_WORKFLOW)["jobs"]["cli"]
@@ -332,8 +351,8 @@ class TestReleaseWorkflowBinaryBuild:
 
     def test_matrix_reuses_the_identical_three_verify_legs(self) -> None:
         """The goal of "all four platform and architecture combinations" is
-        satisfied for the three combinations a free-tier GitHub-hosted
-        runner can actually build (see the disclosed macOS x86_64 gap);
+        satisfied for the three combinations this pipeline's runners can
+        actually build (see the disclosed macOS x86_64 gap);
         this asserts the binary-build matrix is not a fourth, independently
         maintained copy that could silently drift from `verify.yml`'s own
         matrix."""
@@ -352,7 +371,7 @@ class TestReleaseWorkflowBinaryBuild:
         assert binary_legs == {
             ("ubuntu-latest", "linux-x86_64"),
             ("ubuntu-24.04-arm", "linux-arm64"),
-            ("macos-26", "macos-arm64"),
+            (_MACOS_RUNNER, "macos-arm64"),
         }
 
     def test_fail_fast_is_disabled(self) -> None:

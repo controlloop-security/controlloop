@@ -46,6 +46,20 @@ project uses [Semantic Versioning](https://semver.org/).
   files them under, so an organization approval matches locally as it
   does on the platform. See [Team envelope](docs/reference/team-envelope.md).
 
+### Changed
+
+- **The macOS arm64 checks and standalone binary run on a self-hosted
+  runner.** GitHub's hosted macOS arm64 runners (`macos-15`, then
+  `macos-26`) were repeatedly out of capacity, so the macOS leg of every
+  check and of the release build now runs on the maintainers' runner
+  labelled `controlloop-macos`, an Apple Silicon macOS virtual machine.
+  A pull request from a fork is routed to GitHub's hosted `macos-26`,
+  and workflows for outside contributors need a maintainer's approval
+  before they run. The binary's
+  platform and architecture are unchanged; the attestation does not
+  record the self-hosted build, so
+  [Standalone binaries](docs/reference/standalone-binaries.md) states it.
+
 ## [0.6.3] - 2026-10-30
 
 The Action is listed on GitHub Marketplace as "ControlLoop Security", and

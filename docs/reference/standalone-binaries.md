@@ -28,9 +28,11 @@ its own.
 
 ## What it does, per platform/architecture leg
 
-For each of three real, free-tier GitHub-hosted runner legs -- the exact
-same three `.github/workflows/verify.yml` already tests every pull
-request on, see [Supported platforms](supported-platforms.md) -- the job:
+For each of three real runner legs -- the exact same three
+`.github/workflows/verify.yml` already tests every pull request on: two
+free-tier GitHub-hosted Linux runners and the maintainers' self-hosted
+macOS arm64 runner, see [Supported platforms](supported-platforms.md) --
+the job:
 
 1. **Builds** one single-file executable with PyInstaller
    (`release-scripts/build_binary.py`), named `controlloop-<platform>-
@@ -67,10 +69,20 @@ release pipeline already gates behind `verify`, `changelog-gate`, and
 
 | Platform | Architecture | Runner label | Built? |
 | --- | --- | --- | --- |
-| Linux | x86_64 | `ubuntu-latest` | Yes |
-| Linux | arm64 | `ubuntu-24.04-arm` | Yes |
-| macOS | arm64 (Apple Silicon) | `macos-26` | Yes |
+| Linux | x86_64 | `ubuntu-latest` (GitHub-hosted) | Yes |
+| Linux | arm64 | `ubuntu-24.04-arm` (GitHub-hosted) | Yes |
+| macOS | arm64 (Apple Silicon) | `controlloop-macos` (self-hosted) | Yes |
 | macOS | x86_64 (Intel) | -- | **No -- disclosed gap** |
+
+**The macOS arm64 binary is built on a self-hosted runner**, a macOS
+virtual machine on a maintainer's Apple Silicon Mac, because GitHub's
+hosted macOS arm64 runners were repeatedly out of capacity. The build
+runs the same workflow steps as the Linux legs, from the tagged commit,
+and its binary is checksummed and attested by the same later jobs on
+GitHub-hosted runners. The attestation proves the binary came from this
+repository's release workflow for that commit; it does not record that
+the build step ran on a self-hosted machine, which is why it is stated
+here.
 
 **macOS x86_64 (Intel) is a disclosed gap, not an oversight**, for the
 identical reason [Supported platforms](supported-platforms.md) already

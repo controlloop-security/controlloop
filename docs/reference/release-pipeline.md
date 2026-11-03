@@ -153,7 +153,13 @@ the cause and re-run only that job; nothing earlier needs to run again.
   binaries](standalone-binaries.md) and [Release
   verification](release-verification.md) for the full disclosure.
 - **No local or developer-machine publication of any kind.** Every step
-  above runs only on GitHub-hosted Actions runners.
+  above runs as a GitHub Actions job from the tagged commit, and every
+  publishing, attesting, and signing-in step runs on a GitHub-hosted
+  runner. One build step does not: the macOS arm64 leg of `verify` and
+  `build-binaries` runs on the maintainers' self-hosted runner
+  (`controlloop-macos`, a macOS virtual machine), because GitHub's
+  hosted macOS arm64 runners were repeatedly out of capacity. See
+  [Supported platforms](supported-platforms.md).
 
 ## Version consistency
 

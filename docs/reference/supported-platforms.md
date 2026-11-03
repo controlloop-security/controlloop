@@ -19,14 +19,26 @@ repository's own CI does not actually run.
 
 The full verified command surface (`uv sync --locked --all-groups`,
 formatting, lint, type checking, the whole `pytest` suite, and `uv build`)
-runs on all three of these real GitHub-hosted runner legs, via
+runs on all three of these real runner legs, via
 `.github/workflows/verify.yml`'s own build matrix:
 
-| Platform | Architecture | Runner label |
-| --- | --- | --- |
-| Linux | x86_64 | `ubuntu-latest` |
-| Linux | arm64 | `ubuntu-24.04-arm` |
-| macOS | arm64 (Apple Silicon) | `macos-26` |
+| Platform | Architecture | Runner label | Runner |
+| --- | --- | --- | --- |
+| Linux | x86_64 | `ubuntu-latest` | GitHub-hosted |
+| Linux | arm64 | `ubuntu-24.04-arm` | GitHub-hosted |
+| macOS | arm64 (Apple Silicon) | `controlloop-macos` | Self-hosted |
+
+GitHub's hosted macOS arm64 runners (`macos-15`, then `macos-26`) were
+repeatedly out of capacity, so the macOS leg runs on the maintainers'
+self-hosted runner: an Apple Silicon macOS virtual machine with no access
+to its host's files and no access to the host's local network. The
+repository's own branches and release tags run there. A pull request
+from a fork is routed to GitHub's hosted `macos-26` instead. Because a
+fork's pull request runs its own copy of the workflow files and could
+change that routing, the repository also requires a maintainer's
+approval before any workflow runs for an outside contributor; check a
+fork's workflow changes before approving it. The macOS leg runs only
+while that runner is online; otherwise it waits in the queue.
 
 A failure on any one of these legs fails that leg's own check and blocks
 merge -- `fail-fast` is disabled so every leg reports independently rather

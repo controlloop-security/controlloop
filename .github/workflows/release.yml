@@ -164,11 +164,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The same three real, free-tier GitHub-hosted legs
-        # `.github/workflows/verify.yml` already tests on, not a fourth
-        # invented one. The goal is all four platform and architecture
-        # combinations (Linux/macOS x x86_64/arm64); macOS x86_64 is a
-        # disclosed, deliberate gap here for the identical
+        # The same three legs `.github/workflows/verify.yml` already
+        # tests on, not a fourth invented one: two free-tier
+        # GitHub-hosted Linux runners and the maintainers' self-hosted
+        # macOS arm64 runner (`controlloop-macos`). A release is a tag
+        # push, never a fork's pull request, so the macOS leg always
+        # builds on the self-hosted runner. The goal is all four
+        # platform and architecture combinations (Linux/macOS x
+        # x86_64/arm64); macOS x86_64 is a disclosed, deliberate gap
+        # here for the identical
         # reason `verify.yml` and `docs/reference/supported-platforms.md`
         # already document for testing: every current free-tier
         # GitHub-hosted macOS runner is Apple Silicon (arm64) only, and
@@ -185,7 +189,7 @@ jobs:
             label: linux-arm64
             platform: linux
             arch: arm64
-          - os: macos-26
+          - os: ${{ github.event.pull_request.head.repo.fork && 'macos-26' || 'controlloop-macos' }}
             label: macos-arm64
             platform: macos
             arch: arm64
