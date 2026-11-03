@@ -6,6 +6,27 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-03
+
+The gate reads the files that install tools and run commands when a
+repository is opened or committed to: dev containers, VS Code extension
+lists, pre-commit configuration, editor startup files, and JetBrains
+required plugins. The existing rules report them, with no new rule id.
+
+### Upgrading
+
+- **A committed baseline from 0.6.x has none of these components**, so
+  the first scan against it reports each one as added, at medium
+  severity when it is not pinned. Re-record the baseline with 0.7.0.
+  With no committed baseline, the gate scans the merge-base with the
+  same version, so only components a change adds or changes are
+  reported; a pre-commit `rev` moved to a new tag is one of those.
+- **On Team, an approval of type `plugin` no longer covers editor
+  extensions, devcontainer features, or pre-commit hook repositories.**
+  They are judged as `editor_extension`, `devcontainer_feature`, and
+  `pre_commit_hook`, as the platform files them, so approve them under
+  those types. pre-commit dependencies stay `plugin`.
+
 ### Added
 
 - **Dev containers and VS Code extensions are read.** `devcontainer.json`
@@ -55,9 +76,8 @@ project uses [Semantic Versioning](https://semver.org/).
   labelled `controlloop-macos`, an Apple Silicon macOS virtual machine.
   A pull request from a fork is routed to GitHub's hosted `macos-26`,
   and workflows for outside contributors need a maintainer's approval
-  before they run. The binary's
-  platform and architecture are unchanged; the attestation does not
-  record the self-hosted build, so
+  before they run. The binary's platform and architecture are
+  unchanged; the attestation does not record the self-hosted build, so
   [Standalone binaries](docs/reference/standalone-binaries.md) states it.
 
 ## [0.6.3] - 2026-10-30

@@ -65,9 +65,10 @@ _GOLDEN_VERDICT = "passed"
 # And for 0.6.0 -> 0.6.1.
 # And for 0.6.1 -> 0.6.2.
 # And for 0.6.2 -> 0.6.3.
+# And for 0.6.3 -> 0.7.0.
 # Stable across 3 repeated local runs before being recorded.
 _GOLDEN_DIGEST = (
-    "sha256:cc02a7654685fa5b953fb1f72d852c40fe7d861c0de431784198d7222678d5d0"
+    "sha256:3dc2e405c21bc0a69a40467c243b09bc952b2f7386172f5f79fa5874035a6c67"
 )
 
 

@@ -13,8 +13,8 @@ updated: 2026-10-30
 
 **The GitHub Action is listed on GitHub Marketplace** as
 [ControlLoop Security](https://github.com/marketplace/actions/controlloop-security),
-from release `v0.6.3`. It works from any workflow
-(`uses: controlloop-security/controlloop@v0.6.3`); the listing makes it
+from release `v0.7.0`. It works from any workflow
+(`uses: controlloop-security/controlloop@v0.7.0`); the listing makes it
 discoverable from Marketplace search. This page
 records what is prepared and the steps a maintainer takes to publish it.
 
@@ -45,7 +45,7 @@ releases for `controlloop-security/controlloop`. It is public, and the
 listing stays up until a maintainer removes it.
 
 1. Open the release to list, for example
-   `https://github.com/controlloop-security/controlloop/releases/tag/v0.6.3`,
+   `https://github.com/controlloop-security/controlloop/releases/tag/v0.7.0`,
    and choose **Edit** (for a new release, start from **Draft a new
    release**).
 2. Under **Release action**, check **Publish this Action to the GitHub
@@ -82,7 +82,7 @@ own. (A `vMAJOR` tag like `v1` has no dot, so it could never match this
 workflow's own `v*.*.*` trigger glob and re-trigger a release -- but the
 invariant is broader than self-triggering risk, so it is kept intact.)
 
-Release tags `v0.1.1` through `v0.6.3` exist (`v0.6.1` was tagged but
+Release tags `v0.1.1` through `v0.7.0` exist (`v0.6.1` was tagged but
 never published). No floating tag exists yet,
 and none is needed before 1.0: during `0.x` every minor release may
 change behavior, so consumers should pin an exact tag. From `v1.0.0` on,
