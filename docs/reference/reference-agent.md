@@ -522,6 +522,17 @@ change that must not fail.
 | `scenario/agent-workflow-id-token` | The review workflow gets `id-token: write` and `--dangerously-skip-permissions` | Deployment blocked | `policy.overprivileged-agent-workflow` (high) |
 | `scenario/pinned-plugin-added` | A plugin pinned to a commit is listed in the team marketplace | Passed | `policy.unpinned-agent-component` (low, pinned) |
 
+Two more branches cover Clone-time protection, the files that install
+tools and run scripts every time the repository is opened or committed
+to. `main` also holds a `.pre-commit-config.yaml` with one hook
+repository pinned to a full commit SHA, and the pre-commit branch starts
+from the commit that added it, so the gate sees the `rev` move.
+
+| Branch | The change | Recorded verdict | Rule that fired |
+| --- | --- | --- | --- |
+| `scenario/devcontainer-extension-added` | A new `.devcontainer/devcontainer.json` auto-installs an extension with no `@version` and runs `node .devcontainer/post-create.js` as its `postCreateCommand` | Deployment blocked | `policy.agent-hook-command-change` (high), `policy.unpinned-agent-component` (medium) |
+| `scenario/pre-commit-rev-moved` | The hook repository's `rev` moves from a commit SHA to the tag `v2.4.0` | Passed | `policy.unpinned-agent-component` (medium); a repository with `severity_threshold = "medium"` blocks it |
+
 The hook branch's recorded authority statement is the target sentence:
 
 ```text
@@ -540,7 +551,7 @@ Each branch commits `expected/<scenario>.json`, recorded from a real
 `controlloop gate` run. Besides the verdict, exit code, and blast radius,
 these assert `rules_fired` and the exact `authority_statements`, which
 [the assertion script](../../action-scripts/assert_scenario_expectations.py)
-reads from the SARIF document's `authorityDelta`. The five rows are in
+reads from the SARIF document's `authorityDelta`. The seven rows are in
 the [reference-scenario workflow](#end-to-end-proof-in-ci). That
 workflow runs the published Action from `main`, so these rows pass only
 once the rules they assert are merged there.

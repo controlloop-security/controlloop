@@ -28,11 +28,16 @@ name: Reference scenario proof
 # here, because nothing produces that edge yet. The `scenario` matrix is
 # the single place to add one -- a data change, not a rewrite.
 #
-# Five agent-configuration scenarios run on
+# Seven agent-configuration scenarios run on
 # `scenarios/storefront-agent-config`, one branch each: four incident
 # patterns that must block, and a pinned plugin that must pass. They
 # assert the rules that fired and the authority statements too, so they
-# need a published Action that includes the agent-authority rules.
+# need a published Action that includes the agent-authority rules. Two
+# more are Clone-time protection: a dev container that installs an
+# unpinned extension and runs a postCreateCommand must block, and a
+# pre-commit hook repository moved from a commit SHA to a tag passes at
+# the default threshold with a medium unpinned finding. Both need a
+# published Action that reads dev containers and pre-commit configs.
 #
 # Three Team scenarios run on the same storefront: a sanctioned grant
 # that passes, an unsanctioned one that requires review (exit 3), and no
@@ -214,6 +219,26 @@ jobs:
             expect-blocked: false
             guard-file: scenarios/storefront-agent-config/.claude-plugin/marketplace.json
             guard-text: "release-notes-plugin"
+
+          - name: Dev container installs an unpinned extension and runs a command
+            id: devcontainer-extension-added
+            branch: scenario/devcontainer-extension-added
+            expected: scenarios/storefront-agent-config/expected/devcontainer-extension-added.json
+            path: scenarios/storefront-agent-config
+            run: blocking_run
+            expect-blocked: true
+            guard-file: scenarios/storefront-agent-config/.devcontainer/devcontainer.json
+            guard-text: "widgetworks-example.storefront-tools"
+
+          - name: Pre-commit hook repository moved from a commit to a tag
+            id: pre-commit-rev-moved
+            branch: scenario/pre-commit-rev-moved
+            expected: scenarios/storefront-agent-config/expected/pre-commit-rev-moved.json
+            path: scenarios/storefront-agent-config
+            run: pass_run
+            expect-blocked: false
+            guard-file: scenarios/storefront-agent-config/.pre-commit-config.yaml
+            guard-text: "rev: v2.4.0"
 
           - name: Team gate passes a sanctioned grant
             id: team-sanctioned-grant
